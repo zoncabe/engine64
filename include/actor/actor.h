@@ -31,6 +31,9 @@ typedef struct {
 	float jump_minimum_speed;
 	float jump_timer_max;
 
+	float gravity;
+	float fall_max_speed;
+
 } ActorMotionSettings;
 
 typedef struct {

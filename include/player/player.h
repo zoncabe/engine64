@@ -1,7 +1,7 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 
-#define PLAYER_COUNT 1
+#define PLAYER_COUNT 2
 
 typedef struct {
 

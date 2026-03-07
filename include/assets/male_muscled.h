@@ -2,9 +2,7 @@
 #define MALE_MUSCLED_H
 
 #define male_muscled_model "rom:/models/male_muscled.t3dm"
-#define micey_model "rom:/models/micey.t3dm"
 #define gorilla_model "rom:/models/gorilla.t3dm"
-#define girl_model "rom:/models/girl.t3dm"
 
 // motion settings
 
@@ -23,6 +21,9 @@
 
 #define MALE_MUSCLED_JUMP_FORCE_MULTIPLIER 3000
 #define MALE_MUSCLED_JUMP_MINIMUM_SPEED 400
+
+#define MALE_MUSCLED_GRAVITY -1800
+#define MALE_MUSCLED_FALL_MAX_SPEED 1000
 
 
 // convertion ratio between locomotion animation lenghts

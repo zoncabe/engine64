@@ -50,7 +50,7 @@ int main()
 	{
 
 		time_update();
-		timer.delta *= 1.8;
+		//timer.delta *= 1.8;
 
 		player_setControllerData();
 		

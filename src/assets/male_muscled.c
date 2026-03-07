@@ -27,10 +27,13 @@ ActorMotionSettings male_muscled_motion_settings = {
     .roll_change_grip_time = MALE_MUSCLED_RUN_TO_ROLLING_ANIM_GRIP,
     .roll_timer_max = MALE_MUSCLED_RUN_TO_ROLLING_ANIM_LENGHT,
 
+    .jump_timer_max = MALE_MUSCLED_JUMP_ANIM_AIR,
+    
     .jump_force_multiplier = MALE_MUSCLED_JUMP_FORCE_MULTIPLIER,  
     .jump_minimum_speed = MALE_MUSCLED_JUMP_MINIMUM_SPEED,
 
-    .jump_timer_max = MALE_MUSCLED_JUMP_ANIM_AIR,
+    .gravity = MALE_MUSCLED_GRAVITY,
+    .fall_max_speed = MALE_MUSCLED_FALL_MAX_SPEED,
 };    
     
 

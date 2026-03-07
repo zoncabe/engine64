@@ -40,17 +40,15 @@ void actorMotion_setJumpAcceleration(RigidBody* body, float target_speed, float 
 
 void actorMotion_integrate (RigidBody* body, ActorMotionData* motion_data, ActorMotionSettings* motion_settings, ActorStateData* state)
 {
-    if (body->acceleration.x != 0 || body->acceleration.y != 0 || body->acceleration.z != 0){
-        vector3_addScaledVector(&body->velocity, &body->acceleration, timer.delta);
-    }
+    if (body->acceleration.x != 0 || body->acceleration.y != 0 || body->acceleration.z != 0) vector3_addScaledVector(&body->velocity, &body->acceleration, timer.delta);
 
-	if (fabs(body->velocity.x) < 5 && fabs(body->velocity.y) < 5 && fabs(body->velocity.z) == 0){
+	if (fabs(body->velocity.x) < LOCOMOTION_MIN_SPEED && fabs(body->velocity.y) < LOCOMOTION_MIN_SPEED && fabs(body->velocity.z) == 0){
 		body->velocity.x = 0;
 		body->velocity.y = 0;
+        motion_data->horizontal_speed = 0;
 	}
 
-    if (body->velocity.x != 0 || body->velocity.y != 0 || body->velocity.z != 0) 
-        vector3_addScaledVector(&body->position, &body->velocity, timer.delta);
+    if (body->velocity.x != 0 || body->velocity.y != 0 || body->velocity.z != 0) vector3_addScaledVector(&body->position, &body->velocity, timer.delta);
 
     if (body->velocity.x != 0 || body->velocity.y != 0) {
 
@@ -76,36 +74,6 @@ void actorMotion_integrate (RigidBody* body, ActorMotionData* motion_data, Actor
 void actorMotion_setIdle(RigidBody* body, ActorMotionData* motion_data, ActorMotionSettings* motion_settings)
 {
     actorMotion_setStopingAcceleration(body, motion_settings);
-    
-    if  (fabs(body->velocity.x) < 1 && fabs(body->velocity.y) < 1){
-        vector3_init(&body->velocity);
-        motion_data->horizontal_speed = 0;
-    }
-}
-
-void actorMotion_setlocomotion(RigidBody* body, ActorMotionData* motion_data, ActorStateData* state, ActorMotionSettings* motion_settings)
-{
-    switch (state->current) {
-
-        case WALKING: {
-
-            actorMotion_setHorizontalAcceleration (body, motion_data, motion_data->horizontal_target_speed, motion_settings->walk_acceleration_rate);
-
-            break;
-        }
-        case RUNNING: {
-
-            actorMotion_setHorizontalAcceleration (body, motion_data, motion_data->horizontal_target_speed, motion_settings->run_acceleration_rate);
-
-            break;
-        }
-        case SPRINTING: {
-            
-            actorMotion_setHorizontalAcceleration (body, motion_data, motion_data->horizontal_target_speed * 1.333333f, motion_settings->sprint_acceleration_rate);
-
-            break;
-        }
-    }
 }
 
 void actorMotion_setWalking(RigidBody* body, ActorMotionData* motion_data, ActorMotionSettings* motion_settings)
@@ -166,7 +134,7 @@ void actorMotion_setJump(RigidBody* body, ActorMotionData* motion_data, ActorMot
         vector3_scale(&body->velocity, 0.8f);
 
         body->velocity.z = motion_data->jump_force * motion_settings->jump_force_multiplier;
-        if (body->velocity.z < JUMP_MINIMUM_SPEED) body->velocity.z = JUMP_MINIMUM_SPEED;
+        if (body->velocity.z < motion_settings->jump_minimum_speed) body->velocity.z = motion_settings->jump_minimum_speed;
 
         motion_data->jump_force = 0;
     }
@@ -175,12 +143,12 @@ void actorMotion_setJump(RigidBody* body, ActorMotionData* motion_data, ActorMot
 
         motion_data->jump_timer += timer.delta;
                 
-        body->acceleration.z = PLAYER_GRAVITY;
+        body->acceleration.z = motion_settings->gravity;
     }
     
     else {
         
-        body->acceleration.z = PLAYER_GRAVITY;
+        body->acceleration.z = motion_settings->gravity;
         motion_data->jump_timer = 0;
         
         actor_setState(state, FALLING);
@@ -192,8 +160,8 @@ void actorMotion_setFalling(RigidBody* body, ActorMotionData* motion_data, Actor
 {
     motion_data->grounded = 0;
     actorMotion_setHorizontalAcceleration (body, motion_data, motion_data->horizontal_speed, motion_settings->aerial_control_rate);
-    body->acceleration.z = PLAYER_GRAVITY;
-    if (body->velocity.z > FALL_MAX_SPEED) body->velocity.z = FALL_MAX_SPEED;
+    body->acceleration.z = motion_settings->gravity;
+    if (body->velocity.z > motion_settings->fall_max_speed) body->velocity.z = motion_settings->fall_max_speed;
 
     if (body->position.z <= motion_data->grounding_height + 10) {
 

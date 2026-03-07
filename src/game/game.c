@@ -48,7 +48,7 @@ void game_init()
 
 	menu_init();
 	
-	game.state = GAMEPLAY;
+	game.state = INTRO;
 }
 
 void game_close()
