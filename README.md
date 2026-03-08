@@ -12,7 +12,7 @@ Then run make from the main folder and pray!
 hit the [N64brew Discord](https://discord.gg/r86zSRwDDY) for more<br/>
 
 
-download the latest build on [itch.io](https://zoncabe.itch.io/engine64)<br/>
+[download](engine64/purchase?popup=1) the latest build on the [itch.io] page for the project(https://zoncabe.itch.io/engine64)<br/>
 
 ##
 
