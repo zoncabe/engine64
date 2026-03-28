@@ -72,6 +72,7 @@ ActorAnimationSettings male_muscled_animation_settings = {
         .jump_footing_speed = MALE_MUSCLED_JUMP_FOOTING_SPEED,
 
         .land_anim_length = MALE_MUSCLED_LAND_ANIM_LENGTH,
+        .land_anim_crouch = MALE_MUSCLED_LAND_ANIM_CROUCH,
         .land_anim_ground = MALE_MUSCLED_LAND_ANIM_GROUND,
         .land_anim_stand = MALE_MUSCLED_LAND_ANIM_STAND,
     },

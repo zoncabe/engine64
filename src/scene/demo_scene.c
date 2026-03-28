@@ -39,9 +39,9 @@ void demoScene_init()
 	player[0]->actor.body.position =(Vector3){-210.0f, -210.0f, 0.0f};
 	player[0]->actor.body.rotation.z = 200;
 	
-	player[1] = player_create(gorilla_model, &male_muscled_motion_settings, &male_muscled_animation_settings);
-	player[1]->actor.body.position =(Vector3){210.0f, 500.0f, 0.0f};
-	player[1]->actor.body.rotation.z = 20;
+	//player[1] = player_create(gorilla_model, &male_muscled_motion_settings, &male_muscled_animation_settings);
+	//player[1]->actor.body.position =(Vector3){210.0f, 500.0f, 0.0f};
+	//player[1]->actor.body.rotation.z = 20;
 	
 
 	scenery[0] = scenery_create("rom:/models/room.t3dm");

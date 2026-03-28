@@ -53,7 +53,7 @@ void playerControl_setRoll(Player* player)
     }
 }
 
-void playerControl_moveWithStick(Player* player, float camera_angle_around, float camera_offset_angle)
+void playerControl_setLocomotionWithStick(Player* player, float camera_angle_around, float camera_offset_angle)
 {
     int deadzone = 6;
     float stick_magnitude = 0; 
@@ -94,7 +94,7 @@ void player_setActorControl(Player* player)
 {
     playerControl_setRoll(player);
     playerControl_setJump(player);
-    playerControl_moveWithStick(player, viewport.camera.angle_around_barycenter, viewport.camera.offset_angle);
+    playerControl_setLocomotionWithStick(player, viewport.camera.angle_around_barycenter, viewport.camera.offset_angle);
 }
 
 void playerControl_setPauseState(Player* player)

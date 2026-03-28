@@ -24,6 +24,7 @@ changes the camera variables depending on controller input*/
 void cameraControl_orbitWithStick(Camera *camera, ControllerData *controller)
 {
     int deadzone = 8;
+    float sensitivity = 1.8f;
     float stick_x = 0;
     float stick_y = 0;
 
@@ -38,8 +39,8 @@ void cameraControl_orbitWithStick(Camera *camera, ControllerData *controller)
     }
     
     else if (stick_x != 0 || stick_y != 0) {
-        camera->orbitational_target_velocity.y = stick_y;
-        camera->orbitational_target_velocity.x = stick_x;
+        camera->orbitational_target_velocity.y = stick_y * sensitivity;
+        camera->orbitational_target_velocity.x = stick_x * sensitivity;
     }
 }
 

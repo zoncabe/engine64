@@ -57,10 +57,10 @@ void actor_init(Actor *actor, ActorMotionSettings* motion_settings, ActorAnimati
 			.previous = 0,
 			
 			.locomotion_blending_ratio = 0.0f,
-			.action_blending_ratio = 0.0f,
 			.jump_blending_ratio = 0.0f,
+			.land_blending_ratio = 0.0f,
 			.roll_blending_ratio = 0.0f,
-			.footing_blending_ratio = 0.5f,
+			.footing_phase = 0.5f,
 
 			.speed = 0.0f,
 		},

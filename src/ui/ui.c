@@ -63,6 +63,10 @@ void ui_init()
 void ui_drawDebugData()
 {
     //rdpq_text_printf(NULL, DROID_SANS, 270, 20, "%d FPS", (int)(timer.rate));
+
+    rdpq_text_printf(NULL, DROID_SANS, 10, 20, "land weight %f", player[0]->actor.animation.data.land_blending_ratio);
+    rdpq_text_printf(NULL, DROID_SANS, 10, 30, "jump weight %f", player[0]->actor.animation.data.jump_blending_ratio);
+    rdpq_text_printf(NULL, DROID_SANS, 10, 40, "is jumping %d", player[0]->actor.animation.jump.jump_left.isPlaying);
 }
 
 void ui_drawSlidingTransition(float progress, float r, float g, float b, uint8_t direction)

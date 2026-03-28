@@ -7,12 +7,12 @@ This project is being made using the open source SDK [Libdragon](https://github.
 
 I only tested on lubuntu 24.04.2.<br/>
 You need to install [Libdragon](https://github.com/DragonMinded/libdragon/wiki/Installing-libdragon) and [Tiny3D](https://github.com/HailToDodongo/tiny3d/blob/main/README.md) on your machine, follow their guides on the links.<br/>
-Then run make from the main folder and pray!
+Then run make from the main folder and it should compile.
+
+download the latest build on the [itch.io](https://zoncabe.itch.io/engine64) page<br/>
+
 
 hit the [N64brew Discord](https://discord.gg/r86zSRwDDY) for more<br/>
-
-
-download the latest build on the [itch.io](https://zoncabe.itch.io/engine64) page for the project<br/>
 
 ##
 

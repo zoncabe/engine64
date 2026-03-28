@@ -11,7 +11,6 @@
 
 // function prototypes
 
-
 void actor_setMotion(Actor* actor);
 
 #endif

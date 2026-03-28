@@ -2,6 +2,8 @@
 #define ACTOR_H
 
 
+#define ANIMATION_BUFFER_COUNT 6
+
 typedef struct {
 
 	uint8_t current;
@@ -73,12 +75,11 @@ typedef struct {
 
 } ActorMotion;
 
-typedef struct{
+typedef struct {
 
-	T3DSkeleton main;
-	T3DSkeleton blend;
-	T3DSkeleton blend2;
-
+    T3DSkeleton main;
+    T3DSkeleton buffer[ANIMATION_BUFFER_COUNT];
+	
 } ActorArmature;
 
 typedef struct {
@@ -155,6 +156,7 @@ typedef struct {
 
     float land_anim_length;
     float land_anim_ground;
+    float land_anim_crouch;
     float land_anim_stand;
 
 } ActorAnimationJumpSettings;
@@ -187,10 +189,10 @@ typedef struct {
 	uint8_t previous;
 	
 	float locomotion_blending_ratio;
-	float action_blending_ratio;
 	float jump_blending_ratio;
+	float land_blending_ratio;
 	float roll_blending_ratio;
-	float footing_blending_ratio;
+	float footing_phase;
 	float speed;
 
 } ActorAnimationData;
