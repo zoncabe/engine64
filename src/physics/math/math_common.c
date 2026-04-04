@@ -77,3 +77,24 @@ inline bool isfinite(float x)
 {
     return (x == x) && (x != INFINITY) && (x != -INFINITY);
 }
+
+/* wrap angle to [-180, 180) */
+inline float angle_wrap(float angle)
+{
+    while (angle >  180.0f) angle -= 360.0f;
+    while (angle <= -180.0f) angle += 360.0f;
+    return angle;
+}
+
+/* wrap angle to the [-180, 180) range relative to a reference angle */
+inline float angle_wrap_relative(float angle, float reference)
+{
+    while (angle >  reference + 180.0f) angle -= 360.0f;
+    while (angle <= reference - 180.0f) angle += 360.0f;
+    return angle;
+}
+
+inline float lerpf(float a, float b, float t)
+{
+    return a + t * (b - a);
+}

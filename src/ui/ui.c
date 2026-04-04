@@ -1,148 +1,104 @@
-#include <t3d/t3dskeleton.h>
+#include <libdragon.h>
 #include <t3d/t3danim.h>
 
 #include "../../include/time/time.h"
 #include "../../include/physics/physics.h"
-#include "../../include/control/control.h"
 #include "../../include/actor/actor.h"
-#include "../../include/ui/ui.h"
-#include "../../include/ui/menu.h"
-#include "../../include/player/player.h"
-#include "../../include/light/lighting.h"
-#include "../../include/graphics/font.h"
-#include "../../include/camera/camera.h"
-#include "../../include/viewport/viewport.h"
 #include "../../include/scene/scenery.h"
-#include "../../include/game/game.h"
-#include "../../include/graphics/shapes.h"
+#include "../../include/graphics/font.h"
 #include "../../include/graphics/sprites.h"
+#include "../../include/graphics/shapes.h"
+#include "../../include/render/render.h"
+#include "../../include/game/game.h"
+#include "../../include/ui/menu.h"
+#include "../../include/ui/ui.h"
 
 
-#define MAIN_MENU_SPRITE_COUNT  11
-Sprite main_menu_sprites[MAIN_MENU_SPRITE_COUNT] = {
-    { .path = "rom:/textures/play.ia8.sprite",    .position = {45, 125},  .rotation = 0.0f, .scale = {0.34f, 0.34f} },  // 2 play
-    { .path = "rom:/textures/options.ia8.sprite", .position = {45, 150},  .rotation = 0.0f, .scale = {0.30f, 0.30f} },  // 3 options
-    { .path = "rom:/textures/credits.ia8.sprite", .position = {45, 175},  .rotation = 0.0f, .scale = {0.30f, 0.30f} },  // 4 credits
-    
-    { .path = "rom:/textures/not_a.ia8.sprite",   .position = {41,  18},  .rotation = 0.0f, .scale = {0.65f, 0.65f} },  // 0 not_a
-    { .path = "rom:/textures/game.ia8.sprite",    .position = {39,  55},  .rotation = 0.0f, .scale = {0.45f, 0.45f} },  // 1 game
-    { .path = "rom:/textures/move.ia8.sprite",    .position = {65, 217},  .rotation = 0.0f, .scale = {0.32f, 0.32f} },  // 5 move
-    { .path = "rom:/textures/select.ia8.sprite",  .position = {115, 215}, .rotation = 0.0f, .scale = {0.32f, 0.32f} },  // 6 select
-    { .path = "rom:/textures/AButton.sprite",     .position = {102, 216}, .rotation = 0.0f, .scale = {0.60f, 0.60f} },  // 7 abutton
-    { .path = "rom:/textures/DUp.sprite",         .position = {43, 217},  .rotation = 0.0f, .scale = {0.48f, 0.48f} },  // 8 dup
-    { .path = "rom:/textures/DDown.sprite",       .position = {53, 217},  .rotation = 0.0f, .scale = {0.48f, 0.48f} },  // 9 ddown
-    { .path = "rom:/textures/gorilla.rgba32.sprite", .position = {170, 0}, .rotation = 0.0f, .scale = {1.0f, 1.0f} },  // 10 gorilla
+static const rdpq_textparms_t h14_parms = { .char_spacing = 0.95f };
+static const rdpq_textparms_t h20_parms = { .char_spacing = 0.7f  };
+static const rdpq_textparms_t h40_parms = { .char_spacing = 0.0f  };
+
+static RenderContext main_menu_screen = {
+    .element = {
+        [0]  = { DRAW_RECTANGLE, .rectangle = { COLOR_GRADIENT, { 0.0f, 0.0f }, { 320.0f, 240.0f }, .gradient = { RGBA32(201, 121, 25, 255), RGBA32(223, 175, 117, 255), RGBA32(223, 175, 117, 255), RGBA32(201, 121, 25, 255) } } },
+        [1]  = { DRAW_TEXT,      .text      = { HEADLINER_40, MENU_STYLE_NORMAL, {  43.0f,  55.0f }, "not a",   &h40_parms } },
+        [2]  = { DRAW_TEXT,      .text      = { HEADLINER_40, MENU_STYLE_NORMAL, {  43.0f,  98.0f }, "GAME",    &h40_parms } },
+        [3]  = { DRAW_TEXT,      .text      = { HEADLINER_20, MENU_STYLE_NORMAL, {  45.0f, 137.0f }, "Play",    &h20_parms } },
+        [4]  = { DRAW_TEXT,      .text      = { HEADLINER_20, MENU_STYLE_NORMAL, {  45.0f, 162.0f }, "Options", &h20_parms } },
+        [5]  = { DRAW_TEXT,      .text      = { HEADLINER_20, MENU_STYLE_NORMAL, {  45.0f, 187.0f }, "Credits", &h20_parms } },
+        [6]  = { DRAW_TEXT,      .text      = { HEADLINER_14, 0,                 {  65.0f, 225.0f }, "Move",    &h14_parms } },
+        [7]  = { DRAW_TEXT,      .text      = { HEADLINER_14, 0,                 { 115.0f, 225.0f }, "Select",  &h14_parms } },
+        [8]  = { DRAW_SPRITE,    .sprite    = { SPR_BTN_A,   { 102.0f, 216.0f }, { 0.60f, 0.60f } } },
+        [9]  = { DRAW_SPRITE,    .sprite    = { SPR_D_UP,    {  43.0f, 217.0f }, { 0.48f, 0.48f } } },
+        [10] = { DRAW_SPRITE,    .sprite    = { SPR_D_DOWN,  {  53.0f, 217.0f }, { 0.48f, 0.48f } } },
+        [11] = { DRAW_SPRITE,    .sprite    = { SPR_GORILLA, { 170.0f,   0.0f }, { 1.0f,  1.0f  } } },
+    },
+    .element_count = 12,
 };
 
-#define PAUSE_SPRITE_COUNT      10
-Sprite pause_sprites[PAUSE_SPRITE_COUNT] = {
-    { .path = "rom:/textures/continue.ia8.sprite", .position = {45,  40},  .rotation = 0.0f, .scale = {0.33f, 0.33f} },  // 0 kontinue
-    { .path = "rom:/textures/options.ia8.sprite",  .position = {45,  70},  .rotation = 0.0f, .scale = {0.30f, 0.30f} },  // 1 options
-    { .path = "rom:/textures/quit.ia8.sprite",     .position = {45, 100},  .rotation = 0.0f, .scale = {0.30f, 0.30f} },  // 2 quit
-    
-    { .path = "rom:/textures/move.ia8.sprite",     .position = {0,  187},  .rotation = 0.0f, .scale = {0.32f, 0.32f} },  // 3 move
-    { .path = "rom:/textures/select.ia8.sprite",   .position = {0,  200},  .rotation = 0.0f, .scale = {0.32f, 0.32f} },  // 4 select
-    { .path = "rom:/textures/back.ia8.sprite",     .position = {0,  215},  .rotation = 0.0f, .scale = {0.32f, 0.32f} },  // 5 back
-    { .path = "rom:/textures/DUp.sprite",          .position = {0,  186},  .rotation = 0.0f, .scale = {0.48f, 0.48f} },  // 6 dup
-    { .path = "rom:/textures/DDown.sprite",        .position = {0,  187},  .rotation = 0.0f, .scale = {0.48f, 0.48f} },  // 7 ddown
-    { .path = "rom:/textures/AButton.sprite",      .position = {0,  201},  .rotation = 0.0f, .scale = {0.60f, 0.60f} },  // 8 abutton
-    { .path = "rom:/textures/BButton.sprite",      .position = {0,  216},  .rotation = 0.0f, .scale = {0.60f, 0.60f} },  // 9 bbutton
+static RenderContext pause_screen = {
+    .element = {
+        [0]  = { DRAW_RECTANGLE, .rectangle = { COLOR_GRADIENT, { 0.0f, 0.0f }, { 320.0f, 240.0f } } },
+        [1]  = { DRAW_TEXT,      .text      = { HEADLINER_20, MENU_STYLE_NORMAL, { 0.0f,  50.0f }, "Continue", &h20_parms } },
+        [2]  = { DRAW_TEXT,      .text      = { HEADLINER_20, MENU_STYLE_NORMAL, { 0.0f,  80.0f }, "Options",  &h20_parms } },
+        [3]  = { DRAW_TEXT,      .text      = { HEADLINER_20, MENU_STYLE_NORMAL, { 0.0f, 110.0f }, "Quit",     &h20_parms } },
+        [4]  = { DRAW_TEXT,      .text      = { HEADLINER_14, 0,                 { 0.0f, 196.0f }, "Move",     &h14_parms } },
+        [5]  = { DRAW_TEXT,      .text      = { HEADLINER_14, 0,                 { 0.0f, 211.0f }, "Select",   &h14_parms } },
+        [6]  = { DRAW_TEXT,      .text      = { HEADLINER_14, 0,                 { 0.0f, 226.0f }, "Back",     &h14_parms } },
+        [7]  = { DRAW_SPRITE,    .sprite    = { SPR_D_UP,   { 0.0f, 186.0f }, { 0.48f, 0.48f } } },
+        [8]  = { DRAW_SPRITE,    .sprite    = { SPR_D_DOWN, { 0.0f, 187.0f }, { 0.48f, 0.48f } } },
+        [9]  = { DRAW_SPRITE,    .sprite    = { SPR_BTN_A,  { 0.0f, 201.0f }, { 0.60f, 0.60f } } },
+        [10] = { DRAW_SPRITE,    .sprite    = { SPR_BTN_B,  { 0.0f, 216.0f }, { 0.60f, 0.60f } } },
+    },
+    .element_count = 11,
 };
+
+const RenderContext* mainMenu_getRenderContext(void) { return &main_menu_screen; }
+const RenderContext* pause_getRenderContext(void) { return &pause_screen; }
+
+void mainMenu_animate()
+{
+    for (int i = 0; i < 3; i++)
+        main_menu_screen.element[3 + i].text.style = (menu_getIndex() == i) ? MENU_STYLE_SELECTED : MENU_STYLE_NORMAL;
+}
+
+static const float pause_offsets_x[] = { 82.0f, 76.0f, 57.0f };
+
+void pause_animate(const Game *game)
+{
+    if (game->state != PAUSE && game->state != GAMEPLAY) return;
+
+    float t = game->transition.progress;
+    pause_screen.element[0].rectangle.gradient[0] = RGBA32(0, 0, 0, (uint8_t)(0.3f * t * 255));
+    pause_screen.element[0].rectangle.gradient[1] = RGBA32(0, 0, 0, (uint8_t)(t * 255));
+    pause_screen.element[0].rectangle.gradient[2] = RGBA32(0, 0, 0, (uint8_t)(t * 255));
+    pause_screen.element[0].rectangle.gradient[3] = RGBA32(0, 0, 0, (uint8_t)(0.3f * t * 255));
+
+    for (int i = 0; i < 3; i++) {
+        if (game->previous_state != PAUSE)
+            pause_screen.element[1 + i].text.style = (menu_getIndex() == i) ? MENU_STYLE_SELECTED : MENU_STYLE_NORMAL;
+        pause_screen.element[1 + i].text.position.x = 320.0f - pause_offsets_x[i] * t;
+    }
+
+    pause_screen.element[4].text.position.x = 347.0f - 85.0f * t;
+    pause_screen.element[5].text.position.x = 338.0f - 76.0f * t;
+    pause_screen.element[6].text.position.x = 338.0f - 76.0f * t;
+
+    pause_screen.element[7].sprite.position.x  = 320.0f - 85.0f * t;
+    pause_screen.element[8].sprite.position.x  = 330.0f - 85.0f * t;
+    pause_screen.element[9].sprite.position.x  = 320.0f - 76.0f * t;
+    pause_screen.element[10].sprite.position.x = 320.0f - 76.0f * t;
+}
 
 void ui_init()
 {
     fonts_init();
-    sprite_init(main_menu_sprites, MAIN_MENU_SPRITE_COUNT);
-    sprite_init(pause_sprites,     PAUSE_SPRITE_COUNT);
+    sprite_init();
 
-    game.timer.mainMenu_transition = 1.0f;
-    game.timer.gameplay_transition = 1.0f;
-    game.timer.pause_transition    = 0.0f;
 }
 
 void ui_drawDebugData()
 {
-    //rdpq_text_printf(NULL, DROID_SANS, 270, 20, "%d FPS", (int)(timer.rate));
-
-    rdpq_text_printf(NULL, DROID_SANS, 10, 20, "land weight %f", player[0]->actor.animation.data.land_blending_ratio);
-    rdpq_text_printf(NULL, DROID_SANS, 10, 30, "jump weight %f", player[0]->actor.animation.data.jump_blending_ratio);
-    rdpq_text_printf(NULL, DROID_SANS, 10, 40, "is jumping %d", player[0]->actor.animation.jump.jump_left.isPlaying);
+    rdpq_text_printf(NULL, DROID_SANS, 272, 20, "%d FPS", (int)(time_get()->rate));
 }
 
-void ui_drawSlidingTransition(float progress, float r, float g, float b, uint8_t direction)
-{
-    switch(direction)
-    {
-        case UP:    shapes_drawSolidBox(r, g, b, 1.0f, 0.0f, 240.0f - (240.0f * progress), 320.0f, 240.0f); break;
-        case DOWN:  shapes_drawSolidBox(r, g, b, 1.0f, 0.0f, 0.0f, 320.0f, 240.0f * progress);              break;
-        case LEFT:  shapes_drawSolidBox(r, g, b, 1.0f, 320.0f - (320.0f * progress), 0.0f, 320.0f, 240.0f); break;
-        case RIGHT: shapes_drawSolidBox(r, g, b, 1.0f, 0.0f, 0.0f, 320.0f * progress, 240.0f);              break;
-    }
-}
-
-void ui_drawFadingTransition(float progress, float r, float g, float b)
-{
-    shapes_drawSolidBox(r, g, b, progress, 0.0f, 0.0f, 320.0f, 240.0f);
-}
-
-void ui_drawMainMenu()
-{
-    shapes_drawGradientBox(
-        0.788f, 0.475f, 0.098f, 1.0f,
-        0.875f, 0.686f, 0.459f, 1.0f,
-        0.875f, 0.686f, 0.459f, 1.0f,
-        0.788f, 0.475f, 0.098f, 1.0f,
-        0.0f, 0.0f, 320.0f, 240.0f
-    );
-
-    sprite_setMode();
-
-    for (int i = 0; i <= 2; i++) {
-        
-        if (menu.index == i && main_menu_sprites[i].scale.x < 0.34f) main_menu_sprites[i].scale.x += 0.01f;
-        
-        else if (menu.index != i && main_menu_sprites[i].scale.x > 0.30f) main_menu_sprites[i].scale.x -= 0.015f;
-
-        main_menu_sprites[i].scale.y = main_menu_sprites[i].scale.x;
-    }
-
-    sprite_draw(main_menu_sprites, MAIN_MENU_SPRITE_COUNT);
-}
-
-void ui_drawPauseMenu()
-{
-    float t = game.timer.pause_transition;
-
-    shapes_drawGradientBox(
-        0.0f, 0.0f, 0.0f, 0.3f * t,
-        0.0f, 0.0f, 0.0f, t,
-        0.0f, 0.0f, 0.0f, t,
-        0.0f, 0.0f, 0.0f, 0.3f * t,
-        0.0f, 0.0f, 320.0f, 240.0f
-    );
-
-    sprite_setMode();
-
-    for (int i = 0; i <= 2; i++) {
-
-        if (menu.index == i && pause_sprites[i].scale.x < 0.33f) pause_sprites[i].scale.x += 0.01f;
-
-        else if (menu.index != i && pause_sprites[i].scale.x > 0.30f) pause_sprites[i].scale.x -= 0.015f;
-
-        pause_sprites[i].scale.y = pause_sprites[i].scale.x;
-    }
-
-    float offsets_x[] = { 92.0f, 83.0f, 57.0f };
-    for (int i = 0; i <= 2; i++)
-        pause_sprites[i].position.x = 320.0f - (offsets_x[i] * t);
-
-    pause_sprites[3].position.x = 347.0f - (85.0f * t);
-    pause_sprites[4].position.x = 338.0f - (76.0f * t);
-    pause_sprites[5].position.x = 338.0f - (76.0f * t);
-    pause_sprites[6].position.x = 320.0f - (85.0f * t);
-    pause_sprites[7].position.x = 330.0f - (85.0f * t);
-    pause_sprites[8].position.x = 320.0f - (76.0f * t);
-    pause_sprites[9].position.x = 320.0f - (76.0f * t);
-
-    sprite_draw(pause_sprites, PAUSE_SPRITE_COUNT);
-}

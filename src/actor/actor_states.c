@@ -6,61 +6,20 @@
 #include "../../include/actor/actor_states.h"
 
 
-void actor_setState(ActorStateData *state, uint8_t new_state) 
+static const bool updates_locomotion[] = {
+    [STANDING_IDLE] = true,
+    [WALKING]       = true,
+    [RUNNING]       = true,
+    [SPRINTING]     = true,
+    [ROLLING]       = false,
+    [JUMPING]       = false,
+    [FALLING]       = false,
+};
+
+void actor_setState(ActorStateData *state, uint8_t new_state)
 {
-    switch(new_state) {
-        
-        case STANDING_IDLE: {
-            if (state->current == STANDING_IDLE) return;
-            state->previous = state->current;
-            state->current = STANDING_IDLE;
-            state->locomotion = STANDING_IDLE;
-            break;
-        }
-
-        case WALKING: {
-            if (state->current == WALKING) return;
-            state->previous = state->current;
-            state->current = WALKING;
-            state->locomotion = WALKING;
-            break;
-        }
-
-        case RUNNING: {
-            if (state->current == RUNNING) return;
-            state->previous = state->current;
-            state->current = RUNNING;
-            state->locomotion = RUNNING;
-            break;
-        }
-
-        case SPRINTING: {
-            if (state->current == SPRINTING) return;
-            state->previous = state->current;
-            state->current = SPRINTING;
-            state->locomotion = SPRINTING;
-            break;
-        }
-
-        case ROLLING: {
-            if (state->current == ROLLING) return;
-            state->previous = state->current;
-            state->current = ROLLING;
-            break;
-        }
-        
-        case JUMPING: {
-            if (state->current == JUMPING) return;
-            state->previous = state->current;
-            state->current = JUMPING;
-            break;
-        }
-        
-        case FALLING: {
-            if (state->current == FALLING ) return;
-            state->previous = state->current;
-            state->current = FALLING;
-            break;
-        }   
-    }
+    if (state->current == new_state) return;
+    state->previous = state->current;
+    state->current  = new_state;
+    if (updates_locomotion[new_state]) state->locomotion = new_state;
 }

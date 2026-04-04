@@ -1,174 +1,142 @@
-#include <t3d/t3danim.h>
-
-#include "../../include/physics/physics.h"
-#include "../../include/control/control.h"
-#include "../../include/actor/actor.h"
-#include "../../include/actor/actor_states.h"
 #include "../../include/player/player.h"
+#include "../../include/actor/actor_states.h"
 #include "../../include/control/player_control.h"
-#include "../../include/player/player_animation.h"
-#include "../../include/physics/physics.h"
-#include "../../include/control/control.h"
-#include "../../include/light/lighting.h"
-#include "../../include/camera/camera.h"
 #include "../../include/viewport/viewport.h"
-#include "../../include/time/time.h"
-#include "../../include/scene/scenery.h"
-#include "../../include/ui/ui.h"
-#include "../../include/ui/menu.h"
 #include "../../include/game/game.h"
-#include "../../include/control/camera_control.h"
-#include "../../include/game/game_states.h"
-#include "../../include/render/render.h"
+#include "../../include/ui/menu.h"
 
 
-void playerControl_setJump(Player* player)
-{    
-    if (player->control.pressed.a && player->actor.state.current != ROLLING && player->actor.state.current != JUMPING && player->actor.state.current != FALLING){
-        
-        player->actor.motion.input.jump_hold = true;
-        
-        player->actor.motion.data.jump_initial_velocity = player->actor.body.velocity;
+void player_controlIntro(Player *player, Game *game) {}
 
-        actor_setState(&player->actor.state, JUMPING);
+void playerControl_setJump(Player *player)
+{
+    if (player->control.pressed.a && player->entity->state.current != ROLLING && player->entity->state.current != JUMPING && player->entity->state.current != FALLING){
+
+        player->entity->motion->input.jump_hold = true;
+        player->entity->motion->input.jump_triggered = true;
+
+        actor_setState(&player->entity->state, JUMPING);
     }
-    
+
     else if (player->control.held.a) return;
-    
+
     else {
-        player->actor.motion.input.jump_hold = false;
+        player->entity->motion->input.jump_hold = false;
     }
 }
 
-void playerControl_setRoll(Player* player)
+void playerControl_setRoll(Player *player)
 {
-    if (player->control.pressed.b 
-        && player->actor.state.current != ROLLING
-        && player->actor.state.current != STANDING_IDLE
-        && player->actor.state.current != WALKING
-        && player->actor.state.current != JUMPING
-        && player->actor.state.current != FALLING){
+    if (player->control.pressed.b
+        && player->entity->state.current != ROLLING
+        && player->entity->state.current != STANDING_IDLE
+        && player->entity->state.current != WALKING
+        && player->entity->state.current != JUMPING
+        && player->entity->state.current != FALLING){
 
-        actor_setState(&player->actor.state, ROLLING);
+        actor_setState(&player->entity->state, ROLLING);
     }
 }
 
-void playerControl_setLocomotionWithStick(Player* player, float camera_angle_around, float camera_offset_angle)
+void playerControl_setLocomotionWithStick(Player *player, float camera_angle_around, float camera_offset_angle)
 {
-    int deadzone = 6;
-    float stick_magnitude = 0; 
+    float stick_magnitude = 0;
 
-    if (fabs(player->control.input.stick_x) >= deadzone || fabs(player->control.input.stick_y) >= deadzone) {
+    if (fabs(player->control.input.stick_x) >= PLAYER_STICK_DEADZONE || fabs(player->control.input.stick_y) >= PLAYER_STICK_DEADZONE) {
 
         Vector2 stick = {player->control.input.stick_x, player->control.input.stick_y};
-        
+
         stick_magnitude = vector2_magnitude(&stick);
-        
+
         float target_yaw = deg(atan2(player->control.input.stick_x, -player->control.input.stick_y) - rad(camera_angle_around - (0.5 * camera_offset_angle)));
-        float target_speed = stick_magnitude * 5;
 
-        player->actor.motion.data.target_yaw = target_yaw;
-
-        player->actor.motion.data.horizontal_target_speed = target_speed;
+        player->entity->motion->input.target_yaw = target_yaw;
     }
 
-    
-    if (stick_magnitude == 0 && player->actor.state.current != ROLLING && player->actor.state.current != JUMPING && player->actor.state.current != FALLING){
-        actor_setState(&player->actor.state, STANDING_IDLE);
+
+    if (stick_magnitude == 0 && player->entity->state.current != ROLLING && player->entity->state.current != JUMPING && player->entity->state.current != FALLING){
+        actor_setState(&player->entity->state, STANDING_IDLE);
     }
 
-    else if (stick_magnitude > 0 && stick_magnitude <= 65 && player->actor.state.current != ROLLING && player->actor.state.current != JUMPING && player->actor.state.current != FALLING){
-        actor_setState(&player->actor.state, WALKING);
+    else if (stick_magnitude > 0 && stick_magnitude <= PLAYER_STICK_WALK_THRESHOLD && player->entity->state.current != ROLLING && player->entity->state.current != JUMPING && player->entity->state.current != FALLING){
+        actor_setState(&player->entity->state, WALKING);
     }
 
-    else if (player->control.held.r && stick_magnitude > 65 && player->actor.state.current != ROLLING && player->actor.state.current != JUMPING && player->actor.state.current != FALLING){
-        actor_setState(&player->actor.state, SPRINTING);
+    else if (player->control.held.r && stick_magnitude > PLAYER_STICK_WALK_THRESHOLD && player->entity->state.current != ROLLING && player->entity->state.current != JUMPING && player->entity->state.current != FALLING){
+        actor_setState(&player->entity->state, SPRINTING);
     }
 
-    else if (stick_magnitude > 65 && player->actor.state.current != ROLLING && player->actor.state.current != JUMPING && player->actor.state.current != FALLING){
-        actor_setState(&player->actor.state, RUNNING);
+    else if (stick_magnitude > PLAYER_STICK_WALK_THRESHOLD && player->entity->state.current != ROLLING && player->entity->state.current != JUMPING && player->entity->state.current != FALLING){
+        actor_setState(&player->entity->state, RUNNING);
     }
 }
 
-void player_setActorControl(Player* player)
+void player_setActorControl(Player *player, Viewport *viewport)
 {
     playerControl_setRoll(player);
     playerControl_setJump(player);
-    playerControl_setLocomotionWithStick(player, viewport.camera.angle_around_barycenter, viewport.camera.offset_angle);
+    playerControl_setLocomotionWithStick(player, viewport->camera.angle_around_barycenter, viewport->camera.offset_angle);
 }
 
-void playerControl_setPauseState(Player* player)
+void playerControl_setPauseState(Player *player, Game *game)
 {
-    if (player->control.pressed.start) game_setState(PAUSE);
+    if (player->control.pressed.start) game_setState(game, PAUSE);
 }
 
-void player_controlPauseState(Player* player)
+void player_controlPause(Player *player, Game *game)
 {
-    if (player->control.pressed.start || player->control.pressed.b || (player->control.pressed.a && menu.index == 0)){
-        
-        game_setState(GAMEPLAY);
-        menu.index = 0;
+    if (player->control.pressed.start || player->control.pressed.b || (player->control.pressed.a && menu_getIndex() == 0)){
+        game_setState(game, GAMEPLAY);
+        menu_setIndex(0);
+        player->control.pressed = (joypad_buttons_t){0};
     }
 
-    if (player->control.pressed.a && menu.index == 2){
-    
-        game_setState(MAIN_MENU);
-        menu.index = 0;
+    if (player->control.pressed.a && menu_getIndex() == 2){
+        game_setState(game, MAIN_MENU);
+        menu_setIndex(0);
     }
 
-    if (player->control.pressed.d_up) --menu.index;
-    if (player->control.pressed.d_down) ++menu.index;
-    if (menu.index < 0) menu.index = 2;
-    if (menu.index > 2) menu.index = 0;
+    if (player->control.pressed.d_up) menu_moveIndex(-1, 2);
+    if (player->control.pressed.d_down) menu_moveIndex(1, 2);
 }
 
-void player_controlMainMenu(Player* player)
+void player_controlMainMenu(Player *player, Game *game)
 {
-    if ((player->control.pressed.a && menu.index == 0)) game_setState(GAMEPLAY);
-    if (player->control.pressed.d_up) --menu.index;
-    if (player->control.pressed.d_down) ++menu.index;
-    if (menu.index < 0) menu.index = 2;
-    if (menu.index > 2) menu.index = 0;
+    if (player->control.pressed.a && menu_getIndex() == 0) game_setState(game, GAMEPLAY);
+    if (player->control.pressed.d_up) menu_moveIndex(-1, 2);
+    if (player->control.pressed.d_down) menu_moveIndex(1, 2);
 }
 
-void playerControl_handleGameOverMenu(Player* player)
+void playerControl_handleGameOverMenu(Player *player, Game *game) {}
+
+void player_controlGameOver(Player *player, Game *game) {}
+
+void player_controlGameplay(Player *player, Game *game)
 {
+    playerControl_setPauseState(player, game);
 }
 
-void player_controlGameState(Player* player)
+static void (*playerControl_handler[])(Player *, Game *) = {
+
+    [INTRO]      = player_controlIntro,
+    [MAIN_MENU]  = player_controlMainMenu,
+    [GAMEPLAY]   = player_controlGameplay,
+    [PAUSE]      = player_controlPause,
+    [GAME_OVER]  = player_controlGameOver,
+};
+
+static void player_controlGameState(Player *player, Game *game)
 {
-    switch(game.state){
-
-		case INTRO:{
-			break;
-		}
-		case MAIN_MENU:{
-            player_controlMainMenu(player);
-			break;
-		}
-		case GAMEPLAY:{
-            playerControl_setPauseState(player);
-            player_setActorControl(player);
-			break;
-		}
-		case PAUSE:{
-            player_controlPauseState(player);
-			break;
-		}
-		case GAME_OVER:{
-			break;
-		}
-	}
+    playerControl_handler[game->state](player, game);
 }
 
 
-void player_setControllerData()
+void player_setControllerData(Player **players, Game *game)
 {
     joypad_poll();
-    
+
     for (int i = 0; i < PLAYER_COUNT; i++) {
-        
-        controllerData_getInputs(&player[i]->control, i);
-        player_controlGameState(player[i]);
-    } 
+        controllerData_getInputs(&players[i]->control, i);
+        player_controlGameState(players[i], game);
+    }
 }

@@ -24,7 +24,12 @@ float max3(float a, float b, float c);
 bool sameSign(float a, float b);
 bool approxEqual(float a, float b);
 
+float angle_wrap(float angle);
+float angle_wrap_relative(float angle, float reference);
+
 bool isfinite(float x);
+
+float lerpf(float a, float b, float t);
 
 
 #endif

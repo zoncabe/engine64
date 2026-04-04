@@ -30,10 +30,10 @@ void camera_setOrbitalSpeed(Camera *camera)
         camera->orbitational_acceleration.x = camera->settings.orbitational_acceleration_rate * (camera->orbitational_target_velocity.x - camera->orbitational_velocity.x);
         camera->orbitational_acceleration.y = camera->settings.orbitational_acceleration_rate * (camera->orbitational_target_velocity.y - camera->orbitational_velocity.y);
 
-        camera->orbitational_velocity.x += camera->orbitational_acceleration.x * timer.delta;
-        camera->orbitational_velocity.y += camera->orbitational_acceleration.y * timer.delta;
-        camera->zoom_speed += camera->zoom_acceleration * timer.delta;
-        camera->offset_speed += camera->offset_acceleration * timer.delta;
+        camera->orbitational_velocity.x += camera->orbitational_acceleration.x * time_get()->delta;
+        camera->orbitational_velocity.y += camera->orbitational_acceleration.y * time_get()->delta;
+        camera->zoom_speed += camera->zoom_acceleration * time_get()->delta;
+        camera->offset_speed += camera->offset_acceleration * time_get()->delta;
     }
     
     else if (camera->state == AIMING) {
@@ -51,10 +51,10 @@ void camera_setOrbitalSpeed(Camera *camera)
         camera->orbitational_acceleration.x = camera->settings.orbitational_acceleration_rate * ((camera->orbitational_target_velocity.x / 2) - camera->orbitational_velocity.x);
         camera->orbitational_acceleration.y = camera->settings.orbitational_acceleration_rate * ((camera->orbitational_target_velocity.y / 2) - camera->orbitational_velocity.y);
 
-        camera->orbitational_velocity.x += camera->orbitational_acceleration.x * timer.delta;
-        camera->orbitational_velocity.y += camera->orbitational_acceleration.y * timer.delta;
-        camera->zoom_speed += camera->zoom_acceleration * timer.delta;
-        camera->offset_speed += camera->offset_acceleration * timer.delta;
+        camera->orbitational_velocity.x += camera->orbitational_acceleration.x * time_get()->delta;
+        camera->orbitational_velocity.y += camera->orbitational_acceleration.y * time_get()->delta;
+        camera->zoom_speed += camera->zoom_acceleration * time_get()->delta;
+        camera->offset_speed += camera->offset_acceleration * time_get()->delta;
     }
 
     if (fabs(camera->orbitational_velocity.x) < 1 && fabs(camera->orbitational_velocity.y) < 1 && fabs(camera->zoom_speed) < 1 && fabs(camera->offset_speed) < 1){
@@ -67,11 +67,11 @@ void camera_setOrbitalSpeed(Camera *camera)
 
 void camera_setOrbitalPosition(Camera *camera, Vector3* barycenter)
 {
-    camera->pitch += camera->orbitational_velocity.y * timer.delta;
-	camera->angle_around_barycenter += camera->orbitational_velocity.x * timer.delta;
+    camera->pitch += camera->orbitational_velocity.y * time_get()->delta;
+	camera->angle_around_barycenter += camera->orbitational_velocity.x * time_get()->delta;
 	
-	camera->field_of_view += camera->zoom_direction * camera->zoom_speed * timer.delta;
-	camera->offset_angle += camera->offset_direction * camera->offset_speed * timer.delta;
+	camera->field_of_view += camera->zoom_direction * camera->zoom_speed * time_get()->delta;
+	camera->offset_angle += camera->offset_direction * camera->offset_speed * time_get()->delta;
 
 	if (camera->angle_around_barycenter > 360) camera->angle_around_barycenter -= 360;
     if (camera->angle_around_barycenter < 0) camera->angle_around_barycenter  += 360;

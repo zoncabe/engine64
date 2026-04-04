@@ -1,6 +1,10 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 
+#include <t3d/t3d.h>
+#include "../physics/math/vector2.h"
+#include "../physics/math/vector3.h"
+
 
 // structures
 
@@ -13,7 +17,12 @@ typedef enum {
 typedef struct {
 
 	float orbitational_acceleration_rate;
-	Vector2 orbitational_max_velocity;
+
+	float yaw_sensitivity;
+	int8_t yaw_direction;
+
+	float pitch_sensitivity;
+	int8_t pitch_direction;
 
 	float zoom_acceleration_rate;
 	float zoom_deceleration_rate;

@@ -1,32 +1,21 @@
 #ifndef ACTOR_ANIMATION_H
 #define ACTOR_ANIMATION_H
 
+#include "../entity/entity.h"
 
-#define LAND_ANIM_STARTING_HEIGHT 130 // workaround until definitive solution including collision
-
-/*
-typedef struct {
-    T3DSkeleton** skeleton;
-    float* weight;
-    u_int8_t count;
-} ActorAnimationLayers;
-*/
+#define LAND_ANIM_STARTING_HEIGHT 130
 
 typedef struct {
+    const T3DSkeleton *layer[ANIM_SLOT_COUNT];
+    float              weight[ANIM_SLOT_COUNT];
+    uint8_t            count;
+} ActorAnimationBuffer;
 
-    const T3DSkeleton* layer[ANIMATION_BUFFER_COUNT];
+void actorAnimation_initArmature(Entity *entity);
+void actorAnimation_initStandingLocomotionSet(Entity *entity);
+void actorAnimation_initJumpSet(Entity *entity);
+void actorAnimation_initRollSet(Entity *entity);
 
-    float weight[ANIMATION_BUFFER_COUNT];
-
-    u_int8_t count;
-
-}ActorAnimationBuffer;
-
-void actorAnimation_initArmature(Actor* actor);
-void actorAnimation_initStandingLocomotionSet(Actor* actor);
-void actorAnimation_initJumpSet(Actor* actor);
-void actorAnimation_initRollSet(Actor* actor);
-
-void actorAnimation_set(Actor* actor);
+void actorAnimation_set(Entity *entity);
 
 #endif

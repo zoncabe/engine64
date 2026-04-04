@@ -15,7 +15,8 @@
 
 const resolution_t WIDESCREEN = {.width = 424, .height = 240, .interlaced = INTERLACE_OFF};
 
-Viewport viewport;
+static Viewport viewport;
+Viewport* viewport_get(void) { return &viewport; }
 
 void viewport_init()
 {
@@ -71,10 +72,10 @@ void viewport_setIsometricCamera()
     );
 }
 
-void viewport_setOrbitalCamera()
+void viewport_setOrbitalCamera(ControllerData *control, Vector3 *target)
 {
-    cameraControl_setOrbitalInput(&viewport.camera, &player[0]->control);
-    camera_setOrbitalMotion(&viewport.camera, &player[0]->actor.body.position);
+    cameraControl_setOrbitalInput(&viewport.camera, control);
+    camera_setOrbitalMotion(&viewport.camera, target);
     viewport_setPerspectiveCamera();
     //viewport_setIsometricCamera();
 }

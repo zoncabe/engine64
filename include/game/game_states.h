@@ -1,25 +1,26 @@
 #ifndef GAME_STATES_H
 #define GAME_STATES_H
 
-#define INTRO 0
-#define MAIN_MENU 1
-#define GAMEPLAY 2
-#define PAUSE 3
-#define GAME_OVER 4
+#define TRANSITION_SPEED_SLOW  10.0f
+#define TRANSITION_SPEED_FAST  20.0f
+
+typedef enum {
+    INTRO      = 0,
+    MAIN_MENU  = 1,
+    GAMEPLAY   = 2,
+    PAUSE      = 3,
+    GAME_OVER  = 4,
+    GAME_STATE_COUNT
+} GameState;
 
 
 // function prototypes
 
-void gameState_setIntro();
-void gameState_updateMainMenu();
+typedef struct GameContext GameContext;
+typedef struct Game        Game;
 
-void gameState_updateGameplay();
-void gameState_updatePause();
-
-void gameState_setGameOver();
-
-void game_setState(u_int8_t new_state);
-void game_updateState();
+void game_setState(Game *game, GameState new_state);
+void game_updateState(GameContext *ctx);
 
 
 #endif

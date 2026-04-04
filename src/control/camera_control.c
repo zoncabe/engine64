@@ -23,14 +23,12 @@ changes the camera variables depending on controller input*/
 
 void cameraControl_orbitWithStick(Camera *camera, ControllerData *controller)
 {
-    int deadzone = 8;
-    float sensitivity = 1.8f;
     float stick_x = 0;
     float stick_y = 0;
 
-    if (fabs(controller->input.cstick_x) >= deadzone || fabs(controller->input.cstick_y) >= deadzone) {
+    if (fabs(controller->input.cstick_x) >= CAMERA_STICK_DEADZONE || fabs(controller->input.cstick_y) >= CAMERA_STICK_DEADZONE) {
         stick_x = controller->input.cstick_x;
-        stick_y = - controller->input.cstick_y;
+        stick_y = controller->input.cstick_y;
     }
 
     if (stick_x == 0 && stick_y == 0) {
@@ -39,37 +37,10 @@ void cameraControl_orbitWithStick(Camera *camera, ControllerData *controller)
     }
     
     else if (stick_x != 0 || stick_y != 0) {
-        camera->orbitational_target_velocity.y = stick_y * sensitivity;
-        camera->orbitational_target_velocity.x = stick_x * sensitivity;
+        camera->orbitational_target_velocity.x = stick_x * camera->settings.yaw_sensitivity * camera->settings.yaw_direction;
+        camera->orbitational_target_velocity.y = stick_y * camera->settings.pitch_sensitivity * camera->settings.pitch_direction;
     }
 }
-
-// rendered obsolete by libdragon's gamecube controller support
-// leaving the function because the algorithm is reusable
-void cameraControl_orbit_withCButtons(Camera *camera, ControllerData *controller)
-{
-    float input_x = 0;
-    float input_y = 0;
-
-    if (controller->pressed.c_right || controller->pressed.c_left || controller->pressed.c_up || controller->pressed.c_down){
-        
-        input_x = input(controller->pressed.c_right) - input(controller->pressed.c_left);
-        input_y = input(controller->pressed.c_up) - input(controller->pressed.c_down);
-    }
-    else if (controller->held.c_right || controller->held.c_left || controller->held.c_up || controller->held.c_down){
-        
-        input_x = input(controller->held.c_right) - input(controller->held.c_left);
-        input_y = input(controller->held.c_up) - input(controller->held.c_down);
-    }
-
-    if (input_y == 0) camera->orbitational_target_velocity.y = 0; 
-    else camera->orbitational_target_velocity.y = input_y * camera->settings.orbitational_max_velocity.y;
-
-	if (input_x == 0) camera->orbitational_target_velocity.x = 0; 
-    else camera->orbitational_target_velocity.x = input_x * camera->settings.orbitational_max_velocity.x;
-
-}
-
 
 void cameraControl_aim(Camera *camera, ControllerData *controller)
 {

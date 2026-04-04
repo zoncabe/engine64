@@ -2,6 +2,9 @@
 #define CAMERA_CONTROLS_H
 
 
+#define CAMERA_STICK_DEADZONE 8
+
+
 int input(int input);
 
 void cameraControl_orbit_withStick(Camera *camera, ControllerData *data);

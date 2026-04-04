@@ -1,35 +1,67 @@
+#include <stdbool.h>
+
 #ifndef GAME_H
 #define GAME_H
 
-typedef struct
-{
+#include "game_states.h"
 
-    float intro_counter;
-    float intro_transition;
-    float mainMenu_transition;
-    float gameplay_transition;
-    float pause_transition;
-    float gameOver_transition;
+typedef struct Scene         Scene;
+typedef struct RenderContext RenderContext;
+typedef struct Viewport      Viewport;
+typedef struct Player        Player;
 
-} GameTimers;
+typedef enum {
 
-typedef struct
-{
-    uint8_t state;
-    uint8_t previous_state;
-    bool state_transition;
-    
-    GameTimers timer;
+    TRANSITION_FADE,
 
-    bool playing_intro;
+} GameTransitionType;
+
+typedef struct GameTransition {
+
+    GameTransitionType type;
+    float          progress;
+    float          speed;
+    bool           active;
+    uint8_t        phase; // 0 = fade out, 1 = fade in
+    bool           is_overlay;
+
+} GameTransition;
+
+typedef struct Game {
+
+    GameState  state;
+    GameState  previous_state;
+    GameState  target_state;
+    bool       state_changed;
+    GameTransition transition;
+    float      intro_counter;
 
 } Game;
 
-extern Game game;
+
+typedef struct GameContext {
+
+    Game *game;
+    Viewport *viewport;
+    Scene *scene;
+    Player **player;
+    
+} GameContext;
+
+typedef struct GameRenderDescriptor {
+
+    const Scene *scene;
+    const RenderContext *screen;
+} GameRenderDescriptor;
+
+Game *game_get(void);
+GameContext game_getContext(void);
+GameRenderDescriptor game_getRenderDescriptor(const GameContext *ctx);
 
 
-void game_init();
-void game_close();
+void game_init(void);
+void game_runFrame(void);
+void game_close(void);
 
 
 #endif

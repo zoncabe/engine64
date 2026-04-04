@@ -9,7 +9,9 @@
 #include "../../include/light/lighting.h"
 
 
-Light light;
+static Light light;
+
+Light* light_get(void) { return &light; }
 
 
 void light_initAmbient(color_t color)

@@ -28,7 +28,7 @@ typedef struct{
 
 } Light;
 
-extern Light light;
+Light* light_get(void);
 
 void light_initDirectional(DirectionalLight* light, T3DVec3 direction, color_t color);
 void light_initAmbient(color_t color);

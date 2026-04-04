@@ -9,7 +9,7 @@
 #include "../../include/assets/male_muscled.h"
 
 
-ActorMotionSettings male_muscled_motion_settings = {
+static const ActorMotionSettings motion_settings = {
     
     .idle_acceleration_rate = MALE_MUSCLED_IDLE_ACCELERATION_RATE,
     .walk_acceleration_rate = MALE_MUSCLED_WALK_ACCELERATION_RATE,
@@ -20,12 +20,12 @@ ActorMotionSettings male_muscled_motion_settings = {
     .jump_acceleration_rate = MALE_MUSCLED_JUMP_ACCELERATION_RATE,
     .aerial_control_rate = MALE_MUSCLED_AERIAL_CONTROL_RATE,
 
-    .walk_target_speed = MALE_MUSCLED_WALK_TARGET_SPEED,
+    .walk_target_speed = 175,
     .run_target_speed = MALE_MUSCLED_RUN_TARGET_SPEED,
     .sprint_target_speed = MALE_MUSCLED_SPRINT_TARGET_SPEED,
 
     .roll_change_grip_time = MALE_MUSCLED_RUN_TO_ROLLING_ANIM_GRIP,
-    .roll_timer_max = MALE_MUSCLED_RUN_TO_ROLLING_ANIM_LENGHT,
+    .roll_timer_max = MALE_MUSCLED_RUN_TO_ROLLING_ANIM_LENGTH,
 
     .jump_timer_max = MALE_MUSCLED_JUMP_ANIM_AIR,
     
@@ -37,7 +37,7 @@ ActorMotionSettings male_muscled_motion_settings = {
 };    
     
 
-ActorAnimationSettings male_muscled_animation_settings = {
+static const ActorAnimationSettings animation_settings = {
 
     .standing_locomotion = {
 
@@ -82,9 +82,12 @@ ActorAnimationSettings male_muscled_animation_settings = {
         .run_to_rolling_anim_ground = MALE_MUSCLED_RUN_TO_ROLLING_ANIM_GROUND,
         .run_to_rolling_anim_grip = MALE_MUSCLED_RUN_TO_ROLLING_ANIM_GRIP,
         .run_to_rolling_anim_stand = MALE_MUSCLED_RUN_TO_ROLLING_ANIM_STAND,
-        .run_to_rolling_anim_lenght = MALE_MUSCLED_RUN_TO_ROLLING_ANIM_LENGHT,
+        .run_to_rolling_anim_length = MALE_MUSCLED_RUN_TO_ROLLING_ANIM_LENGTH,
 
         .stand_to_rolling_anim_grip = MALE_MUSCLED_STAND_TO_ROLLING_ANIM_GRIP,
-        .stand_to_rolling_anim_lenght = MALE_MUSCLED_STAND_TO_ROLLING_ANIM_LENGHT,
+        .stand_to_rolling_anim_length = MALE_MUSCLED_STAND_TO_ROLLING_ANIM_LENGTH,
     },
 };
+
+const ActorMotionSettings* male_muscled_getMotionSettings(void) { return &motion_settings; }
+const ActorAnimationSettings* male_muscled_getAnimationSettings(void) { return &animation_settings; }

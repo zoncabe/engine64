@@ -19,7 +19,6 @@ void camera_init(Camera* camera)
 		camera->far_clipping = 4000;
 		
         camera->settings.orbitational_acceleration_rate = 10;
-        camera->settings.orbitational_max_velocity = (Vector2){100, 80};
         camera->settings.zoom_acceleration_rate = 30;
         camera->settings.zoom_deceleration_rate = 10;
         camera->settings.zoom_max_speed = 150;
@@ -32,5 +31,10 @@ void camera_init(Camera* camera)
         camera->settings.offset_angle = 30;
         camera->settings.offset_angle_aim = 20;
         camera->settings.max_pitch = 70;
+        
+        camera->settings.yaw_sensitivity = 1.8f;
+        camera->settings.yaw_direction = 1;
+        camera->settings.pitch_sensitivity = 1.6f;
+        camera->settings.pitch_direction = -1;
 }
 

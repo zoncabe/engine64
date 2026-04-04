@@ -15,7 +15,7 @@
 #define MALE_MUSCLED_JUMP_ACCELERATION_RATE 50.0f
 #define MALE_MUSCLED_AERIAL_CONTROL_RATE 0.5f
 
-#define MALE_MUSCLED_WALK_TARGET_SPEED 185.0f
+#define MALE_MUSCLED_WALK_TARGET_SPEED 180.0f
 #define MALE_MUSCLED_RUN_TARGET_SPEED 390.0f
 #define MALE_MUSCLED_SPRINT_TARGET_SPEED 520.0f
 
@@ -26,7 +26,7 @@
 #define MALE_MUSCLED_FALL_MAX_SPEED 1000
 
 
-// convertion ratio between locomotion animation lenghts
+// convertion ratio between locomotion animation lengths
 
 #define MALE_MUSCLED_RUN_TO_WALK_RATIO 1.347826f
 #define MALE_MUSCLED_WALK_TO_RUN_RATIO 0.741935f
@@ -38,7 +38,7 @@
 #define MALE_MUSCLED_WALK_TO_SPRINT_RATIO 0.645161f
 
 
-// animation lenghts in seconds
+// animation lengths in seconds
 
 #define MALE_MUSCLED_ACTION_IDLE_MAX_BLENDING_RATIO 0.85f
 
@@ -54,10 +54,10 @@
 #define MALE_MUSCLED_RUN_TO_ROLLING_ANIM_GROUND 0.3f
 #define MALE_MUSCLED_RUN_TO_ROLLING_ANIM_GRIP 0.9f
 #define MALE_MUSCLED_RUN_TO_ROLLING_ANIM_STAND 0.9f
-#define MALE_MUSCLED_RUN_TO_ROLLING_ANIM_LENGHT 1.166666f
+#define MALE_MUSCLED_RUN_TO_ROLLING_ANIM_LENGTH 1.166666f
 
 #define MALE_MUSCLED_STAND_TO_ROLLING_ANIM_GRIP 1.433333f
-#define MALE_MUSCLED_STAND_TO_ROLLING_ANIM_LENGHT 2.066666f
+#define MALE_MUSCLED_STAND_TO_ROLLING_ANIM_LENGTH 2.066666f
 
 #define MALE_MUSCLED_JUMP_ANIM_LENGTH 0.633333f
 #define MALE_MUSCLED_JUMP_ANIM_CROUCH 0.1f
@@ -71,8 +71,7 @@
 #define MALE_MUSCLED_LAND_ANIM_STAND 0.833333f
 
 
-extern ActorMotionSettings male_muscled_motion_settings;
-
-extern ActorAnimationSettings male_muscled_animation_settings;
+const ActorMotionSettings* male_muscled_getMotionSettings(void);
+const ActorAnimationSettings* male_muscled_getAnimationSettings(void);
 
 #endif

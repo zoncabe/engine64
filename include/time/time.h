@@ -15,7 +15,7 @@ typedef struct
 
 } TimeData;
 
-extern TimeData timer;
+TimeData* time_get(void);
 
 
 // functions prototypes

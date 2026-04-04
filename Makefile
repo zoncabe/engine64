@@ -21,6 +21,7 @@ src =   $(wildcard *.c) \
 		$(wildcard src/viewport/*.c) \
 		$(wildcard src/control/*.c) \
 		$(wildcard src/actor/*.c) \
+		$(wildcard src/entity/*.c) \
 		$(wildcard src/scene/*.c) \
 		$(wildcard src/player/*.c) \
 		$(wildcard src/ui/*.c) \
@@ -57,7 +58,13 @@ filesystem/models/%.t3dm: assets/models/%.glb
 filesystem/fonts/%.font64: assets/fonts/%.ttf
 	@mkdir -p $(dir $@)
 	@echo "    [FONT] $@"
-	$(N64_MKFONT) $(MKFONT_FLAGS) -s 9 -o filesystem/fonts "$<"
+	$(N64_MKFONT) $(MKFONT_FLAGS) -o filesystem/fonts "$<"
+
+filesystem/fonts/DroidSans.font64:  MKFONT_FLAGS += --size 10
+filesystem/fonts/Headliner10.font64: MKFONT_FLAGS += --size 10
+filesystem/fonts/Headliner14.font64: MKFONT_FLAGS += --size 14
+filesystem/fonts/Headliner20.font64: MKFONT_FLAGS += --size 20
+filesystem/fonts/Headliner40.font64: MKFONT_FLAGS += --size 43
 
 filesystem/audio/%.wav64: assets/audio/%.wav
 	@mkdir -p $(dir $@)

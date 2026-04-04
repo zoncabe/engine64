@@ -1,214 +1,161 @@
-#include <t3d/t3dskeleton.h>
-#include <t3d/t3danim.h>
-
 #include "../../include/time/time.h"
-#include "../../include/physics/physics.h"
-#include "../../include/control/control.h"
-#include "../../include/actor/actor.h"
 #include "../../include/actor/actor_states.h"
 #include "../../include/actor/actor_motion.h"
 
 
-void actorMotion_setHorizontalAcceleration(Actor* actor, float target_speed, float acceleration_rate)
+static void actorMotion_setHorizontalAcceleration(Entity *entity, float target_speed, float acceleration_rate)
 {
-    actor->motion.data.target_velocity.x = target_speed * sinf(rad(actor->motion.data.target_yaw));
-    actor->motion.data.target_velocity.y = target_speed * -cosf(rad(actor->motion.data.target_yaw));
+    entity->motion->data.target_velocity.x = target_speed * sinf(rad(entity->motion->input.target_yaw));
+    entity->motion->data.target_velocity.y = target_speed * -cosf(rad(entity->motion->input.target_yaw));
 
-    actor->body.acceleration.x = acceleration_rate * (actor->motion.data.target_velocity.x - actor->body.velocity.x);
-    actor->body.acceleration.y = acceleration_rate * (actor->motion.data.target_velocity.y - actor->body.velocity.y);
+    entity->physics->acceleration.x = acceleration_rate * (entity->motion->data.target_velocity.x - entity->physics->velocity.x);
+    entity->physics->acceleration.y = acceleration_rate * (entity->motion->data.target_velocity.y - entity->physics->velocity.y);
 }
 
-void actorMotion_setHorizontalInertiaAcceleration(Actor* actor, float target_speed, float acceleration_rate)
+static void actorMotion_setHorizontalInertiaAcceleration(Entity *entity, float target_speed, float acceleration_rate)
 {
-    actor->motion.data.target_velocity.x = target_speed * -sinf(rad(actor->body.rotation.z));
-    actor->motion.data.target_velocity.y = target_speed * -cosf(rad(actor->body.rotation.z));
+    entity->motion->data.target_velocity.x = target_speed * -sinf(rad(entity->transform.rotation.z));
+    entity->motion->data.target_velocity.y = target_speed * -cosf(rad(entity->transform.rotation.z));
 
-    actor->body.acceleration.x = acceleration_rate * (actor->motion.data.target_velocity.x - actor->body.velocity.x);
-    actor->body.acceleration.y = acceleration_rate * (actor->motion.data.target_velocity.y - actor->body.velocity.y);
+    entity->physics->acceleration.x = acceleration_rate * (entity->motion->data.target_velocity.x - entity->physics->velocity.x);
+    entity->physics->acceleration.y = acceleration_rate * (entity->motion->data.target_velocity.y - entity->physics->velocity.y);
 }
 
-void actorMotion_setStopingAcceleration(Actor* actor)
+static void actorMotion_setStopingAcceleration(Entity *entity)
 {
-    actor->body.acceleration.x = actor->motion.settings.idle_acceleration_rate * (0 - actor->body.velocity.x);
-    actor->body.acceleration.y = actor->motion.settings.idle_acceleration_rate * (0 - actor->body.velocity.y);
+    entity->physics->acceleration.x = entity->motion->settings.idle_acceleration_rate * (0 - entity->physics->velocity.x);
+    entity->physics->acceleration.y = entity->motion->settings.idle_acceleration_rate * (0 - entity->physics->velocity.y);
 }
 
-void actorMotion_setJumpAcceleration(Actor* actor, float target_speed, float acceleration_rate)
+static void actorMotion_integrate(Entity *entity)
 {
-    actor->body.acceleration.z = acceleration_rate * (target_speed - actor->body.velocity.z);
-}
+    entity->motion->data.previous_yaw = entity->transform.rotation.z;
 
-void actorMotion_integrate(Actor* actor)
-{
-    if (actor->body.acceleration.x != 0 || actor->body.acceleration.y != 0 || actor->body.acceleration.z != 0) vector3_addScaledVector(&actor->body.velocity, &actor->body.acceleration, timer.delta);
+    if (entity->physics->acceleration.x || entity->physics->acceleration.y || entity->physics->acceleration.z)
+        vector3_addScaledVector(&entity->physics->velocity, &entity->physics->acceleration, time_get()->delta);
 
-	if (fabs(actor->body.velocity.x) < LOCOMOTION_MIN_SPEED && fabs(actor->body.velocity.y) < LOCOMOTION_MIN_SPEED && fabs(actor->body.velocity.z) == 0){
-		actor->body.velocity.x = 0;
-		actor->body.velocity.y = 0;
-        actor->motion.data.horizontal_speed = 0;
-	}
-
-    if (actor->body.velocity.x != 0 || actor->body.velocity.y != 0 || actor->body.velocity.z != 0) vector3_addScaledVector(&actor->body.position, &actor->body.velocity, timer.delta);
-
-    if (actor->body.velocity.x != 0 || actor->body.velocity.y != 0) {
-
-        Vector2 horizontal_velocity = {actor->body.velocity.x, actor->body.velocity.y};
-        actor->motion.data.horizontal_speed = vector2_magnitude(&horizontal_velocity);
-
-        float target_yaw = deg(atan2(-actor->body.velocity.x, -actor->body.velocity.y));
-
-        if (target_yaw > actor->body.rotation.z + 180) target_yaw -= 360;
-        if (target_yaw < actor->body.rotation.z - 180) target_yaw += 360;
-
-        if(actor->state.current == ROLLING) actor->body.rotation.z = deg(atan2(-actor->body.velocity.x, -actor->body.velocity.y));
-        
-        else if (target_yaw < actor->body.rotation.z - 1 || target_yaw > actor->body.rotation.z + 1) actor->body.rotation.z = lerpf(actor->body.rotation.z, target_yaw, actor->motion.data.horizontal_speed / actor->motion.settings.sprint_target_speed);
-        else actor->body.rotation.z = target_yaw;
-
-        if (actor->body.rotation.z > 180) actor->body.rotation.z -= 360;
-        if (actor->body.rotation.z < -180) actor->body.rotation.z += 360;
-	}
-}
-
-void actorMotion_setIdle(Actor* actor)
-{
-    actorMotion_setStopingAcceleration(actor);
-}
-
-void actorMotion_setWalking(Actor* actor)
-{
-    actorMotion_setHorizontalAcceleration(actor, actor->motion.settings.walk_target_speed, actor->motion.settings.walk_acceleration_rate);
-}
-
-void actorMotion_setRunning(Actor* actor)
-{    
-    actorMotion_setHorizontalAcceleration(actor, actor->motion.settings.run_target_speed, actor->motion.settings.run_acceleration_rate);
-}
-
-void actorMotion_setSprinting(Actor* actor)
-{
-    actorMotion_setHorizontalAcceleration(actor, actor->motion.settings.sprint_target_speed, actor->motion.settings.sprint_acceleration_rate);
-}
-
-void actorMotion_setRolling(Actor* actor)
-{
-    if (actor->motion.data.roll_timer < actor->motion.settings.roll_change_grip_time){
-
-        actorMotion_setHorizontalInertiaAcceleration(actor, actor->motion.data.horizontal_speed, actor->motion.settings.run_acceleration_rate);
-        actor->motion.data.roll_timer += timer.delta;
+    if (fabs(entity->physics->velocity.x) < LOCOMOTION_MIN_SPEED && fabs(entity->physics->velocity.y) < LOCOMOTION_MIN_SPEED && fabs(entity->physics->velocity.z) == 0) {
+        entity->physics->velocity.x = 0;
+        entity->physics->velocity.y = 0;
+        entity->motion->data.horizontal_speed = 0;
     }
 
-    else if (actor->motion.data.roll_timer < actor->motion.settings.roll_timer_max){ 
-        
-        actorMotion_setHorizontalAcceleration(actor, actor->motion.data.horizontal_speed, actor->motion.settings.roll_acceleration_grip_rate);
-        actor->motion.data.roll_timer += timer.delta;
-    }
-    
-    else {
-        actor_setState(&actor->state, actor->state.locomotion);
-        actor->motion.data.roll_timer = 0;
+    if (entity->physics->velocity.x != 0 || entity->physics->velocity.y != 0 || entity->physics->velocity.z != 0)
+        vector3_addScaledVector(&entity->transform.position, &entity->physics->velocity, time_get()->delta);
+
+    if (entity->physics->velocity.x != 0 || entity->physics->velocity.y != 0) {
+        Vector2 horizontal_velocity = {entity->physics->velocity.x, entity->physics->velocity.y};
+        entity->motion->data.horizontal_speed = vector2_magnitude(&horizontal_velocity);
+
+        float target_yaw = angle_wrap_relative(deg(atan2(-entity->physics->velocity.x, -entity->physics->velocity.y)), entity->transform.rotation.z);
+
+        if (entity->state.current == ROLLING)
+            entity->transform.rotation.z = angle_wrap(deg(atan2(-entity->physics->velocity.x, -entity->physics->velocity.y)));
+        else if (fabsf(target_yaw - entity->transform.rotation.z) > ACTOR_ROTATION_SNAP_THRESHOLD)
+            entity->transform.rotation.z = angle_wrap(lerpf(entity->transform.rotation.z, target_yaw, ACTOR_ROTATION_LERP_FACTOR * entity->motion->data.horizontal_speed / entity->motion->settings.sprint_target_speed));
+        else
+            entity->transform.rotation.z = target_yaw;
     }
 }
 
-void actorMotion_setJump(Actor* actor)
+static void actorMotion_setIdle(Entity *entity)
 {
-    actorMotion_setHorizontalAcceleration(actor, actor->motion.data.horizontal_speed, actor->motion.settings.aerial_control_rate);
-    
-    if (actor->motion.data.jump_timer < actor->motion.settings.jump_timer_max){
-        
-        actor->motion.data.jump_timer += timer.delta;
-        
-        if(actor->motion.input.jump_hold){
-            
-            actor->motion.data.jump_force += timer.delta;
-            vector3_scale(&actor->body.velocity, 0.96f);
-        } 
+    actorMotion_setStopingAcceleration(entity);
+}
+
+static void actorMotion_setWalking(Entity *entity)
+{
+    actorMotion_setHorizontalAcceleration(entity, entity->motion->settings.walk_target_speed, entity->motion->settings.walk_acceleration_rate);
+}
+
+static void actorMotion_setRunning(Entity *entity)
+{
+    actorMotion_setHorizontalAcceleration(entity, entity->motion->settings.run_target_speed, entity->motion->settings.run_acceleration_rate);
+}
+
+static void actorMotion_setSprinting(Entity *entity)
+{
+    actorMotion_setHorizontalAcceleration(entity, entity->motion->settings.sprint_target_speed, entity->motion->settings.sprint_acceleration_rate);
+}
+
+static void actorMotion_setRolling(Entity *entity)
+{
+    if (entity->motion->data.roll_timer < entity->motion->settings.roll_change_grip_time) {
+        actorMotion_setHorizontalInertiaAcceleration(entity, entity->motion->data.horizontal_speed, entity->motion->settings.run_acceleration_rate);
+        entity->motion->data.roll_timer += time_get()->delta;
+    } else if (entity->motion->data.roll_timer < entity->motion->settings.roll_timer_max) {
+        actorMotion_setHorizontalAcceleration(entity, entity->motion->data.horizontal_speed, entity->motion->settings.roll_acceleration_grip_rate);
+        entity->motion->data.roll_timer += time_get()->delta;
+    } else {
+        actor_setState(&entity->state, entity->state.locomotion);
+        entity->motion->data.roll_timer = 0;
+    }
+}
+
+static void actorMotion_setJump(Entity *entity)
+{
+    if (entity->motion->input.jump_triggered) {
+        entity->motion->data.jump_initial_velocity = entity->physics->velocity;
+        entity->motion->input.jump_triggered = false;
     }
 
-    else if (actor->motion.data.jump_force > 0){
-        
-        actor->motion.data.jump_timer += timer.delta;
+    actorMotion_setHorizontalAcceleration(entity, entity->motion->data.horizontal_speed, entity->motion->settings.aerial_control_rate);
 
-        actor->body.velocity = actor->motion.data.jump_initial_velocity;
-        vector3_scale(&actor->body.velocity, 0.8f);
-
-        actor->body.velocity.z = actor->motion.data.jump_force * actor->motion.settings.jump_force_multiplier;
-        if (actor->body.velocity.z < actor->motion.settings.jump_minimum_speed) actor->body.velocity.z = actor->motion.settings.jump_minimum_speed;
-
-        actor->motion.data.jump_force = 0;
-    }
-
-    else if (actor->body.velocity.z > 0){
-
-        actor->motion.data.jump_timer += timer.delta;
-                
-        actor->body.acceleration.z = actor->motion.settings.gravity;
-    }
-    
-    else {
-        
-        actor->body.acceleration.z = actor->motion.settings.gravity;
-        actor->motion.data.jump_timer = 0;
-        
-        actor_setState(&actor->state, FALLING);
+    if (entity->motion->data.jump_timer < entity->motion->settings.jump_timer_max) {
+        entity->motion->data.jump_timer += time_get()->delta;
+        if (entity->motion->input.jump_hold) {
+            entity->motion->data.jump_force += time_get()->delta;
+            vector3_scale(&entity->physics->velocity, ACTOR_JUMP_HOLD_VELOCITY_SCALE);
+        }
+    } else if (entity->motion->data.jump_force > 0) {
+        entity->motion->data.jump_timer += time_get()->delta;
+        entity->physics->velocity = entity->motion->data.jump_initial_velocity;
+        vector3_scale(&entity->physics->velocity, ACTOR_JUMP_LAUNCH_VELOCITY_SCALE);
+        entity->physics->velocity.z = entity->motion->data.jump_force * entity->motion->settings.jump_force_multiplier;
+        if (entity->physics->velocity.z < entity->motion->settings.jump_minimum_speed)
+            entity->physics->velocity.z = entity->motion->settings.jump_minimum_speed;
+        entity->motion->data.jump_force = 0;
+    } else if (entity->physics->velocity.z > 0) {
+        entity->motion->data.jump_timer += time_get()->delta;
+        entity->physics->acceleration.z = entity->motion->settings.gravity;
+    } else {
+        entity->physics->acceleration.z = entity->motion->settings.gravity;
+        entity->motion->data.jump_timer = 0;
+        actor_setState(&entity->state, FALLING);
         return;
     }
 }
 
-void actorMotion_setFalling(Actor* actor)
+static void actorMotion_setFalling(Entity *entity)
 {
-    actor->motion.data.grounded = 0;
-    actorMotion_setHorizontalAcceleration(actor, actor->motion.data.horizontal_speed, actor->motion.settings.aerial_control_rate);
-    actor->body.acceleration.z = actor->motion.settings.gravity;
-    if (actor->body.velocity.z > actor->motion.settings.fall_max_speed) actor->body.velocity.z = actor->motion.settings.fall_max_speed;
+    entity->motion->data.grounded = 0;
+    actorMotion_setHorizontalAcceleration(entity, entity->motion->data.horizontal_speed, entity->motion->settings.aerial_control_rate);
+    entity->physics->acceleration.z = entity->motion->settings.gravity;
+    if (entity->physics->velocity.z > entity->motion->settings.fall_max_speed)
+        entity->physics->velocity.z = entity->motion->settings.fall_max_speed;
 
-    if (actor->body.position.z <= actor->motion.data.grounding_height + 10) {
-
-        actor->motion.data.grounded = 1;
-        actor->body.acceleration.z = 0;
-        actor->body.velocity.z = 0;
-        actor->body.position.z = actor->motion.data.grounding_height;
-
-        actor_setState(&actor->state, actor->state.locomotion);
-
+    if (entity->transform.position.z <= entity->motion->data.grounding_height + ACTOR_GROUNDING_SNAP_ZONE) {
+        entity->motion->data.grounded = 1;
+        entity->physics->acceleration.z = 0;
+        entity->physics->velocity.z = 0;
+        entity->transform.position.z = entity->motion->data.grounding_height;
+        actor_setState(&entity->state, entity->state.locomotion);
         return;
     }
 }
 
+static void (*actorMotion_handler[])(Entity *) = {
+    [STANDING_IDLE] = actorMotion_setIdle,
+    [WALKING]       = actorMotion_setWalking,
+    [RUNNING]       = actorMotion_setRunning,
+    [SPRINTING]     = actorMotion_setSprinting,
+    [ROLLING]       = actorMotion_setRolling,
+    [JUMPING]       = actorMotion_setJump,
+    [FALLING]       = actorMotion_setFalling,
+};
 
-void actor_setMotion(Actor* actor)
+void actorMotion_update(Entity *entity)
 {
-   switch (actor->state.current) {
-    
-        case STANDING_IDLE: {
-            actorMotion_setIdle(actor);
-            break;
-        }
-        case WALKING: {
-            actorMotion_setWalking(actor);
-            break;
-        }
-        case RUNNING: {
-            actorMotion_setRunning(actor);
-            break;
-        }
-        case SPRINTING: {
-            actorMotion_setSprinting(actor);
-            break;
-        }
-        case ROLLING: {
-            actorMotion_setRolling(actor);
-            break;
-        }
-        case JUMPING: {
-            actorMotion_setJump(actor);
-            break;
-        }
-        case FALLING: {
-            actorMotion_setFalling(actor);
-            break;
-        }
-    }
-
-	actorMotion_integrate(actor);
+    actorMotion_handler[entity->state.current](entity);
+    actorMotion_integrate(entity);
 }

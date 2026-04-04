@@ -12,16 +12,14 @@
 #include "../../include/viewport/viewport.h"
 
 
-void playerAnimation_init(Player* player)
+void playerAnimation_init(Player *player)
 {
-	actorAnimation_initArmature(&player->actor);
-	actorAnimation_initStandingLocomotionSet(&player->actor);
-	actorAnimation_initJumpSet(&player->actor);
-	actorAnimation_initRollSet(&player->actor);
+    actorAnimation_initStandingLocomotionSet(player->entity);
+    actorAnimation_initJumpSet(player->entity);
+    actorAnimation_initRollSet(player->entity);
 }
 
-
-void player_setAnimation(Player* player)
+void player_setAnimation(Player *player)
 {
-	actorAnimation_set(&player->actor);
+    actorAnimation_set(player->entity);
 }

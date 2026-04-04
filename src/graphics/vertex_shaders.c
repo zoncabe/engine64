@@ -3,8 +3,6 @@
 #include "../../include/graphics/vertex_shaders.h"
 
 
-float flag_transform = 0.0f;
-
 void animate_flag(T3DModel* model, float transformOffset){
 
     // returns the global vertex buffer for a model.

@@ -8,8 +8,6 @@
 #define MUSIC_CHANNEL_1 6
 #define MUSIC_CHANNEL_2 9
 
-extern wav64_t reporte_universal;
-
 void sound_init();
 void sound_setMixer();
 void sound_play();

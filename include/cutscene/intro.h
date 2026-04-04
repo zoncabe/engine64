@@ -4,8 +4,10 @@
 #define INTRO_SCENE_LENGTH 10.0f
 
 
+const RenderContext* intro_getRenderContext(void);
+
 void intro_init();
 void intro_close();
-void intro_draw();
+void intro_animate(float t);
 
 #endif

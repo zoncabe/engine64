@@ -3,7 +3,9 @@
 #include "../../include/time/time.h"
 
 
-TimeData timer;
+static TimeData timer;
+
+TimeData* time_get(void) { return &timer; }
 
 
 // functions implementations

@@ -1,31 +1,24 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 
+#include "../entity/entity.h"
+#include "../control/control.h"
+
 #define PLAYER_COUNT 1
 
 typedef struct {
-
     float hp;
     float stamina;
-
 } PlayerStats;
 
-typedef struct {
-
+typedef struct Player {
     ControllerData control;
-
-    Actor actor;
-
-    PlayerStats stats;
-	
+    Entity        *entity;
+    PlayerStats    stats;
 } Player;
 
+Player **player_get(void);
 
-extern Player* player[PLAYER_COUNT];
-
-void player_init(Player* player, ActorMotionSettings* motion_settings, ActorAnimationSettings* animation_settings);
-
-void player_update();
-
+void player_update(uint8_t fb_index);
 
 #endif
