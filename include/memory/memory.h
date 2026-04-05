@@ -1,9 +1,9 @@
 #ifndef MEMORY_H
 #define MEMORY_H
 
-#include "../entity/entity.h"
-#include "../player/player.h"
+#include "../game/game_states.h"
 
-Player *player_create(const char *model_path, const ActorMotionSettings *motion_settings, const ActorAnimationSettings *animation_settings);
+void memory_load(GameState state);
+void memory_unload(GameState state);
 
 #endif

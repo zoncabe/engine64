@@ -33,8 +33,9 @@ typedef struct {
     Vector2 scale;
 } Sprite;
 
-void sprite_init(void);
-void sprite_setMode();
+void sprite_loadAsset(SpriteID id);
+void sprite_unloadAsset(SpriteID id);
+void sprite_setMode(void);
 void sprite_draw(Sprite *list, int count);
 
 #endif

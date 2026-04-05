@@ -71,7 +71,7 @@
 #define MALE_MUSCLED_LAND_ANIM_STAND 0.833333f
 
 
-const ActorMotionSettings* male_muscled_getMotionSettings(void);
-const ActorAnimationSettings* male_muscled_getAnimationSettings(void);
+extern const ActorMotionSettings    male_muscled_motion_settings;
+extern const ActorAnimationSettings male_muscled_animation_settings;
 
 #endif

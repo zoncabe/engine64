@@ -25,10 +25,15 @@ static const char *sprite_paths[SPRITE_ID_COUNT] = {
 
 static sprite_t *sprite[SPRITE_ID_COUNT];
 
-void sprite_init(void)
+void sprite_loadAsset(SpriteID id)
 {
-    for (int i = 0; i < SPRITE_ID_COUNT; i++)
-        sprite[i] = sprite_load(sprite_paths[i]);
+    sprite[id] = sprite_load(sprite_paths[id]);
+}
+
+void sprite_unloadAsset(SpriteID id)
+{
+    sprite_free(sprite[id]);
+    sprite[id] = NULL;
 }
 
 void sprite_setMode()

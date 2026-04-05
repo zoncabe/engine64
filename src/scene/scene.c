@@ -1,31 +1,9 @@
-#include <libdragon.h>
-#include <t3d/t3d.h>
-#include <t3d/t3dmath.h>
-#include <t3d/t3dmodel.h>
-#include <t3d/t3dskeleton.h>
-#include <t3d/t3danim.h>
-
-#include "../../include/time/time.h"
-#include "../../include/physics/physics.h"
-#include "../../include/control/control.h"
-#include "../../include/light/lighting.h"
-#include "../../include/camera/camera.h"
 #include "../../include/viewport/viewport.h"
-#include "../../include/actor/actor.h"
+#include "../../include/light/lighting.h"
 #include "../../include/player/player.h"
-#include "../../include/control/player_control.h"
-#include "../../include/player/player_animation.h"
-#include "../../include/graphics/font.h"
-#include "../../include/graphics/sprites.h"
-#include "../../include/graphics/shapes.h"
-#include "../../include/render/render.h"
-#include "../../include/ui/ui.h"
-#include "../../include/ui/menu.h"
-#include "../../include/game/game.h"
-#include "../../include/game/game_states.h"
-#include "../../include/assets/male_muscled.h"
-#include "../../include/memory/memory.h"
+#include "../../include/entity/entity.h"
 #include "../../include/scene/scene.h"
+#include "../../include/scene/demo_scene.h"
 
 
 static Scene scene;
@@ -33,7 +11,7 @@ static Scene scene;
 Scene *scene_get(void) { return &scene; }
 
 
-static void scene_load(const SceneDef *def)
+void scene_load(const SceneDef *def)
 {
     light_initAmbient(def->light.ambient_color);
     for (uint8_t i = 0; i < DIRECTIONAL_LIGHT_COUNT; i++)
@@ -66,32 +44,23 @@ static void scene_load(const SceneDef *def)
 }
 
 
-void scene_init(void)
+void scene_clear(void)
 {
-    const SceneDef def = {
-        .light = {
-            .ambient_color = {60, 60, 60, 0xFF},
-            .directional = {
-                [0] = { .color = {210, 210, 210, 0xFF}, .direction = {{1.0f, -1.0f, 1.0f}} },
-            },
-        },
-        .actor = {
-            [0] = {
-                .model_path         = male_muscled_model,
-                .position           = {-210.0f, -210.0f, 0.0f},
-                .rotation           = {0.0f, 0.0f, 200.0f},
-                .scale              = {1.0f, 1.0f, 1.0f},
-                .motion_settings    = male_muscled_getMotionSettings(),
-                .animation_settings = male_muscled_getAnimationSettings(),
-            },
-        },
-        .actor_count = 1,
-        .scenery = {
-            [0] = { "rom:/models/room.t3dm",  {0.0f, 0.0f, -2.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 1.0f} },
-            [1] = { "rom:/models/axis.t3dm",  {0.0f, 0.0f, -2.0f}, {0.0f, 0.0f, 0.0f}, {1.5f, 1.5f, 1.5f} },
-        },
-        .scenery_count = 2,
-    };
+    scene = (Scene){0};
+}
 
-    scene_load(&def);
+void scene_unload(void)
+{
+    for (uint8_t i = 0; i < scene.entity_count; i++)
+        if (scene.entity[i]->type != ENTITY_ACTOR)
+            entity_delete(scene.entity[i]);
+    scene_clear();
+}
+
+const SceneDef *sceneDef_get(SceneID id)
+{
+    static const SceneDef * const table[SCENE_COUNT] = {
+        [SCENE_DEMO] = &demo_scene,
+    };
+    return table[id];
 }

@@ -32,7 +32,7 @@ static void render_setSceneContext(RenderContext *ctx, const Scene *s, uint8_t f
         Entity    *e      = s->entity[i];
         RenderMesh *mesh  = e->mesh;
         T3DMat4FP  *matrix = mesh->matrix_buffer ? &mesh->matrix_buffer[fb_index] : NULL;
-        T3DSkeleton *skel  = e->armature ? &e->armature->main : NULL;
+        T3DSkeleton *skel  = e->actor ? &e->actor->armature.main : NULL;
         ctx->object[ctx->object_count++] = (T3DElement){ mesh->dl, matrix, skel };
     }
 }

@@ -17,11 +17,9 @@ typedef struct
 
 TimeData* time_get(void);
 
-
-// functions prototypes
-
 void time_init();
 void time_update();
+void time_setScale(float scale);
 
 
 #endif

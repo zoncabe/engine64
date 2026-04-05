@@ -4,7 +4,6 @@
 
 #include "../../include/time/time.h"
 #include "../../include/physics/physics.h"
-#include "../../include/control/control.h"
 #include "../../include/light/lighting.h"
 #include "../../include/camera/camera.h"
 #include "../../include/viewport/viewport.h"

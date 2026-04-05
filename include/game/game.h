@@ -4,6 +4,7 @@
 #define GAME_H
 
 #include "game_states.h"
+#include "../control/controller.h"
 
 typedef struct Scene         Scene;
 typedef struct RenderContext RenderContext;
@@ -22,7 +23,7 @@ typedef struct GameTransition {
     float          progress;
     float          speed;
     bool           active;
-    uint8_t        phase; // 0 = fade out, 1 = fade in
+    uint8_t        phase;
     bool           is_overlay;
 
 } GameTransition;
@@ -34,18 +35,18 @@ typedef struct Game {
     GameState  target_state;
     bool       state_changed;
     GameTransition transition;
-    float      intro_counter;
 
 } Game;
 
 
 typedef struct GameContext {
 
-    Game *game;
-    Viewport *viewport;
-    Scene *scene;
-    Player **player;
-    
+    Game          *game;
+    Viewport      *viewport;
+    Scene         *scene;
+    Player       **player;
+    Controller   **controller;
+
 } GameContext;
 
 typedef struct GameRenderDescriptor {

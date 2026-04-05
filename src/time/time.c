@@ -4,8 +4,10 @@
 
 
 static TimeData timer;
+static float time_scale = 1.0f;
 
 TimeData* time_get(void) { return &timer; }
+void time_setScale(float scale) { time_scale = scale; }
 
 
 // functions implementations
@@ -25,7 +27,7 @@ void time_init()
 /* sets timing data */
 void time_update()
 {
-    timer.delta = display_get_delta_time();
+    timer.delta = display_get_delta_time() * time_scale;
     timer.counter += timer.delta;
     timer.rate = display_get_fps();
 }

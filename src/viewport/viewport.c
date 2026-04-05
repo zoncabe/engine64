@@ -4,7 +4,7 @@
 
 #include "../../include/time/time.h"
 #include "../../include/physics/physics.h"
-#include "../../include/control/control.h"
+#include "../../include/control/controller.h"
 #include "../../include/actor/actor.h"
 #include "../../include/light/lighting.h"
 #include "../../include/camera/camera.h"
@@ -72,9 +72,9 @@ void viewport_setIsometricCamera()
     );
 }
 
-void viewport_setOrbitalCamera(ControllerData *control, Vector3 *target)
+void viewport_setOrbitalCamera(const ControllerActions *actions, Vector3 *target)
 {
-    cameraControl_setOrbitalInput(&viewport.camera, control);
+    cameraControl_setOrbitalInput(&viewport.camera, actions);
     camera_setOrbitalMotion(&viewport.camera, target);
     viewport_setPerspectiveCamera();
     //viewport_setIsometricCamera();

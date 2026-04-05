@@ -8,12 +8,12 @@
 
 
 typedef struct {
-    const char                   *model_path;
-    Vector3                       position;
-    Vector3                       rotation;
-    Vector3                       scale;
-    const ActorMotionSettings    *motion_settings;
-    const ActorAnimationSettings *animation_settings;
+    const char                    *model_path;
+    Vector3                        position;
+    Vector3                        rotation;
+    Vector3                        scale;
+    const ActorMotionSettings     *motion_settings;
+    const ActorAnimationSettings  *animation_settings;
 } ActorDef;
 
 typedef struct {
@@ -42,7 +42,18 @@ typedef struct Scene {
     uint8_t  entity_count;
 } Scene;
 
-Scene *scene_get(void);
-void   scene_init(void);
+typedef enum {
+    SCENE_DEMO,
+    SCENE_COUNT,
+} SceneID;
+
+
+Scene          *scene_get(void);
+void            scene_load(const SceneDef *def);
+void            scene_clear(void);
+void            scene_unload(void);
+void            scene_addEntity(Entity *e);
+
+const SceneDef *sceneDef_get(SceneID id);
 
 #endif

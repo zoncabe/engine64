@@ -1,15 +1,8 @@
-#include <t3d/t3danim.h>
-
-#include "../../include/physics/physics.h"
-#include "../../include/control/control.h"
 #include "../../include/actor/actor.h"
-#include "../../include/player/player.h"
-#include "../../include/player/player_animation.h"
-
 #include "../../include/assets/male_muscled.h"
 
 
-static const ActorMotionSettings motion_settings = {
+const ActorMotionSettings male_muscled_motion_settings = {
     
     .idle_acceleration_rate = MALE_MUSCLED_IDLE_ACCELERATION_RATE,
     .walk_acceleration_rate = MALE_MUSCLED_WALK_ACCELERATION_RATE,
@@ -37,7 +30,7 @@ static const ActorMotionSettings motion_settings = {
 };    
     
 
-static const ActorAnimationSettings animation_settings = {
+const ActorAnimationSettings male_muscled_animation_settings = {
 
     .standing_locomotion = {
 
@@ -89,5 +82,3 @@ static const ActorAnimationSettings animation_settings = {
     },
 };
 
-const ActorMotionSettings* male_muscled_getMotionSettings(void) { return &motion_settings; }
-const ActorAnimationSettings* male_muscled_getAnimationSettings(void) { return &animation_settings; }

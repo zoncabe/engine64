@@ -2,7 +2,6 @@
 
 #include "../../include/time/time.h"
 #include "../../include/physics/physics.h"
-#include "../../include/control/control.h"
 #include "../../include/actor/actor.h"
 #include "../../include/actor/actor_states.h"
 #include "../../include/actor/actor_animation.h"

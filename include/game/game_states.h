@@ -1,8 +1,11 @@
 #ifndef GAME_STATES_H
 #define GAME_STATES_H
 
-#define TRANSITION_SPEED_SLOW  10.0f
-#define TRANSITION_SPEED_FAST  20.0f
+#define GAME_INITIAL_STATE         INTRO
+
+#define TRANSITION_SPEED_SLOW      10.0f
+#define TRANSITION_SPEED_FAST      20.0f
+#define GAME_STATE_MAX_CHILD    4
 
 typedef enum {
     INTRO      = 0,
@@ -21,6 +24,7 @@ typedef struct Game        Game;
 
 void game_setState(Game *game, GameState new_state);
 void game_updateState(GameContext *ctx);
+void game_loadInitialState(void);
 
 
 #endif

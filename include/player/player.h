@@ -2,7 +2,6 @@
 #define PLAYER_H
 
 #include "../entity/entity.h"
-#include "../control/control.h"
 
 #define PLAYER_COUNT 1
 
@@ -12,12 +11,13 @@ typedef struct {
 } PlayerStats;
 
 typedef struct Player {
-    ControllerData control;
-    Entity        *entity;
-    PlayerStats    stats;
+    Entity      *entity;
+    PlayerStats  stats;
 } Player;
 
 Player **player_get(void);
+Player  *player_create(const char *model_path, const ActorMotionSettings *motion_settings, const ActorAnimationSettings *animation_settings);
+void     player_destroy(Player *p);
 
 void player_update(uint8_t fb_index);
 

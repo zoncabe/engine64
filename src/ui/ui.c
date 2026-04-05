@@ -90,13 +90,6 @@ void pause_animate(const Game *game)
     pause_screen.element[10].sprite.position.x = 320.0f - 76.0f * t;
 }
 
-void ui_init()
-{
-    fonts_init();
-    sprite_init();
-
-}
-
 void ui_drawDebugData()
 {
     rdpq_text_printf(NULL, DROID_SANS, 272, 20, "%d FPS", (int)(time_get()->rate));

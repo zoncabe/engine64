@@ -193,4 +193,13 @@ typedef struct ActorAnimation {
 } ActorAnimation;
 
 
+typedef struct Actor {
+    RigidBody      body;
+    ActorMotion    motion;
+    ActorArmature  armature;
+    ActorAnimation animation;
+    ActorStateData state;
+} Actor;
+
+
 #endif

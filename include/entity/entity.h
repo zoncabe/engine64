@@ -12,14 +12,10 @@ typedef enum {
 } EntityType;
 
 typedef struct Entity {
-    EntityType      type;
-    Transform       transform;
-    RenderMesh     *mesh;
-    RigidBody      *physics;
-    ActorMotion    *motion;
-    ActorArmature  *armature;
-    ActorAnimation *animation;
-    ActorStateData  state;
+    EntityType  type;
+    Transform   transform;
+    RenderMesh *mesh;
+    Actor      *actor;
 } Entity;
 
 void    entity_init(Entity *entity, EntityType type, const ActorMotionSettings *motion_settings, const ActorAnimationSettings *animation_settings);

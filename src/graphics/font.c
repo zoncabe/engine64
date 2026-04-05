@@ -1,29 +1,35 @@
 #include "../../include/graphics/font.h"
 
 
-static rdpq_font_t *DroiSans;
-static rdpq_font_t *Headliner10;
-static rdpq_font_t *Headliner14;
-static rdpq_font_t *Headliner20;
-static rdpq_font_t *Headliner40;
+static const char *font_paths[] = {
+    [DROID_SANS]   = "rom:/fonts/DroidSans.font64",
+    [HEADLINER_10] = "rom:/fonts/Headliner10.font64",
+    [HEADLINER_14] = "rom:/fonts/Headliner14.font64",
+    [HEADLINER_20] = "rom:/fonts/Headliner20.font64",
+    [HEADLINER_40] = "rom:/fonts/Headliner40.font64",
+};
 
-void fonts_init()
+static rdpq_font_t *fonts[6];
+
+void font_loadAsset(uint8_t id)
 {
-    DroiSans    = rdpq_font_load("rom:/fonts/DroidSans.font64");
-    Headliner10 = rdpq_font_load("rom:/fonts/Headliner10.font64");
-    Headliner14 = rdpq_font_load("rom:/fonts/Headliner14.font64");
-    Headliner20 = rdpq_font_load("rom:/fonts/Headliner20.font64");
-    Headliner40 = rdpq_font_load("rom:/fonts/Headliner40.font64");
+    fonts[id] = rdpq_font_load(font_paths[id]);
 
-    rdpq_font_style(Headliner20, MENU_STYLE_NORMAL,   &(rdpq_fontstyle_t){RGBA32(200, 200, 200, 255)});
-    rdpq_font_style(Headliner20, MENU_STYLE_SELECTED, &(rdpq_fontstyle_t){RGBA32(255, 220, 30,  255)});
-    rdpq_font_style(Headliner40, MENU_STYLE_NORMAL,   &(rdpq_fontstyle_t){RGBA32(255, 255, 255, 200)});
+    if (id == HEADLINER_20) {
+        rdpq_font_style(fonts[id], MENU_STYLE_NORMAL,   &(rdpq_fontstyle_t){RGBA32(200, 200, 200, 255)});
+        rdpq_font_style(fonts[id], MENU_STYLE_SELECTED, &(rdpq_fontstyle_t){RGBA32(255, 220, 30,  255)});
+    }
+    if (id == HEADLINER_40)
+        rdpq_font_style(fonts[id], MENU_STYLE_NORMAL,   &(rdpq_fontstyle_t){RGBA32(255, 255, 255, 200)});
 
-    rdpq_text_register_font(DROID_SANS,   DroiSans);
-    rdpq_text_register_font(HEADLINER_10, Headliner10);
-    rdpq_text_register_font(HEADLINER_14, Headliner14);
-    rdpq_text_register_font(HEADLINER_20, Headliner20);
-    rdpq_text_register_font(HEADLINER_40, Headliner40);
+    rdpq_text_register_font(id, fonts[id]);
+}
+
+void font_unloadAsset(uint8_t id)
+{
+    rdpq_text_unregister_font(id);
+    rdpq_font_free(fonts[id]);
+    fonts[id] = NULL;
 }
 
 void text_draw(const Text *list, uint8_t count)

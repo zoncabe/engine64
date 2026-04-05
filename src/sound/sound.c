@@ -6,7 +6,6 @@
 #include "../../include/game/game.h"
 #include "../../include/game/game_states.h"
 #include "../../include/physics/physics.h"
-#include "../../include/control/control.h"
 #include "../../include/actor/actor.h"
 #include "../../include/player/player.h"
 #include "../../include/player/player_animation.h"

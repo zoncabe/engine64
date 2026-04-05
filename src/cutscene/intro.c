@@ -24,9 +24,11 @@ static SpriteID intro_ids[INTRO_SPRITE_COUNT] = {
 	SPR_ZONCABE
 };
 
+static float intro_counter = 0.0f;
+static RenderContext intro_screen = {0};
+
 float intro_transitions[INTRO_SPRITE_COUNT + 1] = { 3.00f, 5.00f, 7.00f, 10.0f };
 
-static RenderContext intro_screen = {0};
 
 const RenderContext* intro_getRenderContext(void) { return &intro_screen; }
 
@@ -74,4 +76,15 @@ void intro_animate(float t)
 
         start = end;
     }
+}
+
+bool intro_update(void)
+{
+    intro_counter += time_get()->delta;
+    intro_animate(intro_counter);
+    if (intro_counter >= INTRO_SCENE_LENGTH) {
+        intro_counter = 0.0f;
+        return true;
+    }
+    return false;
 }

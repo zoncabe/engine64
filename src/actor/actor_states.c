@@ -1,7 +1,6 @@
 #include <t3d/t3danim.h>
 
 #include "../../include/physics/physics.h"
-#include "../../include/control/control.h"
 #include "../../include/actor/actor.h"
 #include "../../include/actor/actor_states.h"
 
