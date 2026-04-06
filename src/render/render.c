@@ -11,6 +11,7 @@
 #include "../../include/time/time.h"
 #include "../../include/scene/scene.h"
 #include "../../include/game/game.h"
+#include "../../include/player/player.h"
 
 
 void render_initContext(RenderContext *ctx)
@@ -30,9 +31,9 @@ static void render_setSceneContext(RenderContext *ctx, const Scene *s, uint8_t f
 {
     for (uint8_t i = 0; i < s->entity_count; i++) {
         Entity    *e      = s->entity[i];
-        RenderMesh *mesh  = e->mesh;
+        Mesh *mesh  = e->mesh;
         T3DMat4FP  *matrix = mesh->matrix_buffer ? &mesh->matrix_buffer[fb_index] : NULL;
-        T3DSkeleton *skel  = e->actor ? &e->actor->armature.main : NULL;
+        T3DSkeleton *skel  = e->actor ? &e->actor->animation.main : NULL;
         ctx->object[ctx->object_count++] = (T3DElement){ mesh->dl, matrix, skel };
     }
 }
@@ -52,12 +53,26 @@ static void render_setTransitionContext(RenderContext *ctx, const GameTransition
 
 static void render_setDebugContext(RenderContext *ctx)
 {
+    /*
     static char fps_buf[8];
     snprintf(fps_buf, sizeof(fps_buf), "%d FPS", (int)time_get()->rate);
     ctx->element[ctx->element_count++] = (DrawElement){
         .type = DRAW_TEXT,
         .text = { DROID_SANS, 0, {272.0f, 20.0f}, fps_buf, NULL }
     };
+
+    Player **p = player_get();
+    if (p[0] && p[0]->entity->actor && p[0]->entity->actor->animation.animation) {
+        static char anim_buf[48];
+        T3DAnim    *idle = &p[0]->entity->actor->animation.animation[0];
+        T3DSkeleton *sk  = &p[0]->entity->actor->animation.main;
+        snprintf(anim_buf, sizeof(anim_buf), "t=%.2f ch=%ld b5=%.2f b6=%.2f", idle->time, sk->bones[5].hasChanged, sk->bones[5].rotation.v[0], sk->bones[6].rotation.v[0]);
+        ctx->element[ctx->element_count++] = (DrawElement){
+            .type = DRAW_TEXT,
+            .text = { DROID_SANS, 0, {10.0f, 40.0f}, anim_buf, NULL }
+        };
+    }
+    */
 }
 
 void render_setContext(RenderContext *ctx, const Scene *scene, uint8_t fb_index, const GameTransition *transition, const RenderContext *screen)

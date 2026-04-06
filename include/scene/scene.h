@@ -14,6 +14,7 @@ typedef struct {
     Vector3                        scale;
     const ActorMotionSettings     *motion_settings;
     const ActorAnimationSettings  *animation_settings;
+    const AnimDef                 *anim_def;
 } ActorDef;
 
 typedef struct {

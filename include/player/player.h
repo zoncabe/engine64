@@ -16,7 +16,7 @@ typedef struct Player {
 } Player;
 
 Player **player_get(void);
-Player  *player_create(const char *model_path, const ActorMotionSettings *motion_settings, const ActorAnimationSettings *animation_settings);
+Player  *player_create(const char *model_path, const ActorMotionSettings *motion_settings, const ActorAnimationSettings *animation_settings, const AnimDef *anim_def);
 void     player_destroy(Player *p);
 
 void player_update(uint8_t fb_index);

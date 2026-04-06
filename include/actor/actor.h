@@ -9,24 +9,67 @@
 #include <t3d/t3danim.h>
 
 #include "../physics/physics.h"
-#include "../render/render_mesh.h"
+#include "../graphics/mesh.h"
 
 
-// --- Animation slots ---
+// --- Anim graph types ---
+
+#define ANIM_SLOT_MAIN 0xFF
 
 typedef enum {
-    ANIM_SLOT_WALK,
-    ANIM_SLOT_IDLE_R,
-    ANIM_SLOT_JUMP_L,
-    ANIM_SLOT_JUMP_R,
-    ANIM_SLOT_LAND_L,
-    ANIM_SLOT_LAND_R,
-    ANIM_SLOT_ROLL_L,
-    ANIM_SLOT_ROLL_R,
-    ANIM_SLOT_TURN_WALK,
-    ANIM_SLOT_TURN_RUN,
-    ANIM_SLOT_COUNT
-} AnimSlot;
+    ANIM_PARAM_WALK,
+    ANIM_PARAM_RUN,
+    ANIM_PARAM_SPRINT,
+    ANIM_PARAM_IDLE_RIGHT,
+    ANIM_PARAM_TURNING,
+    ANIM_PARAM_JUMP_L,
+    ANIM_PARAM_JUMP_R,
+    ANIM_PARAM_LAND_L,
+    ANIM_PARAM_LAND_R,
+    ANIM_PARAM_ROLL,
+    ANIM_PARAM_ROLL_DIR,
+    ANIM_PARAM_TURN_WALK,
+    ANIM_PARAM_TURN_RUN,
+    ANIM_PARAM_COUNT
+} AnimParam;
+
+typedef enum {
+    ANIM_NODE_CLIP,
+    ANIM_NODE_SELECT,
+    ANIM_NODE_SEQUENCE,
+    ANIM_NODE_BLEND,
+    ANIM_NODE_LAYER,
+} AnimNodeType;
+
+typedef struct {
+    AnimNodeType type;
+    uint8_t      anim;
+    uint8_t      anim2;
+    uint8_t      buffer;
+    uint8_t      param;
+} AnimNode;
+
+typedef struct {
+    const char *name;
+    uint8_t     buffer;
+    bool        looping;
+} AnimClipDef;
+
+typedef struct {
+    const AnimClipDef *clip;
+    const AnimNode    *node;
+    uint8_t            clip_count;
+    uint8_t            node_count;
+    uint8_t            buffer_count;
+    uint8_t            walk_anim;
+    uint8_t            run_anim;
+    uint8_t            sprint_anim;
+    uint8_t            turn_walk_anim;
+    uint8_t            turn_run_anim;
+    uint8_t            jump_anim;
+    uint8_t            land_anim;
+    uint8_t            roll_anim;
+} AnimDef;
 
 
 // --- State ---
@@ -89,43 +132,7 @@ typedef struct ActorMotion {
 } ActorMotion;
 
 
-// --- Armature & Animation ---
-
-typedef struct ActorArmature {
-    T3DSkeleton main;
-    T3DSkeleton buffer[ANIM_SLOT_COUNT];
-} ActorArmature;
-
-typedef struct {
-    T3DAnim breathing_idle;
-    T3DAnim transition_left;
-    T3DAnim transition_right;
-    T3DAnim standing_idle_left;
-    T3DAnim standing_idle_right;
-    T3DAnim walking;
-    T3DAnim running;
-    T3DAnim sprinting;
-    T3DAnim walking_turn_left;
-    T3DAnim walking_turn_right;
-    T3DAnim running_turn_left;
-    T3DAnim running_turn_right;
-} ActorAnimationStandingLocomotionSet;
-
-typedef struct {
-    T3DAnim jump_left;
-    T3DAnim jump_right;
-    T3DAnim falling_left;
-    T3DAnim falling_right;
-    T3DAnim land_left;
-    T3DAnim land_right;
-} ActorAnimationJumpSet;
-
-typedef struct {
-    T3DAnim running_to_roll_left;
-    T3DAnim running_to_roll_right;
-    T3DAnim standing_to_roll_left;
-    T3DAnim standing_to_roll_right;
-} ActorAnimationRollSet;
+// --- Animation settings ---
 
 typedef struct {
     float action_idle_max_blending_ratio;
@@ -172,33 +179,24 @@ typedef struct {
     ActorAnimationRollSettings       roll;
 } ActorAnimationSettings;
 
-typedef struct {
-    uint8_t current;
-    uint8_t previous;
-    float locomotion_blending_ratio;
-    float turning_blending_ratio;
-    float jump_blending_ratio;
-    float land_blending_ratio;
-    float roll_blending_ratio;
-    float footing_phase;
-    float speed;
-} ActorAnimationData;
-
 typedef struct ActorAnimation {
-    ActorAnimationStandingLocomotionSet standing_locomotion;
-    ActorAnimationJumpSet               jump;
-    ActorAnimationRollSet               roll;
-    ActorAnimationSettings              settings;
-    ActorAnimationData                  data;
+    T3DSkeleton  main;
+    T3DSkeleton *buffer;
+    T3DAnim     *animation;
+    uint8_t     *node_state;
+    float        param[ANIM_PARAM_COUNT];
+    uint8_t      prev_speed_state;
+    uint8_t      action_state;
+    ActorAnimationSettings settings;
 } ActorAnimation;
 
 
 typedef struct Actor {
-    RigidBody      body;
-    ActorMotion    motion;
-    ActorArmature  armature;
-    ActorAnimation animation;
-    ActorStateData state;
+    RigidBody       body;
+    ActorMotion     motion;
+    ActorAnimation  animation;
+    ActorStateData  state;
+    const AnimDef  *anim_def;
 } Actor;
 
 

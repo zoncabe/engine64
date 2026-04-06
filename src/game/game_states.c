@@ -71,7 +71,7 @@ static void gameTransition_start(Game *game, GameTransitionType type, float spee
     game->transition.is_overlay = is_overlay;
     if (reversed) {
         game->transition.progress = 1.0f;
-        game->transition.phase    = 1;
+        game->transition.phase    = 2;
         game->state               = game->target_state;
     } else {
         game->transition.progress = 0.0f;
@@ -128,17 +128,20 @@ static void gameTransition_swapContext(Game *game)
 static void gameTransition_update(Game *game)
 {
     if (!game->transition.active) return;
+
     if (game->transition.phase == 0) {
         game->transition.progress += game->transition.speed * time_get()->delta;
         if (game->transition.progress >= 1.0f) {
             game->transition.progress = 1.0f;
-            gameTransition_swapContext(game);
-            game->state = game->target_state;
-            if (game->transition.is_overlay) {
-                game->transition.active = false;
-            } else {
-                game->transition.phase = 1;
-            }
+            game->transition.phase = 1;
+        }
+    } else if (game->transition.phase == 1) {
+        gameTransition_swapContext(game);
+        game->state = game->target_state;
+        if (game->transition.is_overlay) {
+            game->transition.active = false;
+        } else {
+            game->transition.phase = 2;
         }
     } else {
         game->transition.progress -= game->transition.speed * time_get()->delta;
@@ -199,7 +202,7 @@ void gameState_updatePause(GameContext *ctx)
     uint8_t fb_index = ctx->viewport->fb_index;
 
     for (uint8_t i = 0; i < PLAYER_COUNT; i++)
-        renderMesh_buildMatrix(ctx->player[i]->entity->mesh, &ctx->player[i]->entity->transform, fb_index);
+        mesh_buildMatrix(ctx->player[i]->entity->mesh, &ctx->player[i]->entity->transform, fb_index);
 
     if (!game->transition.active || game->transition.is_overlay)
         pause_animate(game);

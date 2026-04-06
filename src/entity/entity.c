@@ -19,28 +19,27 @@ void entity_init(Entity *entity, EntityType type, const ActorMotionSettings *mot
         *entity->actor = (Actor){
             .body      = (RigidBody){0},
             .motion    = (ActorMotion){ .settings = *motion_settings, .data.grounded = true },
-            .armature  = (ActorArmature){0},
-            .animation = (ActorAnimation){ .settings = *animation_settings, .data.footing_phase = 0.5f },
+            .animation = (ActorAnimation){ .settings = *animation_settings },
             .state     = (ActorStateData){ STANDING_IDLE, 0, 0 },
         };
     }
 }
 
-Entity *entity_create(EntityType type, const char *model_path, const ActorMotionSettings *motion_settings, const ActorAnimationSettings *animation_settings)
+Entity *entity_create(EntityType type, const char *model_path, const ActorMotionSettings *motion_settings, const ActorAnimationSettings *animation_settings, const AnimDef *anim_def)
 {
     Entity *entity = malloc(sizeof(Entity));
     entity_init(entity, type, motion_settings, animation_settings);
 
-    entity->mesh               = malloc(sizeof(RenderMesh));
+    entity->mesh               = malloc(sizeof(Mesh));
     entity->mesh->model        = t3d_model_load(model_path);
     entity->mesh->matrix_buffer = malloc_uncached(sizeof(T3DMat4FP) * FB_COUNT);
     t3d_mat4fp_identity(entity->mesh->matrix_buffer);
 
     if (type == ENTITY_ACTOR) {
-        actorAnimation_initArmature(entity);
+        actorAnimation_initGraph(entity, anim_def);
 
         rspq_block_begin();
-        t3d_model_draw_skinned(entity->mesh->model, &entity->actor->armature.main);
+        t3d_model_draw_skinned(entity->mesh->model, &entity->actor->animation.main);
         entity->mesh->dl = rspq_block_end();
     } else {
         rspq_block_begin();
@@ -59,6 +58,15 @@ void entity_delete(Entity *entity)
     free(entity->mesh);
 
     if (entity->type == ENTITY_ACTOR) {
+        ActorAnimation *anim = &entity->actor->animation;
+        for (uint8_t i = 0; i < entity->actor->anim_def->clip_count; i++)
+            t3d_anim_destroy(&anim->animation[i]);
+        for (uint8_t i = 0; i < entity->actor->anim_def->buffer_count; i++)
+            t3d_skeleton_destroy(&anim->buffer[i]);
+        t3d_skeleton_destroy(&anim->main);
+        free(anim->animation);
+        free(anim->buffer);
+        free(anim->node_state);
         free(entity->actor);
     }
 

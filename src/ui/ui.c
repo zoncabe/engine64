@@ -12,6 +12,7 @@
 #include "../../include/game/game.h"
 #include "../../include/ui/menu.h"
 #include "../../include/ui/ui.h"
+#include "../../include/player/player.h"
 
 
 static const rdpq_textparms_t h14_parms = { .char_spacing = 0.95f };
@@ -93,5 +94,13 @@ void pause_animate(const Game *game)
 void ui_drawDebugData()
 {
     rdpq_text_printf(NULL, DROID_SANS, 272, 20, "%d FPS", (int)(time_get()->rate));
+
+    Player **p = player_get();
+    if (p[0]) {
+        T3DAnim    *idle = &p[0]->entity->actor->animation.animation[0];
+        T3DSkeleton *sk  = &p[0]->entity->actor->animation.main;
+        rdpq_text_printf(NULL, DROID_SANS, 10, 40, "idle playing=%d time=%.2f", idle->isPlaying, idle->time);
+        rdpq_text_printf(NULL, DROID_SANS, 10, 55, "bone0 rot x=%.2f y=%.2f", sk->bones[0].rotation.v[0], sk->bones[0].rotation.v[1]);
+    }
 }
 

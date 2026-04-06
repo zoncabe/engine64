@@ -24,7 +24,7 @@ void scene_load(const SceneDef *def)
     Player **player = player_get();
     for (uint8_t i = 0; i < def->actor_count; i++) {
         const ActorDef *a = &def->actor[i];
-        player[i] = player_create(a->model_path, a->motion_settings, a->animation_settings);
+        player[i] = player_create(a->model_path, a->motion_settings, a->animation_settings, a->anim_def);
         player[i]->entity->transform.position = a->position;
         player[i]->entity->transform.rotation = a->rotation;
         player[i]->entity->transform.scale    = a->scale;
@@ -33,12 +33,12 @@ void scene_load(const SceneDef *def)
 
     for (uint8_t i = 0; i < def->scenery_count; i++) {
         const SceneryDef *s = &def->scenery[i];
-        Entity *e = entity_create(ENTITY_SCENERY, s->model_path, NULL, NULL);
+        Entity *e = entity_create(ENTITY_SCENERY, s->model_path, NULL, NULL, NULL);
         e->transform.position = s->position;
         e->transform.rotation = s->rotation;
         e->transform.scale    = s->scale;
         for (uint8_t fb = 0; fb < FB_COUNT; fb++)
-            renderMesh_buildMatrix(e->mesh, &e->transform, fb);
+            mesh_buildMatrix(e->mesh, &e->transform, fb);
         scene.entity[scene.entity_count++] = e;
     }
 }

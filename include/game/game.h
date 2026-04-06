@@ -9,7 +9,8 @@
 typedef struct Scene         Scene;
 typedef struct RenderContext RenderContext;
 typedef struct Viewport      Viewport;
-typedef struct Player        Player;
+
+#include "../player/player.h"
 
 typedef enum {
 

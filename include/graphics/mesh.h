@@ -11,8 +11,8 @@ typedef struct {
     rspq_block_t *dl;
     T3DMat4FP    *matrix_buffer;  // NULL = matrix baked in dl (static mesh)
     T3DModel     *model;
-} RenderMesh;
+} Mesh;
 
-void renderMesh_buildMatrix(RenderMesh *mesh, const Transform *transform, uint8_t fb_index);
+void mesh_buildMatrix(Mesh *mesh, const Transform *transform, uint8_t fb_index);
 
 #endif

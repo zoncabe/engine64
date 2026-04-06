@@ -18,6 +18,7 @@ const SceneDef demo_scene = {
             .scale              = {1.0f, 1.0f, 1.0f},
             .motion_settings    = &male_muscled_motion_settings,
             .animation_settings = &male_muscled_animation_settings,
+            .anim_def           = &male_muscled_anim_def,
         },
     },
     .actor_count = 1,

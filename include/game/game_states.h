@@ -1,7 +1,7 @@
 #ifndef GAME_STATES_H
 #define GAME_STATES_H
 
-#define GAME_INITIAL_STATE         INTRO
+#define GAME_INITIAL_STATE         MAIN_MENU
 
 #define TRANSITION_SPEED_SLOW      10.0f
 #define TRANSITION_SPEED_FAST      20.0f

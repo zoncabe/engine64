@@ -6,16 +6,29 @@
 #define LAND_ANIM_STARTING_HEIGHT 130
 
 typedef struct {
-    const T3DSkeleton *layer[ANIM_SLOT_COUNT];
-    float              weight[ANIM_SLOT_COUNT];
+    const T3DSkeleton *layer[16];
+    float              weight[16];
     uint8_t            count;
 } ActorAnimationBuffer;
 
-void actorAnimation_initArmature(Entity *entity);
-void actorAnimation_initStandingLocomotionSet(Entity *entity);
-void actorAnimation_initJumpSet(Entity *entity);
-void actorAnimation_initRollSet(Entity *entity);
+typedef struct {
+    Entity                       *entity;
+    Actor                        *actor;
+    ActorAnimation               *anim;
+    const AnimDef                *def;
+    const ActorAnimationSettings *settings;
+    float                         delta;
 
-void actorAnimation_set(Entity *entity);
+    uint8_t  speed_state;
+    float    locomotion_param;
+    float    locomotion_phase;
+    float    turning;
+} AnimParamCtx;
+
+void actorAnimation_addLayer(ActorAnimationBuffer *buffer, const T3DSkeleton *skel, float weight);
+void actorAnimation_blendLayers(const T3DSkeleton *main, const ActorAnimationBuffer *buffer);
+void actorAnimation_initGraph(Entity *entity, const AnimDef *def);
+void actorAnimation_setParams(Entity *entity, const AnimDef *def);
+void actorAnimation_evaluateGraph(const AnimDef *def, const ActorAnimationSettings *settings, ActorAnimation *anim, float delta);
 
 #endif
