@@ -4,7 +4,6 @@
 #include "../../include/time/time.h"
 #include "../../include/physics/physics.h"
 #include "../../include/actor/actor.h"
-#include "../../include/scene/scenery.h"
 #include "../../include/graphics/font.h"
 #include "../../include/graphics/sprites.h"
 #include "../../include/graphics/shapes.h"
@@ -89,18 +88,5 @@ void pause_animate(const Game *game)
     pause_screen.element[8].sprite.position.x  = 330.0f - 85.0f * t;
     pause_screen.element[9].sprite.position.x  = 320.0f - 76.0f * t;
     pause_screen.element[10].sprite.position.x = 320.0f - 76.0f * t;
-}
-
-void ui_drawDebugData()
-{
-    rdpq_text_printf(NULL, DROID_SANS, 272, 20, "%d FPS", (int)(time_get()->rate));
-
-    Player **p = player_get();
-    if (p[0]) {
-        T3DAnim    *idle = &p[0]->entity->actor->animation.animation[0];
-        T3DSkeleton *sk  = &p[0]->entity->actor->animation.main;
-        rdpq_text_printf(NULL, DROID_SANS, 10, 40, "idle playing=%d time=%.2f", idle->isPlaying, idle->time);
-        rdpq_text_printf(NULL, DROID_SANS, 10, 55, "bone0 rot x=%.2f y=%.2f", sk->bones[0].rotation.v[0], sk->bones[0].rotation.v[1]);
-    }
 }
 

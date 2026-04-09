@@ -38,7 +38,7 @@ void scene_load(const SceneDef *def)
         e->transform.rotation = s->rotation;
         e->transform.scale    = s->scale;
         for (uint8_t fb = 0; fb < FB_COUNT; fb++)
-            mesh_buildMatrix(e->mesh, &e->transform, fb);
+            mesh_setMatrix(e->mesh, &e->transform, fb);
         scene.entity[scene.entity_count++] = e;
     }
 }

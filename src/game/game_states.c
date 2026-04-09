@@ -2,7 +2,6 @@
 #include "../../include/memory/memory.h"
 #include "../../include/time/time.h"
 #include "../../include/scene/scene.h"
-#include "../../include/scene/scenery.h"
 #include "../../include/render/render.h"
 #include "../../include/cutscene/intro.h"
 #include "../../include/ui/ui.h"
@@ -202,7 +201,7 @@ void gameState_updatePause(GameContext *ctx)
     uint8_t fb_index = ctx->viewport->fb_index;
 
     for (uint8_t i = 0; i < PLAYER_COUNT; i++)
-        mesh_buildMatrix(ctx->player[i]->entity->mesh, &ctx->player[i]->entity->transform, fb_index);
+        mesh_setMatrix(ctx->player[i]->entity->mesh, &ctx->player[i]->entity->transform, fb_index);
 
     if (!game->transition.active || game->transition.is_overlay)
         pause_animate(game);

@@ -53,14 +53,14 @@ static void render_setTransitionContext(RenderContext *ctx, const GameTransition
 
 static void render_setDebugContext(RenderContext *ctx)
 {
-    /*
     static char fps_buf[8];
     snprintf(fps_buf, sizeof(fps_buf), "%d FPS", (int)time_get()->rate);
     ctx->element[ctx->element_count++] = (DrawElement){
         .type = DRAW_TEXT,
         .text = { DROID_SANS, 0, {272.0f, 20.0f}, fps_buf, NULL }
-    };
-
+        };
+        
+    /*
     Player **p = player_get();
     if (p[0] && p[0]->entity->actor && p[0]->entity->actor->animation.animation) {
         static char anim_buf[48];

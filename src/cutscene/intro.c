@@ -4,14 +4,11 @@
 #include "../../include/time/time.h"
 #include "../../include/physics/physics.h"
 #include "../../include/actor/actor.h"
-#include "../../include/scene/scenery.h"
 #include "../../include/graphics/font.h"
 #include "../../include/graphics/sprites.h"
 #include "../../include/graphics/shapes.h"
 #include "../../include/render/render.h"
 #include "../../include/ui/menu.h"
-#include "../../include/graphics/sprites.h"
-#include "../../include/graphics/shapes.h"
 #include "../../include/cutscene/intro.h"
 
 #define INTRO_SPRITE_COUNT 4
@@ -24,20 +21,15 @@ static SpriteID intro_ids[INTRO_SPRITE_COUNT] = {
 	SPR_ZONCABE
 };
 
-static float intro_counter = 0.0f;
 static RenderContext intro_screen = {0};
 
+static float intro_counter = 0.0f;
 float intro_transitions[INTRO_SPRITE_COUNT + 1] = { 3.00f, 5.00f, 7.00f, 10.0f };
 
 
-const RenderContext* intro_getRenderContext(void) { return &intro_screen; }
-
-void intro_init()
-{
-}
-
-void intro_close()
-{
+const RenderContext* intro_getRenderContext(void)
+{    
+    return &intro_screen;
 }
 
 void intro_animate(float t)

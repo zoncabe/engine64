@@ -9,65 +9,50 @@
 
 static void playerControl_setJump(Player *player, const ControllerActions *actions)
 {
-    if (actions->jump
-        && player->entity->actor->state.current != ROLLING
-        && player->entity->actor->state.current != JUMPING
-        && player->entity->actor->state.current != FALLING) {
+    ActorStateData *state = &player->entity->actor->state;
 
-        player->entity->actor->motion.input.jump_hold      = true;
-        player->entity->actor->motion.input.jump_triggered = true;
-        actor_setState(&player->entity->actor->state, JUMPING);
+    if (actions->jump && actorStates_isLocomotion(state->current)) {
+        player->cmd.jump_hold      = true;
+        player->cmd.jump_triggered = true;
+        actor_setState(state, JUMPING);
     } else if (actions->jump_hold) {
         return;
     } else {
-        player->entity->actor->motion.input.jump_hold = false;
+        player->cmd.jump_hold = false;
     }
 }
 
 static void playerControl_setRoll(Player *player, const ControllerActions *actions)
 {
-    if (actions->roll
-        && player->entity->actor->state.current != ROLLING
-        && player->entity->actor->state.current != STANDING_IDLE
-        && player->entity->actor->state.current != WALKING
-        && player->entity->actor->state.current != JUMPING
-        && player->entity->actor->state.current != FALLING) {
+    ActorStateData *state = &player->entity->actor->state;
 
-        actor_setState(&player->entity->actor->state, ROLLING);
+    if (actions->roll && actorStates_isLocomotion(state->current)) {
+        player->cmd.roll_triggered = true;
+        actor_setState(state, ROLLING);
     }
 }
 
 static void playerControl_setLocomotionWithStick(Player *player, const ControllerActions *actions, float camera_angle_around, float camera_offset_angle)
 {
+    ActorStateData *state = &player->entity->actor->state;
     float stick_magnitude = 0;
 
     if (fabs(actions->stick_x) >= PLAYER_STICK_DEADZONE || fabs(actions->stick_y) >= PLAYER_STICK_DEADZONE) {
         Vector2 stick   = {actions->stick_x, actions->stick_y};
         stick_magnitude = vector2_magnitude(&stick);
-        player->entity->actor->motion.input.target_yaw = deg(atan2(actions->stick_x, -actions->stick_y) - rad(camera_angle_around - (0.5 * camera_offset_angle)));
+        player->cmd.target_yaw = deg(atan2(actions->stick_x, -actions->stick_y) - rad(camera_angle_around - (0.5 * camera_offset_angle)));
     }
 
-    if (stick_magnitude == 0
-        && player->entity->actor->state.current != ROLLING
-        && player->entity->actor->state.current != JUMPING
-        && player->entity->actor->state.current != FALLING) {
-        actor_setState(&player->entity->actor->state, STANDING_IDLE);
-    } else if (stick_magnitude > 0 && stick_magnitude <= PLAYER_STICK_WALK_THRESHOLD
-        && player->entity->actor->state.current != ROLLING
-        && player->entity->actor->state.current != JUMPING
-        && player->entity->actor->state.current != FALLING) {
-        actor_setState(&player->entity->actor->state, WALKING);
-    } else if (actions->sprint && stick_magnitude > PLAYER_STICK_WALK_THRESHOLD
-        && player->entity->actor->state.current != ROLLING
-        && player->entity->actor->state.current != JUMPING
-        && player->entity->actor->state.current != FALLING) {
-        actor_setState(&player->entity->actor->state, SPRINTING);
-    } else if (stick_magnitude > PLAYER_STICK_WALK_THRESHOLD
-        && player->entity->actor->state.current != ROLLING
-        && player->entity->actor->state.current != JUMPING
-        && player->entity->actor->state.current != FALLING) {
-        actor_setState(&player->entity->actor->state, RUNNING);
-    }
+    if (!actorStates_isLocomotion(state->current)) return;
+
+    if (stick_magnitude == 0)
+        actor_setState(state, STANDING_IDLE);
+    else if (stick_magnitude <= PLAYER_STICK_WALK_THRESHOLD)
+        actor_setState(state, WALKING);
+    else if (actions->sprint)
+        actor_setState(state, SPRINTING);
+    else
+        actor_setState(state, RUNNING);
 }
 
 void player_setActorControl(Player *player, const ControllerActions *actions, Viewport *viewport)

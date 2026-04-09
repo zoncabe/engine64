@@ -1,16 +1,37 @@
 #ifndef ACTOR_STATES_H
 #define ACTOR_STATES_H
 
-#include "../entity/entity.h"
+#include <stdbool.h>
+#include <stdint.h>
 
-#define STANDING_IDLE 0
-#define WALKING       1
-#define RUNNING       2
-#define SPRINTING     3
-#define ROLLING       4
-#define JUMPING       5
-#define FALLING       6
+
+typedef enum {
+
+    STANDING_IDLE,
+    WALKING,
+    RUNNING,
+    SPRINTING,
+    ROLLING,
+    JUMPING,
+    FALLING,
+    ACTOR_STATE_COUNT,
+    ACTOR_STATE_NONE
+
+} ActorState;
+
+
+typedef struct ActorStateData {
+
+    uint8_t current;
+    uint8_t previous;
+    uint8_t locomotion;
+    uint8_t next;
+
+} ActorStateData;
 
 void actor_setState(ActorStateData *state, uint8_t new_state);
+bool actorStates_isLocomotion(uint8_t state);
+
+void actorStates_evaluateTransitions(Entity *entity);
 
 #endif

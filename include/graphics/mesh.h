@@ -13,6 +13,6 @@ typedef struct {
     T3DModel     *model;
 } Mesh;
 
-void mesh_buildMatrix(Mesh *mesh, const Transform *transform, uint8_t fb_index);
+void mesh_setMatrix(Mesh *mesh, const Transform *transform, uint8_t fb_index);
 
 #endif

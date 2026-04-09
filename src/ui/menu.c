@@ -3,7 +3,6 @@
 
 #include "../../include/physics/physics.h"
 #include "../../include/actor/actor.h"
-#include "../../include/scene/scenery.h"
 #include "../../include/graphics/font.h"
 #include "../../include/graphics/sprites.h"
 #include "../../include/graphics/shapes.h"

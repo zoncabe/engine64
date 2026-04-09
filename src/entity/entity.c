@@ -17,10 +17,10 @@ void entity_init(Entity *entity, EntityType type, const ActorMotionSettings *mot
     if (type == ENTITY_ACTOR) {
         entity->actor = malloc(sizeof(Actor));
         *entity->actor = (Actor){
-            .body      = (RigidBody){0},
-            .motion    = (ActorMotion){ .settings = *motion_settings, .data.grounded = true },
+            .body = (RigidBody){0},
+            .motion = (ActorMotion){ .settings = *motion_settings, .data.grounded = true },
             .animation = (ActorAnimation){ .settings = *animation_settings },
-            .state     = (ActorStateData){ STANDING_IDLE, 0, 0 },
+            .state = (ActorStateData){ STANDING_IDLE, 0, 0 },
         };
     }
 }
@@ -30,8 +30,8 @@ Entity *entity_create(EntityType type, const char *model_path, const ActorMotion
     Entity *entity = malloc(sizeof(Entity));
     entity_init(entity, type, motion_settings, animation_settings);
 
-    entity->mesh               = malloc(sizeof(Mesh));
-    entity->mesh->model        = t3d_model_load(model_path);
+    entity->mesh = malloc(sizeof(Mesh));
+    entity->mesh->model = t3d_model_load(model_path);
     entity->mesh->matrix_buffer = malloc_uncached(sizeof(T3DMat4FP) * FB_COUNT);
     t3d_mat4fp_identity(entity->mesh->matrix_buffer);
 

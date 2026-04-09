@@ -19,8 +19,6 @@ void time_init()
     timer.delta = 0.0f;
     timer.rate = 0.0f;
 
-    timer.intro_counter = 0.0f;
-    timer.transition_counter = 0.0f;
 }
 
 

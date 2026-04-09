@@ -7,19 +7,24 @@
 #include "../actor/actor.h"
 
 typedef enum {
+
     ENTITY_ACTOR,
     ENTITY_SCENERY,
+
 } EntityType;
 
 typedef struct Entity {
-    EntityType  type;
-    Transform   transform;
+
+    EntityType type;
+    Transform transform;
     Mesh *mesh;
-    Actor      *actor;
+    Actor *actor;
+
 } Entity;
 
-void    entity_init(Entity *entity, EntityType type, const ActorMotionSettings *motion_settings, const ActorAnimationSettings *animation_settings);
+
+void entity_init(Entity *entity, EntityType type, const ActorMotionSettings *motion_settings, const ActorAnimationSettings *animation_settings);
 Entity *entity_create(EntityType type, const char *model_path, const ActorMotionSettings *motion_settings, const ActorAnimationSettings *animation_settings, const AnimDef *anim_def);
-void    entity_delete(Entity *entity);
+void entity_delete(Entity *entity);
 
 #endif

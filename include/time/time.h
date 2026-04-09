@@ -10,9 +10,6 @@ typedef struct
     float delta;
     float rate;
 
-    float intro_counter;
-    float transition_counter;
-
 } TimeData;
 
 TimeData* time_get(void);
