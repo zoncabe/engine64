@@ -125,43 +125,32 @@ const AnimDef male_muscled_anim_def = {
 
 
 const ActorMotionSettings male_muscled_motion_settings = {
-    
-    .idle_acceleration_rate = MALE_MUSCLED_IDLE_ACCELERATION_RATE,
-    .walk_acceleration_rate = MALE_MUSCLED_WALK_ACCELERATION_RATE,
-    .run_acceleration_rate = MALE_MUSCLED_RUN_ACCELERATION_RATE,
-    .sprint_acceleration_rate = MALE_MUSCLED_SPRINT_ACCELERATION_RATE,
-    .roll_acceleration_grip_rate = MALE_MUSCLED_ROLL_ACCELERATION_GRIP_RATE,
 
-    .stand_roll_target_speed  = MALE_MUSCLED_STAND_ROLL_TARGET_SPEED,
-    .stand_roll_launch_rate   = MALE_MUSCLED_STAND_ROLL_LAUNCH_RATE,
-    .walk_roll_target_speed   = MALE_MUSCLED_WALK_ROLL_TARGET_SPEED,
-    .walk_roll_launch_rate    = MALE_MUSCLED_WALK_ROLL_LAUNCH_RATE,
-    .run_roll_target_speed    = MALE_MUSCLED_RUN_ROLL_TARGET_SPEED,
-    .run_roll_launch_rate     = MALE_MUSCLED_RUN_ROLL_LAUNCH_RATE,
-    .sprint_roll_target_speed = MALE_MUSCLED_SPRINT_ROLL_TARGET_SPEED,
-    .sprint_roll_launch_rate  = MALE_MUSCLED_SPRINT_ROLL_LAUNCH_RATE,
+    .locomotion[LOCOMOTION_IDLE]   = { .target_speed = 0,   .response_rate = 8.0f },
+    .locomotion[LOCOMOTION_WALK]   = { .target_speed = 175, .response_rate = 3.0f },
+    .locomotion[LOCOMOTION_RUN]    = { .target_speed = 390, .response_rate = 5.0f },
+    .locomotion[LOCOMOTION_SPRINT] = { .target_speed = 520, .response_rate = 8.0f },
 
-    .aerial_control_rate = MALE_MUSCLED_AERIAL_CONTROL_RATE,
+    .roll = {
+        .launch_response_rate = 15.0f,
+        .spin_response_rate   = 5.0f,
+        .grip_response_rate   = 2.0f,
+        .ground_time          = MALE_MUSCLED_RUN_TO_ROLLING_ANIM_GROUND,
+        .grip_time            = MALE_MUSCLED_RUN_TO_ROLLING_ANIM_GRIP,
+        .timer_max            = MALE_MUSCLED_RUN_TO_ROLLING_ANIM_LENGTH,
+        .target_speed[LOCOMOTION_IDLE]   = 300.0f,
+        .target_speed[LOCOMOTION_WALK]   = 300.0f,
+        .target_speed[LOCOMOTION_RUN]    = 468.0f,
+        .target_speed[LOCOMOTION_SPRINT] = 624.0f,
+    },
 
-    .walk_target_speed = 175,
-    .run_target_speed = MALE_MUSCLED_RUN_TARGET_SPEED,
-    .sprint_target_speed = MALE_MUSCLED_SPRINT_TARGET_SPEED,
+    .jump = {
+        .response_rate    = 0.5f,
+        .force_multiplier = 3000,
+        .minimum_speed    = 500,
+        .timer_max        = MALE_MUSCLED_JUMP_ANIM_AIR,
+    },
 
-    .roll_ground_time = MALE_MUSCLED_RUN_TO_ROLLING_ANIM_GROUND,
-    .roll_change_grip_time = MALE_MUSCLED_RUN_TO_ROLLING_ANIM_GRIP,
-    .roll_timer_max = MALE_MUSCLED_RUN_TO_ROLLING_ANIM_LENGTH,
-
-    .stand_roll_ground_time = MALE_MUSCLED_STAND_TO_ROLLING_ANIM_GROUND,
-    .stand_roll_change_grip_time = MALE_MUSCLED_STAND_TO_ROLLING_ANIM_GRIP,
-    .stand_roll_timer_max = MALE_MUSCLED_STAND_TO_ROLLING_ANIM_LENGTH,
-
-    .jump_timer_max = MALE_MUSCLED_JUMP_ANIM_AIR,
-    
-    .jump_force_multiplier = MALE_MUSCLED_JUMP_FORCE_MULTIPLIER,  
-    .jump_minimum_speed = MALE_MUSCLED_JUMP_MINIMUM_SPEED,
-
-    .gravity = MALE_MUSCLED_GRAVITY,
-    .fall_max_speed = MALE_MUSCLED_FALL_MAX_SPEED,
 };    
     
 

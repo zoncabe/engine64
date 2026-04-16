@@ -11,17 +11,15 @@ typedef struct Entity Entity;
 // Units
 //   distance      : world units
 //   linear speed  : world units / second
-//   acceleration  : world units / second^2
 //   angles        : degrees (yaw stored on transform.rotation.z)
 //   time / dt     : seconds
 //
-// Per-character tunables (gravity, fall_max_speed, jump_minimum_speed, target
-// speeds, acceleration rates, roll/jump timings) live in ActorMotionSettings
-// and are loaded from the asset file (e.g. male_muscled.c). The constants
-// below are engine-wide invariants, not per-character knobs.
+// Per-character tunables live in ActorMotionSettings and are loaded from the
+// asset file (e.g. male_muscled.c). The constants below are engine-wide
+// invariants, not per-character knobs.
 // ----------------------------------------------------------------------------
 
-#define LOCOMOTION_MIN_SPEED 5         // horizontal speed snapped to 0 below this
+#define LOCOMOTION_MIN_SPEED 5
 
 #define ACTOR_ROTATION_LERP_FACTOR 0.8f
 #define ACTOR_ROTATION_SNAP_THRESHOLD 1.0f
@@ -43,60 +41,48 @@ typedef struct Entity Entity;
 #define ACTOR_JUMP_HOLD_VELOCITY_SCALE 0.96f
 #define ACTOR_JUMP_LAUNCH_VELOCITY_SCALE 0.8f
 
+#define ACTOR_GRAVITY -1800.0f
+#define ACTOR_FALL_MAX_SPEED -1500.0f
+
+
+typedef enum {
+    LOCOMOTION_IDLE,
+    LOCOMOTION_WALK,
+    LOCOMOTION_RUN,
+    LOCOMOTION_SPRINT,
+    LOCOMOTION_COUNT
+} LocomotionType;
 
 typedef struct {
-
-    float idle_acceleration_rate;
-    float walk_acceleration_rate;
-    float run_acceleration_rate;
-    float sprint_acceleration_rate;
-    float roll_acceleration_grip_rate;
-
-    float stand_roll_target_speed;
-    float stand_roll_launch_rate;
-    float walk_roll_target_speed;
-    float walk_roll_launch_rate;
-    float run_roll_target_speed;
-    float run_roll_launch_rate;
-    float sprint_roll_target_speed;
-    float sprint_roll_launch_rate;
-
-    float walk_target_speed;
-    float run_target_speed;
-    float sprint_target_speed;
-
-    float roll_ground_time;
-    float roll_change_grip_time;
-    float roll_timer_max;
-
-    float stand_roll_ground_time;
-    float stand_roll_change_grip_time;
-    float stand_roll_timer_max;
-
-    float aerial_control_rate;
-    float jump_force_multiplier;
-    float jump_minimum_speed;
-    float jump_timer_max;
-
-    float gravity;
-    float fall_max_speed;
-
-} ActorMotionSettings;
+    float target_speed;
+    float response_rate;
+} LocomotionSettings;
 
 typedef struct {
-
+    float launch_response_rate;
+    float spin_response_rate;
+    float grip_response_rate;
     float ground_time;
     float grip_time;
     float timer_max;
-    float target_speed;
-    float launch_rate;
-
-} RollParams;
+    float target_speed[LOCOMOTION_COUNT];
+} RollSettings;
 
 typedef struct {
+    float response_rate;
+    float force_multiplier;
+    float minimum_speed;
+    float timer_max;
+} JumpSettings;
 
+typedef struct {
+    LocomotionSettings locomotion[LOCOMOTION_COUNT];
+    RollSettings       roll;
+    JumpSettings       jump;
+} ActorMotionSettings;
+
+typedef struct {
     float previous_yaw;
-    Vector3 target_velocity;
     float horizontal_speed;
     float roll_timer;
     Vector3 jump_initial_velocity;
@@ -105,23 +91,18 @@ typedef struct {
     bool grounded;
     float grounding_height;
     uint8_t rotation_mode;
-
 } ActorMotionData;
 
 typedef struct {
-
     float target_yaw;
     bool roll_triggered;
     bool jump_hold;
     bool jump_triggered;
-
 } MotionCommand;
 
 typedef struct ActorMotion {
-
     ActorMotionSettings settings;
     ActorMotionData data;
-
 } ActorMotion;
 
 void actor_updateMotion(Entity *entity, MotionCommand *cmd, float dt);
