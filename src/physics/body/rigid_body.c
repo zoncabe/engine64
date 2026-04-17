@@ -2,5 +2,5 @@
 
 void rigidBody_init(RigidBody *body)
 {
-    *body = (RigidBody){0};
+	*body = (RigidBody){0};
 }

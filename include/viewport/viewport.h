@@ -2,13 +2,13 @@
 #define VIEWPORT_H
 
 #include <t3d/t3d.h>
-#include "../camera/camera.h"
-#include "../physics/math/vector3.h"
-
-typedef struct ControllerActions ControllerActions;
-
+#include "camera/camera.h"
+#include "physics/math/vector3.h"
 
 #define FB_COUNT 3
+
+
+typedef struct ControllerActions ControllerActions;
 
 typedef struct Viewport {
 
@@ -20,8 +20,9 @@ typedef struct Viewport {
 
 Viewport *viewport_get(void);
 
+
 void viewport_init(void);
 void viewport_clear(void);
-void viewport_setOrbitalCamera(const ControllerActions *actions, Vector3 *target);
+void viewport_updateCamera(const ControllerActions *actions, Vector3 *center);
 
 #endif

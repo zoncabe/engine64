@@ -10,7 +10,4 @@ const RenderContext* pause_getRenderContext(void);
 void mainMenu_animate();
 void pause_animate(const Game *game);
 
-void ui_drawDebugData();
-
-
 #endif

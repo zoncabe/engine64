@@ -2,15 +2,14 @@
 #define TIME_H
 
 
-// structures
-
 typedef struct
 {
-    float counter;
-    float delta;
-    float rate;
+	float counter;
+	float delta;
+	float rate;
 
 } TimeData;
+
 
 TimeData* time_get(void);
 

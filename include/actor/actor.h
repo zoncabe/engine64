@@ -8,20 +8,20 @@
 #include <t3d/t3dskeleton.h>
 #include <t3d/t3danim.h>
 
-#include "../physics/physics.h"
-#include "../graphics/mesh.h"
-#include "../actor/actor_motion.h"
-#include "../actor/actor_animation.h"
-#include "../actor/actor_states.h"
+#include "physics/physics.h"
+#include "graphics/mesh.h"
+#include "actor/actor_motion.h"
+#include "actor/actor_animation.h"
+#include "actor/actor_states.h"
 
 typedef struct Actor {
 
-    RigidBody       body;
-    ActorMotion     motion;
-    ActorAnimation  animation;
-    ActorStateData  state;
-    const AnimDef  *anim_def;
-    
+	RigidBody       body;
+	ActorMotion     motion;
+	ActorAnimation  animation;
+	ActorStateData  state;
+	const AnimationDef  *animation_def;
+	
 } Actor;
 
 

@@ -3,7 +3,7 @@
 
 typedef struct {
 
-    float h, s, v, a;
+	float h, s, v, a;
 
 } color_hsv;
 

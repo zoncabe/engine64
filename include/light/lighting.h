@@ -4,11 +4,11 @@
 #define DIRECTIONAL_LIGHT_COUNT 1
 #define POINT_LIGHT_COUNT 0
 
+
 typedef struct{
 
 	color_t color;
 	T3DVec3 direction;
-	T3DVec3 size;
 	
 } DirectionalLight;
 
@@ -27,6 +27,7 @@ typedef struct{
 	PointLight point[POINT_LIGHT_COUNT];
 
 } Light;
+
 
 Light* light_get(void);
 

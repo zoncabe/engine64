@@ -1,41 +1,35 @@
-#include <t3d/t3d.h>
+#include <math.h>
 
-#include "../../include/physics/physics.h"
-#include "../../include/light/lighting.h"
-#include "../../include/camera/camera.h"
-#include "../../include/viewport/viewport.h"
-#include "../../include/control/camera_control.h"
-#include "../../include/camera/camera_states.h"
+#include "camera/camera.h"
+#include "camera/spherical.h"
+#include "control/camera_control.h"
 
 
-static void cameraControl_orbitWithStick(Camera *camera, const ControllerActions *actions)
+static void cameraControl_setSphericalInput(Camera *camera, const ControllerActions *actions)
 {
-    float stick_x = 0;
-    float stick_y = 0;
+	CameraSphericalData *data = &camera->spherical.data;
+	const CameraSphericalSettings *settings = &camera->spherical.settings;
 
-    if (fabs(actions->cstick_x) >= CAMERA_STICK_DEADZONE || fabs(actions->cstick_y) >= CAMERA_STICK_DEADZONE) {
-        stick_x = actions->cstick_x;
-        stick_y = actions->cstick_y;
-    }
+	if (fabsf(actions->cstick_x) >= CAMERA_STICK_DEADZONE
+	 || fabsf(actions->cstick_y) >= CAMERA_STICK_DEADZONE) {
+		data->target_velocity.x = actions->cstick_x * settings->max_velocity.x * settings->direction.x;
+		data->target_velocity.y = actions->cstick_y * settings->max_velocity.y * settings->direction.y;
+	} else {
+		data->target_velocity.x = 0;
+		data->target_velocity.y = 0;
+	}
 
-    if (stick_x == 0 && stick_y == 0) {
-        camera->orbitational_target_velocity.x = 0;
-        camera->orbitational_target_velocity.y = 0;
-    } else {
-        camera->orbitational_target_velocity.x = stick_x * camera->settings.yaw_sensitivity   * camera->settings.yaw_direction;
-        camera->orbitational_target_velocity.y = stick_y * camera->settings.pitch_sensitivity * camera->settings.pitch_direction;
-    }
-}
-
-static void cameraControl_aim(Camera *camera, const ControllerActions *actions)
-{
-    if (actions->camera_aim) camera_setState(camera, AIMING);
-    else                     camera_setState(camera, ORBITAL);
+	camera->spherical.state = actions->camera_aim ? CAMERA_SPHERICAL_AIMING : CAMERA_SPHERICAL_DEFAULT;
 }
 
 
-void cameraControl_setOrbitalInput(Camera *camera, const ControllerActions *actions)
+static void (*cameraControl_handler[CAMERA_TYPE_COUNT])(Camera *, const ControllerActions *) = {
+	[CAMERA_TYPE_SPHERICAL] = cameraControl_setSphericalInput,
+};
+
+
+void cameraControl_setInput(Camera *camera, const ControllerActions *actions)
 {
-    cameraControl_orbitWithStick(camera, actions);
-    cameraControl_aim(camera, actions);
+	if (camera->type == CAMERA_TYPE_NONE) return;
+	cameraControl_handler[camera->type](camera, actions);
 }

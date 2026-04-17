@@ -6,7 +6,7 @@ void sound_init()
 {
 	audio_init(48000, 4);
 	mixer_init(NUM_CHANNELS);
-	wav64_init_compression(3);	
+	wav64_init_compression(3);
 }
 
 void sound_play()
@@ -15,5 +15,5 @@ void sound_play()
 }
 
 void sound_setMixer()
-{	
+{
 }

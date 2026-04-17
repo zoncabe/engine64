@@ -1,12 +1,15 @@
 #ifndef SHAPES_H
 #define SHAPES_H
 
-#include <libdragon.h> // color_t
-#include "../physics/math/vector2.h"
+#include <libdragon.h>
+#include "physics/math/vector2.h"
+
 
 typedef enum {
-	COLOR_SOLID,
-	COLOR_GRADIENT,
+
+	SHAPE_FILL_SOLID,
+	SHAPE_FILL_GRADIENT,
+	
 } ShapeFill;
 
 typedef struct {
@@ -22,7 +25,6 @@ typedef struct {
 } Rectangle;
 
 
-void shapes_drawRectangle(const Rectangle *rect);
-
+void shape_drawRectangle(const Rectangle *rect);
 
 #endif

@@ -7,25 +7,25 @@
 
 typedef enum {
 
-    STANDING_IDLE,
-    WALKING,
-    RUNNING,
-    SPRINTING,
-    ROLLING,
-    JUMPING,
-    FALLING,
-    ACTOR_STATE_COUNT,
-    ACTOR_STATE_NONE
+	ACTOR_STATE_IDLE,
+	ACTOR_STATE_WALKING,
+	ACTOR_STATE_RUNNING,
+	ACTOR_STATE_SPRINTING,
+	ACTOR_STATE_ROLLING,
+	ACTOR_STATE_JUMPING,
+	ACTOR_STATE_FALLING,
+	ACTOR_STATE_COUNT,
+	ACTOR_STATE_NONE
 
 } ActorState;
 
 
 typedef struct ActorStateData {
 
-    uint8_t current;
-    uint8_t previous;
-    uint8_t locomotion;
-    uint8_t next;
+	uint8_t current;
+	uint8_t previous;
+	uint8_t locomotion;
+	uint8_t next;
 
 } ActorStateData;
 

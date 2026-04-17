@@ -21,7 +21,6 @@ typedef struct Entity Entity;
 
 #define LOCOMOTION_MIN_SPEED 5
 
-#define ACTOR_ROTATION_LERP_FACTOR 0.8f
 #define ACTOR_ROTATION_SNAP_THRESHOLD 1.0f
 
 #define ACTOR_ROTATION_MODE_LERP 0
@@ -46,63 +45,64 @@ typedef struct Entity Entity;
 
 
 typedef enum {
-    LOCOMOTION_IDLE,
-    LOCOMOTION_WALK,
-    LOCOMOTION_RUN,
-    LOCOMOTION_SPRINT,
-    LOCOMOTION_COUNT
+	LOCOMOTION_IDLE,
+	LOCOMOTION_WALK,
+	LOCOMOTION_RUN,
+	LOCOMOTION_SPRINT,
+	LOCOMOTION_COUNT
 } LocomotionType;
 
 typedef struct {
-    float target_speed;
-    float response_rate;
+	float target_speed;
+	float response_rate;
+	float rotation_response_rate;
 } LocomotionSettings;
 
 typedef struct {
-    float launch_response_rate;
-    float spin_response_rate;
-    float grip_response_rate;
-    float ground_time;
-    float grip_time;
-    float timer_max;
-    float target_speed[LOCOMOTION_COUNT];
+	float launch_response_rate;
+	float spin_response_rate;
+	float grip_response_rate;
+	float ground_time;
+	float grip_time;
+	float timer_max;
+	float target_speed[LOCOMOTION_COUNT];
 } RollSettings;
 
 typedef struct {
-    float response_rate;
-    float force_multiplier;
-    float minimum_speed;
-    float timer_max;
+	float response_rate;
+	float force_multiplier;
+	float minimum_speed;
+	float timer_max;
 } JumpSettings;
 
 typedef struct {
-    LocomotionSettings locomotion[LOCOMOTION_COUNT];
-    RollSettings       roll;
-    JumpSettings       jump;
+	LocomotionSettings locomotion[LOCOMOTION_COUNT];
+	RollSettings       roll;
+	JumpSettings       jump;
 } ActorMotionSettings;
 
 typedef struct {
-    float previous_yaw;
-    float horizontal_speed;
-    float roll_timer;
-    Vector3 jump_initial_velocity;
-    float jump_force;
-    float jump_timer;
-    bool grounded;
-    float grounding_height;
-    uint8_t rotation_mode;
+	float previous_yaw;
+	float horizontal_speed;
+	float roll_timer;
+	Vector3 jump_initial_velocity;
+	float jump_force;
+	float jump_timer;
+	bool is_grounded;
+	float grounding_height;
+	uint8_t rotation_mode;
 } ActorMotionData;
 
 typedef struct {
-    float target_yaw;
-    bool roll_triggered;
-    bool jump_hold;
-    bool jump_triggered;
+	float target_yaw;
+	bool roll_triggered;
+	bool jump_held;
+	bool jump_triggered;
 } MotionCommand;
 
 typedef struct ActorMotion {
-    ActorMotionSettings settings;
-    ActorMotionData data;
+	ActorMotionSettings settings;
+	ActorMotionData data;
 } ActorMotion;
 
 void actor_updateMotion(Entity *entity, MotionCommand *cmd, float dt);
