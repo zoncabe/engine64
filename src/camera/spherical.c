@@ -64,19 +64,19 @@ static void cameraSpherical_setPosition(Camera *camera, Vector3 *center, float d
 	if (data->pitch >  settings->max_pitch)      data->pitch =  settings->max_pitch;
 	if (data->pitch < -settings->max_pitch + 30) data->pitch = -settings->max_pitch + 30;
 
-	float horizontal_center_distance = data->distance_from_center * fm_cosf(rad(data->pitch));
-	float vertical_center_distance   = data->distance_from_center * fm_sinf(rad(data->pitch));
-	float horizontal_target_distance = data->distance_center_to_target * fm_cosf(rad(data->pitch));
-	float vertical_target_distance   = data->distance_center_to_target * fm_sinf(rad(data->pitch + 180));
+	float horizontal_center_distance = data->distance_from_center * fm_cosf(deg_to_rad(data->pitch));
+	float vertical_center_distance   = data->distance_from_center * fm_sinf(deg_to_rad(data->pitch));
+	float horizontal_target_distance = data->distance_center_to_target * fm_cosf(deg_to_rad(data->pitch));
+	float vertical_target_distance   = data->distance_center_to_target * fm_sinf(deg_to_rad(data->pitch + 180));
 
 	float half_offset = data->offset_angle * 0.5f;
 
-	camera->position.x = center->x - horizontal_center_distance * fm_sinf(rad(data->angle_around_center - half_offset));
-	camera->position.y = center->y - horizontal_center_distance * fm_cosf(rad(data->angle_around_center - half_offset));
+	camera->position.x = center->x - horizontal_center_distance * fm_sinf(deg_to_rad(data->angle_around_center - half_offset));
+	camera->position.y = center->y - horizontal_center_distance * fm_cosf(deg_to_rad(data->angle_around_center - half_offset));
 	camera->position.z = center->z + data->offset_height + vertical_center_distance;
 
-	camera->target.x = center->x - horizontal_target_distance * fm_sinf(rad(data->angle_around_center + 180 + half_offset));
-	camera->target.y = center->y - horizontal_target_distance * fm_cosf(rad(data->angle_around_center + 180 + half_offset));
+	camera->target.x = center->x - horizontal_target_distance * fm_sinf(deg_to_rad(data->angle_around_center + 180 + half_offset));
+	camera->target.y = center->y - horizontal_target_distance * fm_cosf(deg_to_rad(data->angle_around_center + 180 + half_offset));
 	camera->target.z = center->z + data->offset_height + vertical_target_distance;
 }
 

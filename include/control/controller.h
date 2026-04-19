@@ -19,6 +19,10 @@ typedef struct {
 	ButtonID pause;
 	ButtonID menu_up;
 	ButtonID menu_down;
+	ButtonID menu_left;
+	ButtonID menu_right;
+	ButtonID menu_tab_left;
+	ButtonID menu_tab_right;
 	ButtonID jump;
 	ButtonID roll;
 	ButtonID sprint;
@@ -33,6 +37,10 @@ typedef struct ControllerActions {
 	bool  pause;
 	bool  menu_up;
 	bool  menu_down;
+	bool  menu_left;
+	bool  menu_right;
+	bool  menu_tab_left;
+	bool  menu_tab_right;
 	bool  jump;
 	bool  jump_held;
 	bool  roll;

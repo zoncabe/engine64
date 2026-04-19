@@ -1,13 +1,13 @@
 #ifndef INTRO_H
 #define INTRO_H
 
-#define INTRO_SCENE_LENGTH 10.0f
+#include "screen/screen.h"
+#include "screen/screen_animation.h"
 
 
-const RenderContext* intro_getRenderContext(void);
+extern Screen                intro_screen;
+extern ScreenAnimationPlayer intro_animation_player;
 
-
-void intro_animate(float t);
-bool intro_update(void);
+void intro_init(void);
 
 #endif

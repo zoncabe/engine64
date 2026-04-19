@@ -7,29 +7,27 @@
 #define TOLERANCE 0.000001f
 
 
-// function prototypes
-
-float rad(float angle);
-float deg(float rad);
-
-int clamp_int(int value, int lowerLimit, int upperLimit);
-float clamp(float value, float lowerLimit, float upperLimit);
-
-float max2(float a, float b);
-float min2(float a, float b);
-
-float min3(float a, float b, float c);
-float max3(float a, float b, float c);
-
-bool sameSign(float a, float b);
-bool approxEqual(float a, float b);
+float deg_to_rad(float angle);
+float rad_to_deg(float rad);
 
 float angle_wrap(float angle);
 float angle_wrap_relative(float angle, float reference);
 
-bool isfinite(float x);
-
 float lerpf(float a, float b, float t);
+
+float ease_linear(float t);
+
+float ease_quad_in(float t);
+float ease_quad_out(float t);
+float ease_quad_in_out(float t);
+
+float ease_cubic_in(float t);
+float ease_cubic_out(float t);
+float ease_cubic_in_out(float t);
+
+float ease_expo_in(float t);
+float ease_expo_out(float t);
+float ease_expo_in_out(float t);
 
 
 #endif

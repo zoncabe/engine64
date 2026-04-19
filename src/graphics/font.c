@@ -9,7 +9,7 @@ static const char *font_paths[] = {
 	[HEADLINER_14] = "rom:/fonts/Headliner14.font64",
 	[HEADLINER_20] = "rom:/fonts/Headliner20.font64",
 	[HEADLINER_40] = "rom:/fonts/Headliner40.font64",
-	
+
 };
 
 static rdpq_font_t *fonts[6];
@@ -20,6 +20,10 @@ void font_loadAsset(uint8_t id)
 	fonts[id] = rdpq_font_load(font_paths[id]);
 	assert(fonts[id]);
 
+	if (id == HEADLINER_14) {
+		rdpq_font_style(fonts[id], MENU_STYLE_NORMAL,   &(rdpq_fontstyle_t){RGBA32(200, 200, 200, 255)});
+		rdpq_font_style(fonts[id], MENU_STYLE_SELECTED, &(rdpq_fontstyle_t){RGBA32(255, 220, 30,  255)});
+	}
 	if (id == HEADLINER_20) {
 		rdpq_font_style(fonts[id], MENU_STYLE_NORMAL,   &(rdpq_fontstyle_t){RGBA32(200, 200, 200, 255)});
 		rdpq_font_style(fonts[id], MENU_STYLE_SELECTED, &(rdpq_fontstyle_t){RGBA32(255, 220, 30,  255)});
@@ -37,7 +41,7 @@ void font_unloadAsset(uint8_t id)
 	fonts[id] = NULL;
 }
 
-void text_draw(const Text *element)
+void text_draw(const Text *element, Vector2 position)
 {
-	rdpq_text_printf(element->parms, element->font, element->position.x, element->position.y, "^%02d%s", element->style, element->text);
+	rdpq_text_printf(element->parms, element->font, position.x, position.y, "^%02d%s", element->style, element->text);
 }

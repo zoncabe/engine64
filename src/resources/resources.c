@@ -11,7 +11,7 @@ static const SpriteID intro_sprite[] = {
 static const uint8_t intro_font[] = { DROID_SANS };
 
 static const SpriteID mainmenu_sprite[] = {
-	SPRITE_GORILLA, SPRITE_BTN_A, SPRITE_BTN_B, SPRITE_D_UP, SPRITE_D_DOWN,
+	SPRITE_GORILLA, SPRITE_BTN_A, SPRITE_BTN_B, SPRITE_D_UP, SPRITE_D_DOWN, SPRITE_D_LEFT, SPRITE_D_RIGHT,
 };
 
 static const uint8_t mainmenu_font[] = {
@@ -21,7 +21,7 @@ static const uint8_t mainmenu_font[] = {
 static const uint8_t gameplay_font[] = { DROID_SANS };
 
 static const SpriteID pause_sprite[] = {
-	SPRITE_BTN_A, SPRITE_BTN_B, SPRITE_D_UP, SPRITE_D_DOWN,
+	SPRITE_BTN_A, SPRITE_BTN_B, SPRITE_D_UP, SPRITE_D_DOWN, SPRITE_D_LEFT, SPRITE_D_RIGHT,
 };
 
 static const uint8_t pause_font[] = {

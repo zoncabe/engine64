@@ -15,8 +15,6 @@ typedef enum {
 typedef struct {
 
 	ShapeFill fill;
-	Vector2       position;
-	Vector2       size;
 	union {
 		color_t color;
 		color_t gradient[4];
@@ -25,6 +23,6 @@ typedef struct {
 } Rectangle;
 
 
-void shape_drawRectangle(const Rectangle *rect);
+void shape_drawRectangle(const Rectangle *rect, Vector2 position, Vector2 scale);
 
 #endif

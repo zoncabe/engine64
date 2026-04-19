@@ -31,6 +31,7 @@ src =   $(wildcard *.c) \
 		$(wildcard src/render/*.c) \
 		$(wildcard src/assets/*.c) \
 		$(wildcard src/sound/*.c) \
+		$(wildcard src/menu/*.c) \
 
 assets_png = $(wildcard assets/textures/*.png)
 assets_gltf = $(wildcard assets/models/*.glb)

@@ -10,11 +10,13 @@ static const char *sprite_paths[SPRITE_COUNT] = {
 	[SPRITE_BTN_B]     = "rom:/textures/BButton.sprite",
 	[SPRITE_D_UP]      = "rom:/textures/DUp.sprite",
 	[SPRITE_D_DOWN]    = "rom:/textures/DDown.sprite",
+	[SPRITE_D_LEFT]    = "rom:/textures/DLeft.sprite",
+	[SPRITE_D_RIGHT]   = "rom:/textures/DRight.sprite",
 	[SPRITE_N64LOGO]   = "rom:/textures/n64logo.sprite",
 	[SPRITE_LIBDRAGON] = "rom:/textures/libdragon.sprite",
 	[SPRITE_TINY3D]    = "rom:/textures/tiny3d.sprite",
 	[SPRITE_ZONCABE]   = "rom:/textures/zoncabe.sprite",
-	
+
 };
 
 static sprite_t *sprite[SPRITE_COUNT];
@@ -39,8 +41,14 @@ void sprite_setMode()
 	rdpq_mode_alphacompare(1);
 }
 
-void sprite_draw(const Sprite *element)
+void sprite_draw(const Sprite *element, Vector2 position, Vector2 scale, float rotation)
 {
-	rdpq_sprite_blit(sprite[element->id], element->position.x, element->position.y,
-		&(rdpq_blitparms_t){ .scale_x = element->scale.x, .scale_y = element->scale.y });
+	sprite_t *s = sprite[element->id];
+	rdpq_sprite_blit(s, position.x, position.y, &(rdpq_blitparms_t){
+		.scale_x = scale.x,
+		.scale_y = scale.y,
+		.theta   = rotation,
+		.cx      = (rotation != 0.0f) ? s->width  / 2 : 0,
+		.cy      = (rotation != 0.0f) ? s->height / 2 : 0,
+	});
 }

@@ -10,6 +10,7 @@
 
 typedef struct Scene         Scene;
 typedef struct RenderContext RenderContext;
+typedef struct Screen        Screen;
 typedef struct Viewport      Viewport;
 
 
@@ -61,9 +62,9 @@ typedef struct GameContext {
 
 typedef struct GameRenderDescriptor {
 
-	const Scene *scene;
-	const RenderContext *screen;
-	
+	const Scene  *scene;
+	const Screen *screen;
+
 } GameRenderDescriptor;
 
 Game *game_get(void);

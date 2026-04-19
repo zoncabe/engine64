@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include <t3d/t3d.h>
 #include <t3d/t3dmath.h>
 #include <t3d/t3dskeleton.h>
@@ -8,6 +10,7 @@
 #include "graphics/sprites.h"
 #include "graphics/shapes.h"
 #include "render/render.h"
+#include "screen/screen.h"
 #include "time/time.h"
 #include "scene/scene.h"
 #include "game/game.h"
@@ -20,13 +23,26 @@ void render_initContext(RenderContext *ctx)
 	*ctx = (RenderContext){0};
 }
 
-void render_getScreenContext(RenderContext *ctx, const RenderContext *screen)
+
+static RenderSection *render_beginSection(RenderContext *ctx)
 {
-	memcpy(ctx->element + ctx->element_count,
-		   screen->element,
-		   screen->element_count * sizeof(DrawElement));
-	ctx->element_count += screen->element_count;
+	RenderSection *section = &ctx->section[ctx->section_count++];
+	section->element_start = ctx->element_count;
+	section->element_count = 0;
+	section->has_scissor   = false;
+	return section;
 }
+
+static void render_endSection(RenderContext *ctx, RenderSection *section)
+{
+	section->element_count = ctx->element_count - section->element_start;
+}
+
+static void render_pushElement(RenderContext *ctx, DrawElement element)
+{
+	ctx->element[ctx->element_count++] = element;
+}
+
 
 static void render_setSceneContext(RenderContext *ctx, const Scene *s, uint8_t fb_index)
 {
@@ -39,17 +55,21 @@ static void render_setSceneContext(RenderContext *ctx, const Scene *s, uint8_t f
 	}
 }
 
-static void render_setTransitionContext(RenderContext *ctx, const GameTransition *t)
+static void render_setTransitionContext(RenderContext *ctx, const GameTransition *transition)
 {
-	if (!t->is_active || t->is_overlay) return;
-	switch (t->type) {
+	if (!transition->is_active || transition->is_overlay) return;
+	RenderSection *section = render_beginSection(ctx);
+	switch (transition->type) {
 		case TRANSITION_FADE:
-			ctx->element[ctx->element_count++] = (DrawElement){
-				.type = DRAW_RECTANGLE, .rectangle = { SHAPE_FILL_SOLID, {0.0f, 0.0f}, {320.0f, 240.0f},
-						.color = RGBA32(0, 0, 0, (uint8_t)(t->progress * 255)) }
-			};
+			render_pushElement(ctx, (DrawElement){
+				.type      = DRAW_RECTANGLE,
+				.position  = { 0.0f, 0.0f },
+				.scale     = { 320.0f, 240.0f },
+				.rectangle = { SHAPE_FILL_SOLID, .color = RGBA32(0, 0, 0, (uint8_t)(transition->progress * 255)) }
+			});
 			break;
 	}
+	render_endSection(ctx, section);
 }
 
 static void render_setDebugContext(RenderContext *ctx)
@@ -57,20 +77,41 @@ static void render_setDebugContext(RenderContext *ctx)
 #if DEBUG
 	static char fps_buf[8];
 	snprintf(fps_buf, sizeof(fps_buf), "%d FPS", (int)time_get()->rate);
-	ctx->element[ctx->element_count++] = (DrawElement){
-		.type = DRAW_TEXT,
-		.text = { DROID_SANS, 0, {272.0f, 20.0f}, fps_buf, NULL }
-	};
+	RenderSection *section = render_beginSection(ctx);
+	render_pushElement(ctx, (DrawElement){
+		.type     = DRAW_TEXT,
+		.position = { 272.0f, 20.0f },
+		.text     = { DROID_SANS, 0, fps_buf, NULL }
+	});
+	render_endSection(ctx, section);
 #else
 	(void)ctx;
 #endif
 }
 
-void render_setContext(RenderContext *ctx, const Scene *scene, uint8_t fb_index, const GameTransition *transition, const RenderContext *screen)
+static void render_setScreenContext(RenderContext *ctx, const Screen *screen)
+{
+	for (uint8_t i = 0; i < screen->section_count; i++) {
+		const ScreenSection *src = &screen->section[i];
+		RenderSection *dst = render_beginSection(ctx);
+		memcpy(ctx->element + ctx->element_count,
+			   src->element,
+			   src->element_count * sizeof(DrawElement));
+		ctx->element_count += src->element_count;
+		render_endSection(ctx, dst);
+		dst->has_scissor = src->has_scissor;
+		dst->scissor_x   = src->scissor_x;
+		dst->scissor_y   = src->scissor_y;
+		dst->scissor_w   = src->scissor_w;
+		dst->scissor_h   = src->scissor_h;
+	}
+}
+
+void render_setContext(RenderContext *ctx, const Scene *scene, uint8_t fb_index, const GameTransition *transition, const Screen *screen)
 {
 	render_initContext(ctx);
 	if (scene)      render_setSceneContext(ctx, scene, fb_index);
-	if (screen)     render_getScreenContext(ctx, screen);
+	if (screen)     render_setScreenContext(ctx, screen);
 	if (transition) render_setTransitionContext(ctx, transition);
 	render_setDebugContext(ctx);
 }
@@ -101,12 +142,29 @@ void render(RenderContext *ctx, int *fb_index)
 		}
 	}
 
-	for (uint8_t i = 0; i < ctx->element_count; i++) {
-		switch (ctx->element[i].type) {
-			case DRAW_RECTANGLE: shape_drawRectangle(&ctx->element[i].rectangle);          break;
-			case DRAW_TEXT:      text_draw(&ctx->element[i].text);                          break;
-			case DRAW_SPRITE:    sprite_setMode(); sprite_draw(&ctx->element[i].sprite); break;
+	for (uint8_t s = 0; s < ctx->section_count; s++) {
+		RenderSection *section = &ctx->section[s];
+
+		if (section->has_scissor) {
+			rdpq_set_scissor(
+				section->scissor_x,
+				section->scissor_y,
+				section->scissor_x + section->scissor_w,
+				section->scissor_y + section->scissor_h);
 		}
+
+		for (uint8_t i = 0; i < section->element_count; i++) {
+			DrawElement *element = &ctx->element[section->element_start + i];
+			if (element->is_hidden) continue;
+			switch (element->type) {
+				case DRAW_RECTANGLE: shape_drawRectangle(&element->rectangle, element->position, element->scale);                       break;
+				case DRAW_TEXT:      text_draw(&element->text, element->position);                                                      break;
+				case DRAW_SPRITE:    sprite_setMode(); sprite_draw(&element->sprite, element->position, element->scale, element->rotation); break;
+			}
+		}
+
+		if (section->has_scissor)
+			rdpq_set_scissor(0, 0, 320, 240);
 	}
 
 	render_end();

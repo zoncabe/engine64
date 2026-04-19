@@ -11,6 +11,8 @@ typedef enum {
 	SPRITE_BTN_B,
 	SPRITE_D_UP,
 	SPRITE_D_DOWN,
+	SPRITE_D_LEFT,
+	SPRITE_D_RIGHT,
 	SPRITE_N64LOGO,
 	SPRITE_LIBDRAGON,
 	SPRITE_TINY3D,
@@ -22,8 +24,6 @@ typedef enum {
 typedef struct {
 
 	SpriteID id;
-	Vector2 position;
-	Vector2 scale;
 
 } Sprite;
 
@@ -31,6 +31,6 @@ typedef struct {
 void sprite_loadAsset(SpriteID id);
 void sprite_unloadAsset(SpriteID id);
 void sprite_setMode(void);
-void sprite_draw(const Sprite *element);
+void sprite_draw(const Sprite *element, Vector2 position, Vector2 scale, float rotation);
 
 #endif

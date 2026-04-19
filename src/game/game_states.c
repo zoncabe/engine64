@@ -3,7 +3,12 @@
 #include "scene/scene.h"
 #include "render/render.h"
 #include "cutscene/intro.h"
-#include "ui/ui.h"
+#include "screen/screen.h"
+#include "screen/screen_animation.h"
+#include "ui/main_menu_ui.h"
+#include "ui/pause_ui.h"
+#include "menu/menu.h"
+#include "ui/settings_ui.h"
 #include "player/player.h"
 #include "control/player_control.h"
 #include "game/game.h"
@@ -16,6 +21,7 @@ typedef struct {
 	void (*update)(GameContext *);
 	void (*setDescriptor)(const GameContext *, GameRenderDescriptor *);
 	void (*bindActor)(void);
+	void (*onEnter)(void);
 	GameState          parent;
 	GameState          child[GAME_STATE_MAX_CHILD];
 	uint8_t            child_count;
@@ -35,12 +41,6 @@ static void playerCollision_collideWithRoom(Player *player) {
 	if (player->entity->transform.position.z < 0) player->entity->transform.position.z = 0;
 }//////////////////////////////////////////////////////////////////////////////////////////////////
 
-static bool gameState_showsPause(const Game *game)
-{
-	return (game->previous_state == GAME_STATE_PAUSE || game->target_state == GAME_STATE_PAUSE)
-		   && game->transition.progress > 0.0f;
-}
-
 static void gameState_bindGameplayActor(void)
 {
 	player_setEntity(&player_get()[0], scene_getActor(0));
@@ -48,7 +48,9 @@ static void gameState_bindGameplayActor(void)
 
 static void gameState_updateIntro(GameContext *ctx)
 {
-	if (intro_update()) {
+	if (ctx->game->transition.is_active) return;
+	screenAnimationPlayer_update(&intro_animation_player, time_get()->delta);
+	if (!intro_animation_player.is_active) {
 		game_setState(ctx->game, GAME_STATE_MAIN_MENU);
 		ctx->game->transition.progress = 1.0f;
 	}
@@ -57,7 +59,11 @@ static void gameState_updateIntro(GameContext *ctx)
 static void gameState_updateMainMenu(GameContext *ctx)
 {
 	(void)ctx;
-	mainMenu_animate();
+	if (menuStack_current() != NULL) {
+		settings_ui_update();
+		return;
+	}
+	main_menu_update();
 }
 
 static void gameState_updateGameplay(GameContext *ctx)
@@ -70,18 +76,19 @@ static void gameState_updateGameplay(GameContext *ctx)
 	player_update(ctx->viewport->fb_index);
 	playerCollision_collideWithRoom(&ctx->player[0]);
 	viewport_updateCamera(&control[0].actions, &ctx->player[0].entity->transform.position);
-
-	if (gameState_showsPause(game)) pause_animate(game);
+	(void)game;
 }
 
 static void gameState_updatePause(GameContext *ctx)
 {
-	Game *game = ctx->game;
-
 	player_setMatrix(ctx->viewport->fb_index);
 
-	if (!game->transition.is_active || game->transition.is_overlay)
-		pause_animate(game);
+	if (menuStack_current() != NULL) {
+		settings_ui_update();
+		return;
+	}
+
+	pause_update();
 }
 
 static void gameState_updateGameOver(GameContext *ctx)
@@ -93,26 +100,28 @@ static void gameState_setIntroDescriptor(const GameContext *ctx, GameRenderDescr
 {
 	(void)ctx;
 	descriptor->scene  = NULL;
-	descriptor->screen = intro_getRenderContext();
+	descriptor->screen = &intro_screen;
 }
 
 static void gameState_setMainMenuDescriptor(const GameContext *ctx, GameRenderDescriptor *descriptor)
 {
 	(void)ctx;
 	descriptor->scene  = NULL;
-	descriptor->screen = mainMenu_getRenderContext();
+	Screen *top = menuStack_current();
+	descriptor->screen = top ? top : &main_menu_screen;
 }
 
 static void gameState_setGameplayDescriptor(const GameContext *ctx, GameRenderDescriptor *descriptor)
 {
 	descriptor->scene  = ctx->scene;
-	descriptor->screen = gameState_showsPause(ctx->game) ? pause_getRenderContext() : NULL;
+	descriptor->screen = NULL;
 }
 
 static void gameState_setPauseDescriptor(const GameContext *ctx, GameRenderDescriptor *descriptor)
 {
 	descriptor->scene  = ctx->scene;
-	descriptor->screen = pause_getRenderContext();
+	Screen *top = menuStack_current();
+	descriptor->screen = top ? top : &pause_screen;
 }
 
 static void gameState_setGameOverDescriptor(const GameContext *ctx, GameRenderDescriptor *descriptor)
@@ -128,6 +137,7 @@ static const GameStateDef game_state[GAME_STATE_COUNT] = {
 		.update               = gameState_updateIntro,
 		.setDescriptor        = gameState_setIntroDescriptor,
 		.bindActor            = NULL,
+		.onEnter              = intro_init,
 		.parent               = GAME_STATE_COUNT,
 		.child_count          = 0,
 		.scene_id             = SCENE_COUNT,
@@ -194,6 +204,7 @@ static void gameState_load(GameState id)
 		scene_load(scene_getDef(game_state[id].scene_id));
 		if (game_state[id].bindActor) game_state[id].bindActor();
 	}
+	if (game_state[id].onEnter) game_state[id].onEnter();
 }
 
 static void gameState_unload(GameState id)

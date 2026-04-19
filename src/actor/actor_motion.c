@@ -19,8 +19,8 @@ static void actorMotion_setHorizontalVelocity(Entity *entity, float yaw, float t
 {
 	RigidBody *body = &entity->actor->body;
 
-	float target_vx = target_speed *  fm_sinf(rad(yaw));
-	float target_vy = target_speed * -fm_cosf(rad(yaw));
+	float target_vx = target_speed *  fm_sinf(deg_to_rad(yaw));
+	float target_vy = target_speed * -fm_cosf(deg_to_rad(yaw));
 
 	float factor = fm_exp(-response_rate * dt);
 	body->velocity.x = body->velocity.x * factor + target_vx * (1.0f - factor);
@@ -39,7 +39,7 @@ static void actorMotion_setRotation(Entity *entity, float dt)
 	Vector2 horizontal_velocity = {body->velocity.x, body->velocity.y};
 	data->horizontal_speed = vector2_magnitude(&horizontal_velocity);
 
-	const float velocity_yaw = deg(fm_atan2f(-body->velocity.x, -body->velocity.y));
+	const float velocity_yaw = rad_to_deg(fm_atan2f(-body->velocity.x, -body->velocity.y));
 
 	if (data->rotation_mode == ACTOR_ROTATION_MODE_SNAP) {
 		entity->transform.rotation.z = angle_wrap(velocity_yaw);

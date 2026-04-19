@@ -10,7 +10,7 @@ void mesh_setMatrix(Mesh *mesh, const Transform *transform, uint8_t fb_index)
 		&mesh->matrix_buffer[fb_index],
 		
 		(float[3]){transform->scale.x,         transform->scale.y,         transform->scale.z},
-		(float[3]){rad(transform->rotation.x), rad(transform->rotation.y), rad(transform->rotation.z)},
+		(float[3]){deg_to_rad(transform->rotation.x), deg_to_rad(transform->rotation.y), deg_to_rad(transform->rotation.z)},
 		(float[3]){transform->position.x,      transform->position.y,      transform->position.z}
 	);
 }

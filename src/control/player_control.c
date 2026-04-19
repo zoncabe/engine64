@@ -7,7 +7,10 @@
 #include "control/controller.h"
 #include "viewport/viewport.h"
 #include "game/game.h"
-#include "ui/menu.h"
+#include "menu/menu.h"
+#include "ui/settings_ui.h"
+#include "ui/main_menu_ui.h"
+#include "ui/pause_ui.h"
 
 
 static void playerControl_setJump(Player *player, const ControllerActions *actions)
@@ -43,7 +46,7 @@ static void playerControl_setLocomotionWithStick(Player *player, const Controlle
 	if (fabsf(actions->stick_x) >= PLAYER_STICK_DEADZONE || fabsf(actions->stick_y) >= PLAYER_STICK_DEADZONE) {
 		Vector2 stick   = {actions->stick_x, actions->stick_y};
 		stick_magnitude = vector2_magnitude(&stick);
-		player->cmd.target_yaw = deg(fm_atan2f(actions->stick_x, -actions->stick_y) - rad(camera_angle_around));
+		player->cmd.target_yaw = rad_to_deg(fm_atan2f(actions->stick_x, -actions->stick_y) - deg_to_rad(camera_angle_around));
 	}
 
 	if (!actorStates_isLocomotion(state->current)) return;
@@ -68,12 +71,49 @@ void player_setActorControl(Player *player, const ControllerActions *actions, Vi
 
 static void playerControl_handleIntro(Player *player, const ControllerActions *actions, Game *game) { (void)player; (void)actions; (void)game; }
 
+static void mainMenu_onExitToSettings(void *ctx)
+{
+	(void)ctx;
+	settings_ui_open(SETTINGS_CTX_FROM_MAIN_MENU, main_menu_startEnter);
+}
+
+static void pause_onExitToSettings(void *ctx)
+{
+	(void)ctx;
+	settings_ui_open(SETTINGS_CTX_FROM_PAUSE, pause_startEnter);
+}
+
+static Game *pause_exit_game = NULL;
+
+static void pause_onExitToGameplay(void *ctx)
+{
+	(void)ctx;
+	if (pause_exit_game) game_setState(pause_exit_game, GAME_STATE_GAMEPLAY);
+}
+
+static void settings_onCloseToGameplay(void)
+{
+	if (pause_exit_game) game_setState(pause_exit_game, GAME_STATE_GAMEPLAY);
+}
+
 static void playerControl_handleMainMenu(Player *player, const ControllerActions *actions, Game *game)
 {
 	(void)player;
-	if (actions->confirm && menu_getIndex() == 0) game_setState(game, GAME_STATE_GAMEPLAY);
-	if (actions->menu_up)   menu_moveIndex(-1, 2);
-	if (actions->menu_down) menu_moveIndex(1,  2);
+
+	if (menuStack_current() != NULL) {
+		settings_ui_handleInput(actions);
+		return;
+	}
+
+	if (main_menu_isTransitioning()) return;
+
+	if (actions->confirm) {
+		int8_t idx = menuStack_getIndex();
+		if (idx == 0) game_setState(game, GAME_STATE_GAMEPLAY);
+		if (idx == 1) main_menu_startExit(mainMenu_onExitToSettings, NULL);
+	}
+	if (actions->menu_up)   menuStack_moveIndex(-1, 2);
+	if (actions->menu_down) menuStack_moveIndex(1,  2);
 }
 
 static void playerControl_handleGameplay(Player *player, const ControllerActions *actions, Game *game)
@@ -85,17 +125,41 @@ static void playerControl_handleGameplay(Player *player, const ControllerActions
 static void playerControl_handlePause(Player *player, const ControllerActions *actions, Game *game)
 {
 	(void)player;
-	if (actions->pause || actions->cancel || (actions->confirm && menu_getIndex() == 0)) {
-		game_setState(game, GAME_STATE_GAMEPLAY);
-		menu_setIndex(0);
+
+	if (actions->pause) {
+		pause_exit_game = game;
+		if (menuStack_current() != NULL) {
+			settings_ui_setOnClose(settings_onCloseToGameplay);
+			if (!settings_ui_isTransitioning()) settings_ui_startExit();
+		} else if (!pause_isTransitioning()) {
+			pause_startExit(pause_onExitToGameplay, NULL);
+		}
 		return;
 	}
-	if (actions->confirm && menu_getIndex() == 2) {
-		game_setState(game, GAME_STATE_MAIN_MENU);
-		menu_setIndex(0);
+
+	if (menuStack_current() != NULL) {
+		settings_ui_handleInput(actions);
+		return;
 	}
-	if (actions->menu_up)   menu_moveIndex(-1, 2);
-	if (actions->menu_down) menu_moveIndex(1,  2);
+
+	if (pause_isTransitioning()) return;
+
+	if (actions->cancel || (actions->confirm && menuStack_getIndex() == 0)) {
+		pause_exit_game = game;
+		pause_startExit(pause_onExitToGameplay, NULL);
+		menuStack_setIndex(0);
+		return;
+	}
+	if (actions->confirm && menuStack_getIndex() == 1) {
+		pause_startExit(pause_onExitToSettings, NULL);
+		return;
+	}
+	if (actions->confirm && menuStack_getIndex() == 2) {
+		game_setState(game, GAME_STATE_MAIN_MENU);
+		menuStack_setIndex(0);
+	}
+	if (actions->menu_up)   menuStack_moveIndex(-1, 2);
+	if (actions->menu_down) menuStack_moveIndex(1,  2);
 }
 
 static void playerControl_handleGameOver(Player *player, const ControllerActions *actions, Game *game) { (void)player; (void)actions; (void)game; }

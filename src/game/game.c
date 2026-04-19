@@ -8,6 +8,11 @@
 #include "game/game.h"
 #include "game/game_states.h"
 #include "sound/sound.h"
+#include "menu/settings.h"
+#include "menu/menu.h"
+#include "ui/main_menu_ui.h"
+#include "ui/pause_ui.h"
+#include "ui/settings_ui.h"
 
 
 static Game game;
@@ -46,6 +51,13 @@ void game_init()
 	viewport_init();
 	
 	sound_init();
+
+	settings_init();
+
+	menuStack_init();
+	main_menu_ui_init();
+	pause_ui_init();
+	settings_ui_init();
 
 	game.state = GAME_INITIAL_STATE;
 	game_loadInitialState();

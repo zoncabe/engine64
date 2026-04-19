@@ -3,17 +3,17 @@
 
 #define COLOR_NORM 0.003922f
 
-void shape_drawRectangle(const Rectangle *rect)
+void shape_drawRectangle(const Rectangle *rect, Vector2 position, Vector2 scale)
 {
-	float x  = rect->position.x, y  = rect->position.y;
-	float sx = rect->size.x,     sy = rect->size.y;
+	float x  = position.x, y  = position.y;
+	float sx = scale.x,    sy = scale.y;
 
 	if (rect->fill == SHAPE_FILL_SOLID) {
 
 		rdpq_set_prim_color(rect->color);
 		rdpq_mode_combiner(RDPQ_COMBINER_FLAT);
 		rdpq_mode_blender(RDPQ_BLENDER_MULTIPLY);
-		rdpq_fill_rectangle(x, y, sx, sy);
+		rdpq_fill_rectangle(x, y, x + sx, y + sy);
 	}
 	else {
 

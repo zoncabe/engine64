@@ -17,7 +17,6 @@
 typedef struct {
 	uint8_t                  font;
 	uint8_t                  style;
-	Vector2                  position;
 	const char              *text;
 	const rdpq_textparms_t  *parms;
 } Text;
@@ -25,6 +24,6 @@ typedef struct {
 
 void font_loadAsset(uint8_t id);
 void font_unloadAsset(uint8_t id);
-void text_draw(const Text *element);
+void text_draw(const Text *element, Vector2 position);
 
 #endif
