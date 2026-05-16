@@ -253,12 +253,14 @@ static float actorAnimation_getTurningAvg(ActorAnimation *animation, float curre
 	if (delta_yaw >  180.0f) delta_yaw -= 360.0f;
 	if (delta_yaw <= -180.0f) delta_yaw += 360.0f;
 
-	animation->turn_avg[animation->turn_avg_idx] = delta_yaw / ANIMATION_TURN_AVG_COUNT;
+	animation->turn_avg[animation->turn_avg_idx] = delta_yaw;
 	animation->turn_avg_idx = (animation->turn_avg_idx + 1) % ANIMATION_TURN_AVG_COUNT;
 
 	float sum = 0.0f;
 	for (int i = 0; i < ANIMATION_TURN_AVG_COUNT; i++) sum += animation->turn_avg[i];
-	float r = sum / ANIMATION_TURN_AVG_COUNT;
+	float avg_delta_yaw = sum / ANIMATION_TURN_AVG_COUNT;
+
+	float r = avg_delta_yaw / ANIMATION_TURN_MAX_ANGLE;
 
 	if (r >  1.0f) r =  1.0f;
 	if (r < -1.0f) r = -1.0f;
@@ -487,7 +489,7 @@ static void actorAnimation_setActiveNodes(const AnimationParamCtx *ctx)
 	const AnimationDef *def = ctx->def;
 	ActorAnimation *animation = ctx->animation;
 
-	for (uint8_t i = 0; i < def->node_count; i++) {
+	for (int i = 0; i < def->node_count; i++) {
 		AnimationNodeType t = def->node[i].type;
 		if (t == ANIMATION_NODE_SELECT || t == ANIMATION_NODE_SEQUENCE)
 			animation->node_active[i] = (animation->param[def->node[i].param] != 0.0f);
@@ -550,7 +552,7 @@ void actorAnimation_initGraph(Entity *entity, const AnimationDef *def)
 	animation->node_active = malloc(def->node_count * sizeof(bool));
 	assert(animation->node_active);
 
-	for (uint8_t i = 0; i < def->buffer_count; i++)
+	for (int i = 0; i < def->buffer_count; i++)
 		animation->buffer[i] = t3d_skeleton_clone(&animation->main, false);
 
 	memset(animation->node_state,   0,    def->node_count * sizeof(uint8_t));
@@ -558,7 +560,7 @@ void actorAnimation_initGraph(Entity *entity, const AnimationDef *def)
 	memset(animation->turn_avg,  0,    sizeof(animation->turn_avg));
 	animation->turn_avg_idx = 0;
 
-	for (uint8_t i = 0; i < def->clip_count; i++)
+	for (int i = 0; i < def->clip_count; i++)
 	{
 		const AnimationClipDef *clip_def = &def->clip[i];
 
@@ -579,7 +581,7 @@ void actorAnimation_evaluateGraph( const AnimationDef *def, const ActorAnimation
 	ActorAnimationBuffer blend_buffer;
 	blend_buffer.count = 0;
 
-	for (uint8_t i = 0; i < def->node_count; i++)
+	for (int i = 0; i < def->node_count; i++)
 	{
 		if (!animation->node_active[i]) continue;
 

@@ -5,33 +5,14 @@
 #include "light/lighting.h"
 #include "camera/camera.h"
 #include "camera/spherical.h"
+#include "physics/shapes/physics_shape.h"
+#include "physics/body/rigid_body.h"
 
 #define SCENE_MAX_ACTORS 6
 #define SCENE_MAX_SCENERY 12
 
-#define SCENE_MAX_ENTITIES (SCENE_MAX_ACTORS + SCENE_MAX_SCENERY)
+#define SCENE_MAX_ENTITIES 32
 
-
-typedef struct {
-
-	const char *model_path;
-	Vector3 position;
-	Vector3 rotation;
-	Vector3 scale;
-	const ActorMotionSettings *motion_settings;
-	const ActorAnimationSettings *animation_settings;
-	const AnimationDef *animation_def;
-
-} ActorDef;
-
-typedef struct {
-
-	const char *model_path;
-	Vector3 position;
-	Vector3 rotation;
-	Vector3 scale;
-
-} SceneryDef;
 
 typedef struct {
 
@@ -54,10 +35,8 @@ typedef struct {
 
 	LightDef light;
 	CameraDef camera;
-	ActorDef actor[SCENE_MAX_ACTORS];
-	uint8_t actor_count;
-	SceneryDef scenery[SCENE_MAX_SCENERY];
-	uint8_t scenery_count;
+	EntityDef entity[SCENE_MAX_ENTITIES];
+	uint8_t entity_count;
 
 } SceneDef;
 

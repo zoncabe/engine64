@@ -16,6 +16,7 @@ typedef struct ActorAnimation ActorAnimation;
 
 #define ANIMATION_SLOT_MAIN          0xFF
 #define ANIMATION_TURN_AVG_COUNT  5
+#define ANIMATION_TURN_MAX_ANGLE  5.0f
 
 typedef enum {
 

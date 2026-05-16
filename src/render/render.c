@@ -13,10 +13,20 @@
 #include "screen/screen.h"
 #include "time/time.h"
 #include "scene/scene.h"
+
 #include "game/game.h"
 
 #define DEBUG true
 
+
+void renderTransform_init(RenderTransform *t)
+{
+	*t = (RenderTransform){
+		.position = {0.0f, 0.0f, 0.0f},
+		.rotation = {0.0f, 0.0f, 0.0f},
+		.scale    = {1.0f, 1.0f, 1.0f},
+	};
+}
 
 void render_initContext(RenderContext *ctx)
 {
@@ -46,30 +56,13 @@ static void render_pushElement(RenderContext *ctx, DrawElement element)
 
 static void render_setSceneContext(RenderContext *ctx, const Scene *s, uint8_t fb_index)
 {
-	for (uint8_t i = 0; i < s->entity_count; i++) {
+	for (int i = 0; i < s->entity_count; i++) {
 		Entity    *e      = s->entity[i];
 		Mesh *mesh  = e->mesh;
 		T3DMat4FP  *matrix = mesh->matrix_buffer ? &mesh->matrix_buffer[fb_index] : NULL;
 		T3DSkeleton *skel  = e->actor ? &e->actor->animation.main : NULL;
 		ctx->object[ctx->object_count++] = (T3DElement){ mesh->dl, matrix, skel };
 	}
-}
-
-static void render_setTransitionContext(RenderContext *ctx, const GameTransition *transition)
-{
-	if (!transition->is_active || transition->is_overlay) return;
-	RenderSection *section = render_beginSection(ctx);
-	switch (transition->type) {
-		case TRANSITION_FADE:
-			render_pushElement(ctx, (DrawElement){
-				.type      = DRAW_RECTANGLE,
-				.position  = { 0.0f, 0.0f },
-				.scale     = { 320.0f, 240.0f },
-				.rectangle = { SHAPE_FILL_SOLID, .color = RGBA32(0, 0, 0, (uint8_t)(transition->progress * 255)) }
-			});
-			break;
-	}
-	render_endSection(ctx, section);
 }
 
 static void render_setDebugContext(RenderContext *ctx)
@@ -91,7 +84,7 @@ static void render_setDebugContext(RenderContext *ctx)
 
 static void render_setScreenContext(RenderContext *ctx, const Screen *screen)
 {
-	for (uint8_t i = 0; i < screen->section_count; i++) {
+	for (int i = 0; i < screen->section_count; i++) {
 		const ScreenSection *src = &screen->section[i];
 		RenderSection *dst = render_beginSection(ctx);
 		memcpy(ctx->element + ctx->element_count,
@@ -107,12 +100,11 @@ static void render_setScreenContext(RenderContext *ctx, const Screen *screen)
 	}
 }
 
-void render_setContext(RenderContext *ctx, const Scene *scene, uint8_t fb_index, const GameTransition *transition, const Screen *screen)
+void render_setContext(RenderContext *ctx, const Scene *scene, uint8_t fb_index, const Screen *screen)
 {
 	render_initContext(ctx);
-	if (scene)      render_setSceneContext(ctx, scene, fb_index);
-	if (screen)     render_setScreenContext(ctx, screen);
-	if (transition) render_setTransitionContext(ctx, transition);
+	if (scene)  render_setSceneContext(ctx, scene, fb_index);
+	if (screen) render_setScreenContext(ctx, screen);
 	render_setDebugContext(ctx);
 }
 
@@ -133,7 +125,7 @@ void render(RenderContext *ctx, int *fb_index)
 
 	if (ctx->object_count > 0) {
 		light_set(light_get());
-		for (uint8_t i = 0; i < ctx->object_count; i++) {
+		for (int i = 0; i < ctx->object_count; i++) {
 			T3DElement *obj = &ctx->object[i];
 			if (obj->skeleton) t3d_skeleton_use(obj->skeleton);
 			if (obj->matrix)   t3d_matrix_push(obj->matrix);
@@ -142,7 +134,7 @@ void render(RenderContext *ctx, int *fb_index)
 		}
 	}
 
-	for (uint8_t s = 0; s < ctx->section_count; s++) {
+	for (int s = 0; s < ctx->section_count; s++) {
 		RenderSection *section = &ctx->section[s];
 
 		if (section->has_scissor) {
@@ -153,7 +145,7 @@ void render(RenderContext *ctx, int *fb_index)
 				section->scissor_y + section->scissor_h);
 		}
 
-		for (uint8_t i = 0; i < section->element_count; i++) {
+		for (int i = 0; i < section->element_count; i++) {
 			DrawElement *element = &ctx->element[section->element_start + i];
 			if (element->is_hidden) continue;
 			switch (element->type) {

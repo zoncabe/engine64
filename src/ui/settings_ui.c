@@ -197,9 +197,9 @@ void settings_ui_init(void)
 	static float row_style_values[TAB_COUNT][ROW_MAX][ROW_MAX];
 	static float row_x_by_tab[TAB_COUNT * ROW_MAX * 2][TAB_COUNT];
 
-	for (uint8_t tab = 0; tab < TAB_COUNT; tab++) {
+	for (int tab = 0; tab < TAB_COUNT; tab++) {
 		float tab_x = CAROUSEL_X + tab * CAROUSEL_W;
-		for (uint8_t row = 0; row < tab_item_count[tab]; row++) {
+		for (int row = 0; row < tab_item_count[tab]; row++) {
 			const SettingsItem *item = &tab_items[tab][row];
 			float y = CAROUSEL_Y + row * ROW_HEIGHT;
 
@@ -215,12 +215,12 @@ void settings_ui_init(void)
 				.text = { HEADLINER_14, MENU_STYLE_NORMAL, value_text[tab][row], &h14_parms },
 			};
 
-			for (uint8_t active = 0; active < TAB_COUNT; active++) {
+			for (int active = 0; active < TAB_COUNT; active++) {
 				row_x_by_tab[label_idx][active] = tab_x + tab_offset[active];
 				row_x_by_tab[value_idx][active] = tab_x + 140.0f + tab_offset[active];
 			}
 
-			for (uint8_t i = 0; i < ROW_MAX; i++)
+			for (int i = 0; i < ROW_MAX; i++)
 				row_style_values[tab][row][i] = (i == row) ? MENU_STYLE_SELECTED : MENU_STYLE_NORMAL;
 		}
 	}
@@ -228,7 +228,7 @@ void settings_ui_init(void)
 
 	uint8_t track = 0;
 
-	for (uint8_t i = 0; i < row_element_count; i++) {
+	for (int i = 0; i < row_element_count; i++) {
 		settings_track[track++] = (ScreenAnimationTrack){
 			.target = &row_section->element[i].position.x,
 			.source_int = &settings_active_tab, .values_by_index = row_x_by_tab[i],
@@ -241,8 +241,8 @@ void settings_ui_init(void)
 	settings_track[track++] = (ScreenAnimationTrack){ .target_u8 = &settings_screen.section[0].element[EL_TAB_3].text.style, .source_int = &settings_active_tab, .values_by_index = tab_style_3 };
 
 	uint8_t element_cursor = 0;
-	for (uint8_t tab = 0; tab < TAB_COUNT; tab++) {
-		for (uint8_t row = 0; row < tab_item_count[tab]; row++) {
+	for (int tab = 0; tab < TAB_COUNT; tab++) {
+		for (int row = 0; row < tab_item_count[tab]; row++) {
 			const SettingsItem *item = &tab_items[tab][row];
 			uint8_t label_idx = element_cursor++;
 			uint8_t value_idx = element_cursor++;
@@ -299,7 +299,7 @@ void settings_ui_init(void)
 	settings_transition_main_menu_track[tt++] = (ScreenAnimationTrack){ .target_u8 = &bg_rect->gradient[3].b, .from = 28.0f, .to = 28.0f, .duration = ENTER_DURATION, .easing = SCREEN_ANIMATION_EASING_LINEAR };
 	settings_transition_main_menu_track[tt++] = (ScreenAnimationTrack){ .target_u8 = &bg_rect->gradient[3].a, .from = 255.0f, .to = 255.0f, .duration = ENTER_DURATION, .easing = SCREEN_ANIMATION_EASING_LINEAR };
 
-	for (uint8_t i = EL_TAB_0; i < EL_HEADER_COUNT; i++) {
+	for (int i = EL_TAB_0; i < EL_HEADER_COUNT; i++) {
 		float final_x = header->element[i].position.x;
 		settings_transition_main_menu_track[tt++] = (ScreenAnimationTrack){
 			.target   = &header->element[i].position.x,
@@ -345,7 +345,7 @@ void settings_ui_init(void)
 	settings_transition_pause_track[tt++] = (ScreenAnimationTrack){ .target_u8 = &bg_rect->gradient[3].b, .from = 0.0f, .to = 0.0f, .duration = ENTER_DURATION, .easing = SCREEN_ANIMATION_EASING_LINEAR };
 	settings_transition_pause_track[tt++] = (ScreenAnimationTrack){ .target_u8 = &bg_rect->gradient[3].a, .from = 76.5f, .to = 255.0f, .duration = ENTER_DURATION, .easing = SCREEN_ANIMATION_EASING_LINEAR };
 
-	for (uint8_t i = EL_TAB_0; i < EL_HEADER_COUNT; i++) {
+	for (int i = EL_TAB_0; i < EL_HEADER_COUNT; i++) {
 		float final_x = header->element[i].position.x;
 		settings_transition_pause_track[tt++] = (ScreenAnimationTrack){
 			.target   = &header->element[i].position.x,

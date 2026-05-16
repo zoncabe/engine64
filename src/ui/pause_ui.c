@@ -32,11 +32,17 @@ typedef enum {
 } PauseElement;
 
 
-static ScreenAnimationTrack pause_track[];
+static ScreenAnimationTrack pause_transition_track[];
+static ScreenAnimationTrack pause_cursor_track[];
 
-static const ScreenAnimation pause_animation = {
-	.track       = pause_track,
-	.track_count = 17,
+static const ScreenAnimation pause_transition_animation = {
+	.track       = pause_transition_track,
+	.track_count = 14,
+};
+
+static const ScreenAnimation pause_cursor_animation = {
+	.track       = pause_cursor_track,
+	.track_count = 3,
 };
 
 Screen pause_screen = {
@@ -59,14 +65,14 @@ Screen pause_screen = {
 		},
 	},
 	.section_count = 1,
-	.animation     = &pause_animation,
+	.animation     = &pause_transition_animation,
 };
 
 static const float pause_style_continue[] = { MENU_STYLE_SELECTED, MENU_STYLE_NORMAL,   MENU_STYLE_NORMAL   };
 static const float pause_style_options[]  = { MENU_STYLE_NORMAL,   MENU_STYLE_SELECTED, MENU_STYLE_NORMAL   };
 static const float pause_style_quit[]     = { MENU_STYLE_NORMAL,   MENU_STYLE_NORMAL,   MENU_STYLE_SELECTED };
 
-static ScreenAnimationTrack pause_track[] = {
+static ScreenAnimationTrack pause_transition_track[] = {
 
 	{ .target_u8 = &pause_screen.section[0].element[PAUSE_BG].rectangle.gradient[0].a, .from = 0.0f, .to =  76.5f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
 	{ .target_u8 = &pause_screen.section[0].element[PAUSE_BG].rectangle.gradient[1].a, .from = 0.0f, .to = 255.0f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
@@ -85,6 +91,9 @@ static ScreenAnimationTrack pause_track[] = {
 	{ .target = &pause_screen.section[0].element[PAUSE_D_DOWN].position.x,      .from = 330.0f, .to = 245.0f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
 	{ .target = &pause_screen.section[0].element[PAUSE_BTN_A].position.x,       .from = 320.0f, .to = 244.0f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
 	{ .target = &pause_screen.section[0].element[PAUSE_BTN_B].position.x,       .from = 320.0f, .to = 244.0f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+};
+
+static ScreenAnimationTrack pause_cursor_track[] = {
 
 	{ .target_u8 = &pause_screen.section[0].element[PAUSE_CONTINUE].text.style, .source_int = NULL, .values_by_index = pause_style_continue },
 	{ .target_u8 = &pause_screen.section[0].element[PAUSE_OPTIONS].text.style,  .source_int = NULL, .values_by_index = pause_style_options  },
@@ -97,27 +106,28 @@ static ScreenAnimationPlayer pause_animation_player;
 void pause_ui_init(void)
 {
 	const int8_t *index = menuStack_getIndexPtr();
-	pause_track[14].source_int = index;
-	pause_track[15].source_int = index;
-	pause_track[16].source_int = index;
+	pause_cursor_track[0].source_int = index;
+	pause_cursor_track[1].source_int = index;
+	pause_cursor_track[2].source_int = index;
 }
 
 void pause_update(void)
 {
 	if (pause_animation_player.is_active)
 		screenAnimationPlayer_update(&pause_animation_player, time_get()->delta);
+	screenAnimation_apply(&pause_cursor_animation, 0.0f);
 }
 
 void pause_startEnter(void)
 {
-	screenAnimationPlayer_start(&pause_animation_player, &pause_animation, SCREEN_ANIMATION_PLAY_ONCE, false);
+	screenAnimationPlayer_start(&pause_animation_player, &pause_transition_animation, SCREEN_ANIMATION_PLAY_ONCE, false);
 	pause_animation_player.on_finish     = NULL;
 	pause_animation_player.on_finish_ctx = NULL;
 }
 
 void pause_startExit(void (*on_finish)(void *ctx), void *ctx)
 {
-	screenAnimationPlayer_start(&pause_animation_player, &pause_animation, SCREEN_ANIMATION_PLAY_ONCE, true);
+	screenAnimationPlayer_start(&pause_animation_player, &pause_transition_animation, SCREEN_ANIMATION_PLAY_ONCE, true);
 	pause_animation_player.on_finish     = on_finish;
 	pause_animation_player.on_finish_ctx = ctx;
 }

@@ -3,7 +3,7 @@
 #include "physics/math/math_common.h"
 
 
-void mesh_setMatrix(Mesh *mesh, const Transform *transform, uint8_t fb_index)
+void mesh_setMatrix(Mesh *mesh, const RenderTransform *transform, uint8_t fb_index)
 {
 	t3d_mat4fp_from_srt_euler(
 		

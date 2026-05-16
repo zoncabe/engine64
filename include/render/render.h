@@ -10,14 +10,22 @@
 #include "graphics/shapes.h"
 #include "graphics/sprites.h"
 #include "graphics/font.h"
+#include "physics/math/vector3.h"
 
 #define RENDER_MAX_DRAW_ELEMENT  128
-#define RENDER_MAX_T3D_OBJECT     16
+#define RENDER_MAX_T3D_OBJECT     32
 #define RENDER_MAX_SECTION         8
 
 typedef struct Scene          Scene;
-typedef struct GameTransition GameTransition;
 typedef struct Screen         Screen;
+
+/* Render-side transform: position, rotation as Euler degrees, non-uniform scale.
+   Consumed by mesh_setMatrix → t3d_mat4fp_from_srt. */
+typedef struct RenderTransform {
+	Vector3 position;
+	Vector3 rotation;
+	Vector3 scale;
+} RenderTransform;
 
 typedef enum {
 
@@ -80,10 +88,10 @@ typedef struct RenderContext {
 } RenderContext;
 
 
-// function prototypes
+void renderTransform_init(RenderTransform *t);
 
 void render_initContext(RenderContext *ctx);
-void render_setContext(RenderContext *ctx, const Scene *scene, uint8_t fb_index, const GameTransition *transition, const Screen *screen);
+void render_setContext(RenderContext *ctx, const Scene *scene, uint8_t fb_index, const Screen *screen);
 void render(RenderContext *ctx, int *fb_index);
 
 

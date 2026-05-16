@@ -46,17 +46,17 @@ const ResourceSet *resources_forState(GameState state)
 void resources_load(const ResourceSet *set)
 {
 	if (!set) return;
-	for (uint8_t i = 0; i < set->sprite_count; i++)
+	for (int i = 0; i < set->sprite_count; i++)
 		sprite_loadAsset(set->sprite[i]);
-	for (uint8_t i = 0; i < set->font_count; i++)
+	for (int i = 0; i < set->font_count; i++)
 		font_loadAsset(set->font[i]);
 }
 
 void resources_unload(const ResourceSet *set)
 {
 	if (!set) return;
-	for (uint8_t i = 0; i < set->sprite_count; i++)
+	for (int i = 0; i < set->sprite_count; i++)
 		sprite_unloadAsset(set->sprite[i]);
-	for (uint8_t i = 0; i < set->font_count; i++)
+	for (int i = 0; i < set->font_count; i++)
 		font_unloadAsset(set->font[i]);
 }

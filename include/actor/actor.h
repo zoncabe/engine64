@@ -16,13 +16,20 @@
 
 typedef struct Actor {
 
-	RigidBody       body;
 	ActorMotion     motion;
 	ActorAnimation  animation;
 	ActorStateData  state;
 	const AnimationDef  *animation_def;
-	
+
 } Actor;
+
+typedef struct ActorDef {
+
+	const ActorMotionSettings *motion_settings;
+	const ActorAnimationSettings *animation_settings;
+	const AnimationDef *animation_def;
+
+} ActorDef;
 
 
 #endif

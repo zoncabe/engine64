@@ -3,7 +3,7 @@ BUILD_DIR=build
 include $(N64_INST)/include/n64.mk
 include $(T3D_INST)/t3d.mk
 
-N64_CFLAGS += -std=gnu2x -Iinclude
+N64_CFLAGS   += -std=gnu2x -Iinclude
 GLTF_FLAGS = '--base-scale=1'
 
 PROJECT_NAME = game
@@ -14,9 +14,13 @@ src =   $(wildcard *.c) \
 		$(wildcard src/cutscene/*.c) \
 		$(wildcard src/time/*.c) \
 		$(wildcard src/physics/math/*.c) \
+		$(wildcard src/physics/geometry/*.c) \
+		$(wildcard src/physics/memory/*.c) \
+		$(wildcard src/physics/shapes/*.c) \
 		$(wildcard src/physics/body/*.c) \
+		$(wildcard src/physics/broadphase/*.c) \
 		$(wildcard src/physics/collision/*.c) \
-		$(wildcard src/physics/collision/shapes/*.c) \
+		$(wildcard src/physics/world/*.c) \
 		$(wildcard src/camera/*.c) \
 		$(wildcard src/viewport/*.c) \
 		$(wildcard src/control/*.c) \

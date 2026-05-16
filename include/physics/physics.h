@@ -1,7 +1,12 @@
+
 #ifndef PHYSICS_H
 #define PHYSICS_H
 
-#include "math/math.h"
-#include "body/rigid_body.h"
+#include "physics/math/math.h"
+#include "physics/math/transform.h"
+#include "physics/body/rigid_body.h"
+#include "physics/shapes/physics_shape.h"
+#include "physics/world/physics_scene.h"
+
 
 #endif

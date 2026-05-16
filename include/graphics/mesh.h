@@ -5,7 +5,7 @@
 #include <t3d/t3dmath.h>
 #include <t3d/t3dmodel.h>
 
-#include "physics/math/transform.h"
+#include "render/render.h"
 
 
 typedef struct {
@@ -15,6 +15,6 @@ typedef struct {
 } Mesh;
 
 
-void mesh_setMatrix(Mesh *mesh, const Transform *transform, uint8_t fb_index);
+void mesh_setMatrix(Mesh *mesh, const RenderTransform *transform, uint8_t fb_index);
 
 #endif

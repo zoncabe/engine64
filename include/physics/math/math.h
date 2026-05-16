@@ -7,6 +7,7 @@
 #include "math_common.h"
 #include "vector2.h"
 #include "vector3.h"
+#include "matrix3.h"
 #include "transform.h"
 
 #endif

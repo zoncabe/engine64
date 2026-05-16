@@ -77,14 +77,14 @@ static const ControllerBinding default_binding = {
 
 void controller_start(void)
 {
-	for (uint8_t i = 0; i < CONTROLLER_COUNT; i++)
+	for (int i = 0; i < CONTROLLER_COUNT; i++)
 		controller[i] = (Controller){ .binding = default_binding };
 }
 
 void controller_poll(void)
 {
 	joypad_poll();
-	for (uint8_t i = 0; i < CONTROLLER_COUNT; i++) {
+	for (int i = 0; i < CONTROLLER_COUNT; i++) {
 		controllerData_getInputs(&controller[i].raw, i);
 		controller_mapActions(&controller[i]);
 	}

@@ -14,38 +14,9 @@ typedef struct Screen        Screen;
 typedef struct Viewport      Viewport;
 
 
-typedef enum {
-
-	TRANSITION_FADE,
-
-} GameTransitionType;
-
-typedef enum {
-
-	TRANSITION_PHASE_START,
-	TRANSITION_PHASE_LOAD,
-	TRANSITION_PHASE_FINISH,
-
-} GameTransitionPhase;
-
-typedef struct GameTransition {
-
-	GameTransitionType  type;
-	GameTransitionPhase phase;
-	float               progress;
-	float               speed;
-	bool                is_active;
-	bool                is_overlay;
-
-} GameTransition;
-
 typedef struct Game {
 
-	GameState  state;
-	GameState  previous_state;
-	GameState  target_state;
-	bool       state_changed;
-	GameTransition transition;
+	GameState state;
 
 } Game;
 

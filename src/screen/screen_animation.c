@@ -30,7 +30,7 @@ static float screenAnimationTrack_end(const ScreenAnimationTrack *track)
 static float screenAnimation_duration(const ScreenAnimation *animation)
 {
 	float max = 0.0f;
-	for (uint8_t i = 0; i < animation->track_count; i++) {
+	for (int i = 0; i < animation->track_count; i++) {
 		float end = screenAnimationTrack_end(&animation->track[i]);
 		if (end > max) max = end;
 	}
@@ -43,7 +43,7 @@ static float screenAnimation_duration(const ScreenAnimation *animation)
 static float screenAnimation_maxDelay(const ScreenAnimation *animation)
 {
 	float max = 0.0f;
-	for (uint8_t i = 0; i < animation->track_count; i++) {
+	for (int i = 0; i < animation->track_count; i++) {
 		float d = animation->track[i].delay;
 		if (d > max) max = d;
 	}
@@ -54,7 +54,7 @@ static float screenAnimation_reverseDuration(const ScreenAnimation *animation)
 {
 	float max_delay = screenAnimation_maxDelay(animation);
 	float max = 0.0f;
-	for (uint8_t i = 0; i < animation->track_count; i++) {
+	for (int i = 0; i < animation->track_count; i++) {
 		float end = (max_delay - animation->track[i].delay) + animation->track[i].duration;
 		if (end > max) max = end;
 	}
@@ -169,13 +169,13 @@ static void screenAnimationPlayer_applyFrame(ScreenAnimationPlayer *animation_pl
 	const ScreenAnimation *animation = animation_player->animation;
 	if (animation_player->is_reversed) {
 		float max_delay = screenAnimation_maxDelay(animation);
-		for (uint8_t i = 0; i < animation->track_count; i++) {
+		for (int i = 0; i < animation->track_count; i++) {
 			const ScreenAnimationTrack *track = &animation->track[i];
 			float reverse_delay = max_delay - track->delay;
 			screenAnimationPlayer_applyTrackReversed(track, time, reverse_delay);
 		}
 	} else {
-		for (uint8_t i = 0; i < animation->track_count; i++)
+		for (int i = 0; i < animation->track_count; i++)
 			screenAnimationPlayer_applyTrack(&animation->track[i], time);
 	}
 }
@@ -189,7 +189,7 @@ static void screenAnimationPlayer_finish(ScreenAnimationPlayer *animation_player
 
 void screenAnimation_apply(const ScreenAnimation *animation, float time)
 {
-	for (uint8_t i = 0; i < animation->track_count; i++)
+	for (int i = 0; i < animation->track_count; i++)
 		screenAnimationPlayer_applyTrack(&animation->track[i], time);
 }
 

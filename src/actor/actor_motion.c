@@ -17,29 +17,31 @@ static LocomotionType actorMotion_getLocomotionType(uint8_t state)
 
 static void actorMotion_setHorizontalVelocity(Entity *entity, float yaw, float target_speed, float response_rate, float dt)
 {
-	RigidBody *body = &entity->actor->body;
+	RigidBody *body = entity->body;
 
 	float target_vx = target_speed *  fm_sinf(deg_to_rad(yaw));
 	float target_vy = target_speed * -fm_cosf(deg_to_rad(yaw));
 
 	float factor = fm_exp(-response_rate * dt);
-	body->velocity.x = body->velocity.x * factor + target_vx * (1.0f - factor);
-	body->velocity.y = body->velocity.y * factor + target_vy * (1.0f - factor);
+	body->linear_velocity.x = body->linear_velocity.x * factor + target_vx * (1.0f - factor);
+	body->linear_velocity.y = body->linear_velocity.y * factor + target_vy * (1.0f - factor);
+
+	rigidBody_setToAwake(body);
 }
 
 static void actorMotion_setRotation(Entity *entity, float dt)
 {
 	Actor *actor = entity->actor;
-	RigidBody *body = &actor->body;
+	RigidBody *body = entity->body;
 	ActorMotionData *data = &actor->motion.data;
 	const ActorMotionSettings *settings = &actor->motion.settings;
 
-	if (body->velocity.x == 0 && body->velocity.y == 0) return;
+	if (body->linear_velocity.x == 0 && body->linear_velocity.y == 0) return;
 
-	Vector2 horizontal_velocity = {body->velocity.x, body->velocity.y};
+	Vector2 horizontal_velocity = {body->linear_velocity.x, body->linear_velocity.y};
 	data->horizontal_speed = vector2_magnitude(&horizontal_velocity);
 
-	const float velocity_yaw = rad_to_deg(fm_atan2f(-body->velocity.x, -body->velocity.y));
+	const float velocity_yaw = rad_to_deg(fm_atan2f(-body->linear_velocity.x, -body->linear_velocity.y));
 
 	if (data->rotation_mode == ACTOR_ROTATION_MODE_SNAP) {
 		entity->transform.rotation.z = angle_wrap(velocity_yaw);
@@ -66,22 +68,16 @@ static void actorMotion_setRotation(Entity *entity, float dt)
 static void actorMotion_updateBody(Entity *entity, float dt)
 {
 	Actor *actor = entity->actor;
-	RigidBody *body = &actor->body;
+	RigidBody *body = entity->body;
 	ActorMotionData *data = &actor->motion.data;
 
 	data->previous_yaw = entity->transform.rotation.z;
 
-	if (body->acceleration.z)
-		body->velocity.z += body->acceleration.z * dt;
-
-	if (fabsf(body->velocity.x) < LOCOMOTION_MIN_SPEED && fabsf(body->velocity.y) < LOCOMOTION_MIN_SPEED && body->velocity.z == 0) {
-		body->velocity.x = 0;
-		body->velocity.y = 0;
+	if (fabsf(body->linear_velocity.x) < LOCOMOTION_MIN_SPEED && fabsf(body->linear_velocity.y) < LOCOMOTION_MIN_SPEED && body->linear_velocity.z == 0) {
+		body->linear_velocity.x = 0;
+		body->linear_velocity.y = 0;
 		data->horizontal_speed = 0;
 	}
-
-	if (body->velocity.x != 0 || body->velocity.y != 0 || body->velocity.z != 0)
-		vector3_addScaledVector(&entity->transform.position, &body->velocity, dt);
 
 	actorMotion_setRotation(entity, dt);
 }
@@ -151,36 +147,36 @@ static uint8_t actorMotion_jumpPhase(const ActorMotionData *data, const RigidBod
 {
 	if (data->jump_timer < jump->timer_max) return ACTOR_JUMP_PHASE_CHARGING;
 	if (data->jump_force > 0)               return ACTOR_JUMP_PHASE_LAUNCH;
-	if (body->velocity.z > 0)               return ACTOR_JUMP_PHASE_RISING;
+	if (body->linear_velocity.z > 0)               return ACTOR_JUMP_PHASE_RISING;
 	return ACTOR_JUMP_PHASE_DONE;
 }
 
 static void actorMotion_jumpCharging(Entity *entity, MotionCommand *cmd, float dt)
 {
 	Actor *actor = entity->actor;
-	RigidBody *body = &actor->body;
+	RigidBody *body = entity->body;
 	ActorMotionData *data = &actor->motion.data;
 
 	data->jump_timer += dt;
 	if (cmd->jump_held) {
 		data->jump_force += dt;
-		vector3_scale(&body->velocity, ACTOR_JUMP_HOLD_VELOCITY_SCALE);
+		vector3_scale(&body->linear_velocity, ACTOR_JUMP_HOLD_VELOCITY_SCALE);
 	}
 }
 
 static void actorMotion_jumpLaunch(Entity *entity, float dt)
 {
 	Actor *actor = entity->actor;
-	RigidBody *body = &actor->body;
+	RigidBody *body = entity->body;
 	ActorMotionData *data = &actor->motion.data;
 	const JumpSettings *jump = &actor->motion.settings.jump;
 
 	data->jump_timer += dt;
-	body->velocity = data->jump_initial_velocity;
-	vector3_scale(&body->velocity, ACTOR_JUMP_LAUNCH_VELOCITY_SCALE);
-	body->velocity.z = data->jump_force * jump->force_multiplier;
-	if (body->velocity.z < jump->minimum_speed)
-		body->velocity.z = jump->minimum_speed;
+	body->linear_velocity = data->jump_initial_velocity;
+	vector3_scale(&body->linear_velocity, ACTOR_JUMP_LAUNCH_VELOCITY_SCALE);
+	body->linear_velocity.z = data->jump_force * jump->force_multiplier;
+	if (body->linear_velocity.z < jump->minimum_speed)
+		body->linear_velocity.z = jump->minimum_speed;
 	data->jump_force = 0;
 }
 
@@ -190,13 +186,11 @@ static void actorMotion_jumpRising(Entity *entity, float dt)
 	ActorMotionData *data = &actor->motion.data;
 
 	data->jump_timer += dt;
-	actor->body.acceleration.z = ACTOR_GRAVITY;
 }
 
 static void actorMotion_jumpDone(Entity *entity)
 {
 	Actor *actor = entity->actor;
-	actor->body.acceleration.z = ACTOR_GRAVITY;
 	actor->motion.data.jump_timer = 0;
 	actor->state.next = ACTOR_STATE_FALLING;
 }
@@ -204,12 +198,12 @@ static void actorMotion_jumpDone(Entity *entity)
 static void actorMotion_setJump(Entity *entity, MotionCommand *cmd, float dt)
 {
 	Actor *actor = entity->actor;
-	RigidBody *body = &actor->body;
+	RigidBody *body = entity->body;
 	ActorMotionData *data = &actor->motion.data;
 	const JumpSettings *jump = &actor->motion.settings.jump;
 
 	if (cmd->jump_triggered) {
-		data->jump_initial_velocity = body->velocity;
+		data->jump_initial_velocity = body->linear_velocity;
 		cmd->jump_triggered = false;
 	}
 
@@ -226,20 +220,18 @@ static void actorMotion_setJump(Entity *entity, MotionCommand *cmd, float dt)
 static void actorMotion_setFalling(Entity *entity, MotionCommand *cmd, float dt)
 {
 	Actor *actor = entity->actor;
-	RigidBody *body = &actor->body;
+	RigidBody *body = entity->body;
 	ActorMotionData *data = &actor->motion.data;
 	const JumpSettings *jump = &actor->motion.settings.jump;
 
 	data->is_grounded = 0;
 	actorMotion_setHorizontalVelocity(entity, cmd->target_yaw, data->horizontal_speed, jump->response_rate, dt);
-	body->acceleration.z = ACTOR_GRAVITY;
-	if (body->velocity.z < ACTOR_FALL_MAX_SPEED)
-		body->velocity.z = ACTOR_FALL_MAX_SPEED;
+	if (body->linear_velocity.z < ACTOR_FALL_MAX_SPEED)
+		body->linear_velocity.z = ACTOR_FALL_MAX_SPEED;
 
 	if (entity->transform.position.z <= data->grounding_height + ACTOR_GROUNDING_SNAP_ZONE) {
 		data->is_grounded = 1;
-		body->acceleration.z = 0;
-		body->velocity.z = 0;
+		body->linear_velocity.z = 0;
 		entity->transform.position.z = data->grounding_height;
 		actor->state.next = actor->state.locomotion;
 		return;

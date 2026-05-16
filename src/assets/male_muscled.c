@@ -131,10 +131,10 @@ const AnimationDef male_muscled_animation_def = {
 
 const ActorMotionSettings male_muscled_motion_settings = {
 
-	.locomotion[LOCOMOTION_IDLE]   = { .target_speed = 0,   .response_rate = 6.0f,  .rotation_response_rate = 8.0f },
-	.locomotion[LOCOMOTION_WALK]   = { .target_speed = 175, .response_rate = 8.0f,  .rotation_response_rate = 12.0f },
-	.locomotion[LOCOMOTION_RUN]    = { .target_speed = 390, .response_rate = 9.0f, .rotation_response_rate = 15.0f },
-	.locomotion[LOCOMOTION_SPRINT] = { .target_speed = 520, .response_rate = 10.0f, .rotation_response_rate = 14.0f },
+	.locomotion[LOCOMOTION_IDLE]   = { .target_speed = 0,     .response_rate = 6.0f,  .rotation_response_rate = 8.0f },
+	.locomotion[LOCOMOTION_WALK]   = { .target_speed = 1.75f, .response_rate = 8.0f,  .rotation_response_rate = 12.0f },
+	.locomotion[LOCOMOTION_RUN]    = { .target_speed = 3.9f,  .response_rate = 9.0f,  .rotation_response_rate = 15.0f },
+	.locomotion[LOCOMOTION_SPRINT] = { .target_speed = 5.2f,  .response_rate = 10.0f, .rotation_response_rate = 14.0f },
 
 	.roll = {
 		.launch_response_rate            = 15.0f,
@@ -143,16 +143,16 @@ const ActorMotionSettings male_muscled_motion_settings = {
 		.ground_time                     = 0.3f,
 		.grip_time                       = 0.9f,
 		.timer_max                       = 1.166666f,
-		.target_speed[LOCOMOTION_IDLE]   = 300.0f,
-		.target_speed[LOCOMOTION_WALK]   = 300.0f,
-		.target_speed[LOCOMOTION_RUN]    = 468.0f,
-		.target_speed[LOCOMOTION_SPRINT] = 624.0f,
+		.target_speed[LOCOMOTION_IDLE]   = 3.0f,
+		.target_speed[LOCOMOTION_WALK]   = 3.0f,
+		.target_speed[LOCOMOTION_RUN]    = 4.68f,
+		.target_speed[LOCOMOTION_SPRINT] = 6.24f,
 	},
 
 	.jump = {
 		.response_rate    = 0.5f,
-		.force_multiplier = 3000,
-		.minimum_speed    = 500,
+		.force_multiplier = 30.0f,
+		.minimum_speed    = 5.0f,
 		.timer_max        = 0.233333f,
 	},
 

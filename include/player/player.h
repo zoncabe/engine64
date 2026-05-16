@@ -26,7 +26,7 @@ typedef struct Player {
 Player *player_get(void);
 void player_init(void);
 void player_setEntity(Player *player, Entity *entity);
-void player_update(uint8_t fb_index);
+void player_update(void);
 void player_setMatrix(uint8_t fb_index);
 
 #endif

@@ -12,6 +12,7 @@
 #include "menu/menu.h"
 #include "ui/main_menu_ui.h"
 #include "ui/pause_ui.h"
+#include "ui/gameplay_ui.h"
 #include "ui/settings_ui.h"
 
 
@@ -57,6 +58,7 @@ void game_init()
 	menuStack_init();
 	main_menu_ui_init();
 	pause_ui_init();
+	gameplay_ui_init();
 	settings_ui_init();
 
 	game.state = GAME_INITIAL_STATE;
@@ -74,7 +76,7 @@ void game_runFrame(void)
 	game_updateState(&ctx);
 
 	GameRenderDescriptor desc = game_getRenderDescriptor(&ctx);
-	render_setContext(&render_context, desc.scene, ctx.viewport->fb_index, &ctx.game->transition, desc.screen);
+	render_setContext(&render_context, desc.scene, ctx.viewport->fb_index, desc.screen);
 	render(&render_context, &ctx.viewport->fb_index);
 }
 

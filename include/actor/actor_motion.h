@@ -19,7 +19,7 @@ typedef struct Entity Entity;
 // invariants, not per-character knobs.
 // ----------------------------------------------------------------------------
 
-#define LOCOMOTION_MIN_SPEED 5
+#define LOCOMOTION_MIN_SPEED 0.05f
 
 #define ACTOR_ROTATION_SNAP_THRESHOLD 1.0f
 
@@ -40,8 +40,8 @@ typedef struct Entity Entity;
 #define ACTOR_JUMP_HOLD_VELOCITY_SCALE 0.96f
 #define ACTOR_JUMP_LAUNCH_VELOCITY_SCALE 0.8f
 
-#define ACTOR_GRAVITY -1800.0f
-#define ACTOR_FALL_MAX_SPEED -1500.0f
+#define ACTOR_GRAVITY_SCALE 2.0f
+#define ACTOR_FALL_MAX_SPEED -15.0f
 
 
 typedef enum {
