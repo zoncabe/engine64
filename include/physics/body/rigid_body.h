@@ -3,8 +3,8 @@
 	PhysicsShape (Box / Sphere / Capsule). Ported from qu3e q3Body, renamed
 	to engine conventions.
 */
-#ifndef PHYSICS_BODY_RIGID_BODY_H
-#define PHYSICS_BODY_RIGID_BODY_H
+#ifndef RIGID_BODY_H
+#define RIGID_BODY_H
 
 #include <stdint.h>
 
@@ -18,7 +18,7 @@
 #include "physics/shapes/capsule.h"
 
 
-struct PhysicsScene;
+struct PhysicsWorld;
 struct ContactEdge;
 
 
@@ -63,7 +63,7 @@ typedef struct RigidBody {
 
 	PhysicsShape *shapes;
 	void         *owner;
-	struct PhysicsScene *scene;
+	struct PhysicsWorld *world;
 	struct RigidBody    *next;
 	struct RigidBody    *prev;
 	int32_t       island_index;
@@ -101,7 +101,7 @@ typedef struct RigidBodyDef {
 
 void rigidBodyDef_init(RigidBodyDef *d);
 
-void rigidBody_init(RigidBody *b, const RigidBodyDef *def, struct PhysicsScene *scene);
+void rigidBody_init(RigidBody *b, const RigidBodyDef *def, struct PhysicsWorld *world);
 
 PhysicsShape *rigidBody_addBox    (RigidBody *b, const BoxDef     *def);
 PhysicsShape *rigidBody_addSphere (RigidBody *b, const SphereDef  *def);

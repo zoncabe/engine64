@@ -24,7 +24,7 @@ src =   $(wildcard *.c) \
 		$(wildcard src/camera/*.c) \
 		$(wildcard src/viewport/*.c) \
 		$(wildcard src/control/*.c) \
-		$(wildcard src/actor/*.c) \
+		$(wildcard src/character/*.c) \
 		$(wildcard src/entity/*.c) \
 		$(wildcard src/scene/*.c) \
 		$(wildcard src/player/*.c) \
@@ -46,6 +46,9 @@ assets_conv = $(addprefix filesystem/textures/,$(notdir $(assets_png:%.png=%.spr
 			  $(addprefix filesystem/fonts/,$(notdir $(assets_ttf:%.ttf=%.font64))) \
 			  $(addprefix filesystem/audio/,$(notdir $(assets_wav:%.wav=%.wav64)))
 
+# Models with a collision mesh (declared one per line)
+assets_collision = filesystem/collision/room.collision
+
 
 all: $(PROJECT_NAME).z64
 
@@ -59,6 +62,17 @@ filesystem/models/%.t3dm: assets/models/%.glb
 	@echo "    [T3D-MODEL] $@"
 	$(T3D_GLTF_TO_3D) $(GLTF_FLAGS) "$<" $@
 	$(N64_BINDIR)/mkasset -c 2 -o filesystem/models $@
+
+COLLISION_IMPORTER = tools/collision_importer/collision_importer
+
+$(COLLISION_IMPORTER): tools/collision_importer/main.c
+	gcc -O2 -o $@ $< -I$(T3D_INST)/tools/gltf_importer/src/lib -lm
+
+filesystem/collision/%.collision: assets/models/%.glb $(COLLISION_IMPORTER)
+	@mkdir -p $(dir $@)
+	@echo "    [COLLISION] $@"
+	$(COLLISION_IMPORTER) "$<" $@ $(COL_MESHES)
+	$(N64_BINDIR)/mkasset -c 1 -o filesystem/collision $@
 
 filesystem/fonts/%.font64: assets/fonts/%.ttf
 	@mkdir -p $(dir $@)
@@ -76,7 +90,7 @@ filesystem/audio/%.wav64: assets/audio/%.wav
 	@echo "    [AUDIO] $@"
 	@$(N64_AUDIOCONV) --wav-compress 3 -o filesystem/audio $<
 
-$(BUILD_DIR)/$(PROJECT_NAME).dfs: $(assets_conv)
+$(BUILD_DIR)/$(PROJECT_NAME).dfs: $(assets_conv) $(assets_collision)
 $(BUILD_DIR)/$(PROJECT_NAME).elf: $(src:%.c=$(BUILD_DIR)/%.o)
 
 $(PROJECT_NAME).z64: N64_ROM_TITLE="not a game"

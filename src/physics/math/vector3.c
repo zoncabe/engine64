@@ -113,3 +113,13 @@ float vector3_magnitude(const Vector3 *v)
 {
 	return sqrtf(vector3_squaredMagnitude(v));
 }
+
+Vector3 vector3_reflected(const Vector3 *v, const Vector3 *normal)
+{
+	float t = 2.0f * vector3_dot(v, normal);
+	return (Vector3){
+		v->x - t * normal->x,
+		v->y - t * normal->y,
+		v->z - t * normal->z,
+	};
+}

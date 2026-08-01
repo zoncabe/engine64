@@ -65,7 +65,7 @@ void game_init()
 	game_loadInitialState();
 }
 
-void game_runFrame(void)
+void game_runStep(void)
 {
 	time_update();
 

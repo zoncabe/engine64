@@ -1,11 +1,13 @@
 #include <assert.h>
 
+#include <t3d/t3dmath.h>
+
 #include "viewport/viewport.h"
 #include "light/lighting.h"
 #include "entity/entity.h"
 #include "scene/scene.h"
 #include "scene/demo_scene.h"
-#include "physics/world/physics_scene.h"
+#include "physics/world/physics_world.h"
 #include "physics/shapes/physics_shape.h"
 #include "physics/body/rigid_body.h"
 #include "physics/physics_settings.h"
@@ -13,10 +15,92 @@
 
 
 static Scene scene;
-static PhysicsScene g_physics;
+static PhysicsWorld g_physics;
 
 Scene *scene_get(void) { return &scene; }
-PhysicsScene *physics_getScene(void) { return &g_physics; }
+PhysicsWorld *physics_getWorld(void) { return &g_physics; }
+
+
+/* World transform of a static collider: entity position in metres plus the
+   entity rotation built with the same euler function the renderer uses, so
+   collision and visuals always match. */
+static Transform entity_colliderTransform(const EntityDef *def)
+{
+	T3DMat4 mat;
+	t3d_mat4_from_srt_euler(&mat,
+		(float[3]){1.0f, 1.0f, 1.0f},
+		(float[3]){deg_to_rad(def->rotation.x), deg_to_rad(def->rotation.y), deg_to_rad(def->rotation.z)},
+		(float[3]){0.0f, 0.0f, 0.0f});
+
+	return (Transform){
+		.rotation = {
+			.ex = { mat.m[0][0], mat.m[0][1], mat.m[0][2] },
+			.ey = { mat.m[1][0], mat.m[1][1], mat.m[1][2] },
+			.ez = { mat.m[2][0], mat.m[2][1], mat.m[2][2] },
+		},
+		.position = {
+			def->position.x * RENDER_SCALE_INV,
+			def->position.y * RENDER_SCALE_INV,
+			def->position.z * RENDER_SCALE_INV,
+		},
+	};
+}
+
+/* Shape defs usually initialise .tx with a position only, leaving the
+   rotation matrix zeroed: treat an all-zero rotation as identity. */
+static Transform shape_localTransform(const Transform *tx)
+{
+	Transform local = *tx;
+	if (vector3_squaredMagnitude(&local.rotation.ex) == 0.0f &&
+	    vector3_squaredMagnitude(&local.rotation.ey) == 0.0f &&
+	    vector3_squaredMagnitude(&local.rotation.ez) == 0.0f)
+		local.rotation = matrix3_identity();
+	return local;
+}
+
+/* Entities with a shape and no rigid body become static colliders. */
+static void entity_attachStaticShape(const EntityDef *def)
+{
+	Transform world = entity_colliderTransform(def);
+
+	/* The entity scale applies to the collider too, so one shape def
+	   serves any prop size and visuals and collision cannot diverge. */
+	Vector3 scale = def->scale;
+
+	switch (def->shape->type) {
+		case SHAPE_BOX: {
+			assert(scene.static_box_count < SCENE_MAX_STATIC_BOXES);
+			Transform local = shape_localTransform(&def->shape->box.tx);
+			local.position = (Vector3){ local.position.x * scale.x, local.position.y * scale.y, local.position.z * scale.z };
+			scene.static_box_transform[scene.static_box_count] = transform_product(&world, &local);
+			scene.static_box[scene.static_box_count++] = (Box){ .e = {
+				def->shape->box.e.x * scale.x,
+				def->shape->box.e.y * scale.y,
+				def->shape->box.e.z * scale.z,
+			}};
+			break;
+		}
+		case SHAPE_SPHERE: {
+			assert(scene.static_sphere_count < SCENE_MAX_STATIC_SPHERES);
+			Transform local = shape_localTransform(&def->shape->sphere.tx);
+			local.position = (Vector3){ local.position.x * scale.x, local.position.y * scale.y, local.position.z * scale.z };
+			scene.static_sphere_transform[scene.static_sphere_count] = transform_product(&world, &local);
+			scene.static_sphere[scene.static_sphere_count++] = (Sphere){ .radius = def->shape->sphere.radius * scale.x };
+			break;
+		}
+		case SHAPE_CAPSULE: {
+			assert(scene.static_capsule_count < SCENE_MAX_STATIC_CAPSULES);
+			Transform local = shape_localTransform(&def->shape->capsule.tx);
+			local.position = (Vector3){ local.position.x * scale.x, local.position.y * scale.y, local.position.z * scale.z };
+			scene.static_capsule_transform[scene.static_capsule_count] = transform_product(&world, &local);
+			scene.static_capsule[scene.static_capsule_count++] = (Capsule){
+				.radius      = def->shape->capsule.radius * scale.x,
+				.half_height = def->shape->capsule.half_height * scale.z,
+			};
+			break;
+		}
+	}
+}
 
 
 /* Copies the body-def override bits on top of the freshly-initialised body
@@ -51,8 +135,8 @@ static void entity_attachPhysics(Entity *entity, const EntityDef *def)
 	body_def.axis  = (Vector3){ 0.0f, 0.0f, 1.0f };
 	body_def.angle = 0.0f;
 
-	RigidBody *body = physicsScene_createBody(&g_physics, &body_def);
-	entity->body = body;
+	RigidBody *body = physicsWorld_createBody(&g_physics, &body_def);
+	body->owner = entity;
 
 	if (def->shape) {
 		switch (def->shape->type) {
@@ -87,7 +171,7 @@ void scene_load(const SceneDef *def)
 	scene = (Scene){0};
 
 	Vector3 gravity = { 0.0f, 0.0f, -9.8f };
-	physicsScene_init(&g_physics, PHYSICS_TIMESTEP, gravity, PHYSICS_SOLVER_ITERATIONS);
+	physicsWorld_init(&g_physics, PHYSICS_TIMESTEP, gravity, PHYSICS_SOLVER_ITERATIONS);
 
 	for (int i = 0; i < def->entity_count; i++) {
 		const EntityDef *entity_def = &def->entity[i];
@@ -95,9 +179,27 @@ void scene_load(const SceneDef *def)
 
 		if (entity_def->body) {
 			entity_attachPhysics(entity, entity_def);
+		} else if (entity_def->shape) {
+			entity_attachStaticShape(entity_def);
 		}
 
-		if (!entity_def->actor) {
+		if (entity_def->character) {
+			assert(scene.character_count < SCENE_MAX_CHARACTERS);
+			scene.character[scene.character_count++] = character_create(entity_def->character, entity);
+		}
+
+		if (entity_def->collision_path) {
+			assert(scene.static_mesh_count < SCENE_MAX_STATIC_MESHES);
+			/* Entity positions are in render units; collision runs in metres. */
+			scene.static_mesh_origin[scene.static_mesh_count] = (Vector3){
+				entity_def->position.x * RENDER_SCALE_INV,
+				entity_def->position.y * RENDER_SCALE_INV,
+				entity_def->position.z * RENDER_SCALE_INV,
+			};
+			scene.static_mesh[scene.static_mesh_count++] = collisionMesh_load(entity_def->collision_path);
+		}
+
+		if (!entity_def->character) {
 			for (int fb = 0; fb < FB_COUNT; fb++)
 				mesh_setMatrix(entity->mesh, &entity->transform, fb);
 		}
@@ -114,10 +216,14 @@ void scene_clear(void)
 
 void scene_unload(void)
 {
+	for (int i = 0; i < scene.character_count; i++)
+		character_delete(scene.character[i]);
+	for (int i = 0; i < scene.static_mesh_count; i++)
+		collisionMesh_delete(scene.static_mesh[i]);
 	for (int i = 0; i < scene.entity_count; i++)
 		entity_delete(scene.entity[i]);
 	scene_clear();
-	physicsScene_shutdown(&g_physics);
+	physicsWorld_shutdown(&g_physics);
 }
 
 const SceneDef *scene_getDef(SceneID id)
@@ -134,13 +240,8 @@ void scene_addEntity(Entity *entity)
 	scene.entity[scene.entity_count++] = entity;
 }
 
-Entity *scene_getActor(uint8_t index)
+Character *scene_getCharacter(uint8_t index)
 {
-	uint8_t found = 0;
-	for (int i = 0; i < scene.entity_count; i++) {
-		if (scene.entity[i]->type != ENTITY_ACTOR) continue;
-		if (found == index) return scene.entity[i];
-		found++;
-	}
-	return NULL;
+	if (index >= scene.character_count) return NULL;
+	return scene.character[index];
 }

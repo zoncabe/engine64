@@ -8,11 +8,11 @@
 #include "physics/shapes/capsule.h"
 #include "physics/shapes/physics_shape.h"
 #include "graphics/mesh.h"
-#include "actor/actor.h"
+#include "character/character.h"
 
 typedef enum {
 
-	ENTITY_ACTOR,
+	ENTITY_CHARACTER,
 	ENTITY_SCENERY,
 
 } EntityType;
@@ -22,8 +22,6 @@ typedef struct Entity {
 	EntityType type;
 	RenderTransform transform;
 	Mesh *mesh;
-	Actor *actor;
-	RigidBody *body;
 
 } Entity;
 
@@ -41,10 +39,11 @@ typedef struct EntityShapeDef {
 typedef struct EntityDef {
 
 	const char *model_path;
+	const char *collision_path;
 	Vector3 position;
 	Vector3 rotation;
 	Vector3 scale;
-	const ActorDef *actor;
+	const CharacterDef *character;
 	const RigidBodyDef   *body;
 	const EntityShapeDef *shape;
 
@@ -54,7 +53,7 @@ typedef struct EntityDef {
 void entity_init(Entity *entity, const EntityDef *def);
 Entity *entity_create(const EntityDef *def);
 void entity_delete(Entity *entity);
-void entity_syncTransformToBody(Entity *entity);
+void entity_setTransform(Entity *entity, const KinematicBody *body);
 void entity_setMatrix(Entity *entity, uint8_t fb_index);
 
 #endif

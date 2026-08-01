@@ -27,6 +27,7 @@ Vector3 vector3_inverted(const Vector3 *v);
 Vector3 vector3_abs(const Vector3 *v);
 Vector3 vector3_cross(const Vector3 *a, const Vector3 *b);
 Vector3 vector3_normalized(const Vector3 *v);
+Vector3 vector3_reflected(const Vector3 *v, const Vector3 *normal);
 
 float vector3_dot(const Vector3 *a, const Vector3 *b);
 float vector3_squaredMagnitude(const Vector3 *v);

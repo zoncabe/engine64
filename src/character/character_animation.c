@@ -7,14 +7,14 @@
 #include "viewport/viewport.h"
 
 
-void actorAnimation_addLayer(ActorAnimationBuffer *buffer, const T3DSkeleton *skel, float weight)
+void characterAnimation_addLayer(CharacterAnimationBuffer *buffer, const T3DSkeleton *skel, float weight)
 {
 	buffer->layer[buffer->count] = skel;
 	buffer->weight[buffer->count] = weight;
 	buffer->count++;
 }
 
-void actorAnimation_blendLayers(const T3DSkeleton *main, const ActorAnimationBuffer *buffer)
+void characterAnimation_blendLayers(const T3DSkeleton *main, const CharacterAnimationBuffer *buffer)
 {
 	for (int i = 0; i < main->skeletonRef->boneCount; i++)
 	{
@@ -31,25 +31,25 @@ void actorAnimation_blendLayers(const T3DSkeleton *main, const ActorAnimationBuf
 	}
 }
 
-static uint8_t actorAnimation_getSpeedState(float speed, const ActorMotionSettings *motion)
+static uint8_t characterAnimation_getSpeedState(float speed, const CharacterMovementSettings *movement)
 {
-	if (speed <= 0.0f)                                              return ACTOR_STATE_IDLE;
-	if (speed <= motion->locomotion[LOCOMOTION_WALK].target_speed)  return ACTOR_STATE_WALKING;
-	if (speed <= motion->locomotion[LOCOMOTION_RUN].target_speed)   return ACTOR_STATE_RUNNING;
-	return ACTOR_STATE_SPRINTING;
+	if (speed <= 0.0f)                        return MOVEMENT_STATE_IDLE;
+	if (speed <= movement->walk_target_speed) return MOVEMENT_STATE_WALKING;
+	if (speed <= movement->run_target_speed)  return MOVEMENT_STATE_RUNNING;
+	return MOVEMENT_STATE_SPRINTING;
 }
 
-static float actorAnimation_getLocomotionWeight(float speed, uint8_t speed_state, const ActorMotionSettings *motion)
+static float characterAnimation_getLocomotionWeight(float speed, uint8_t speed_state, const CharacterMovementSettings *movement)
 {
-	float walk_speed   = motion->locomotion[LOCOMOTION_WALK].target_speed;
-	float run_speed    = motion->locomotion[LOCOMOTION_RUN].target_speed;
-	float sprint_speed = motion->locomotion[LOCOMOTION_SPRINT].target_speed;
+	float walk_speed   = movement->walk_target_speed;
+	float run_speed    = movement->run_target_speed;
+	float sprint_speed = movement->sprint_target_speed;
 
 	float p;
 	switch (speed_state) {
-		case ACTOR_STATE_WALKING:   p = speed / walk_speed; break;
-		case ACTOR_STATE_RUNNING:   p = (speed - walk_speed)  / (run_speed    - walk_speed); break;
-		case ACTOR_STATE_SPRINTING: p = (speed - run_speed)   / (sprint_speed - run_speed); break;
+		case MOVEMENT_STATE_WALKING:   p = speed / walk_speed; break;
+		case MOVEMENT_STATE_RUNNING:   p = (speed - walk_speed)  / (run_speed    - walk_speed); break;
+		case MOVEMENT_STATE_SPRINTING: p = (speed - run_speed)   / (sprint_speed - run_speed); break;
 		default:        return 0.0f;
 	}
 	if (p > 1.0f) p = 1.0f;
@@ -57,7 +57,7 @@ static float actorAnimation_getLocomotionWeight(float speed, uint8_t speed_state
 	return p;
 }
 
-static float actorAnimation_getLocomotionPhase(float clip_time, float clip_length)
+static float characterAnimation_getLocomotionPhase(float clip_time, float clip_length)
 {
 	float phase = clip_time / clip_length;
 	float f;
@@ -69,13 +69,13 @@ static float actorAnimation_getLocomotionPhase(float clip_time, float clip_lengt
 	return f;
 }
 
-static void actorAnimation_setJumpFootingSpeed(const AnimationParamCtx *ctx)
+static void characterAnimation_setJumpFootingSpeed(const CharacterAnimationParamCtx *ctx)
 {
-	uint8_t cur = ctx->actor->state.current;
-	if (cur != ACTOR_STATE_JUMPING && cur != ACTOR_STATE_FALLING) return;
+	uint8_t cur = ctx->character->movement.current;
+	if (cur != MOVEMENT_STATE_JUMPING && cur != MOVEMENT_STATE_FALLING) return;
 
 	float jump   = ctx->animation->param[ANIMATION_PARAM_JUMP_L] + ctx->animation->param[ANIMATION_PARAM_JUMP_R];
-	float factor = ctx->settings->jump.jump_footing_speed * (1.0f - jump);
+	float factor = ctx->settings->jump_footing_speed * (1.0f - jump);
 	if (factor < 0.0f) factor = 0.0f;
 
 	ctx->animation->clip[ctx->def->walk_animation].speed          *= factor;
@@ -87,20 +87,20 @@ static void actorAnimation_setJumpFootingSpeed(const AnimationParamCtx *ctx)
 	ctx->animation->clip[ctx->def->turn_run_animation + 1].speed  *= factor;
 }
 
-static void actorAnimation_setIdleSpeed(const AnimationParamCtx *ctx) { (void)ctx; }
+static void characterAnimation_setIdleSpeed(const CharacterAnimationParamCtx *ctx) { (void)ctx; }
 
-static void actorAnimation_setWalkingSpeed(const AnimationParamCtx *ctx)
+static void characterAnimation_setWalkingSpeed(const CharacterAnimationParamCtx *ctx)
 {
 	float p = ctx->locomotion_param;
 	t3d_anim_set_speed(&ctx->animation->clip[ctx->def->walk_animation],          p);
 	t3d_anim_set_speed(&ctx->animation->clip[ctx->def->turn_walk_animation],     p);
 	t3d_anim_set_speed(&ctx->animation->clip[ctx->def->turn_walk_animation + 1], p);
-	actorAnimation_setJumpFootingSpeed(ctx);
+	characterAnimation_setJumpFootingSpeed(ctx);
 }
 
-static void actorAnimation_setRunningSpeed(const AnimationParamCtx *ctx)
+static void characterAnimation_setRunningSpeed(const CharacterAnimationParamCtx *ctx)
 {
-	const ActorAnimationLocomotionSettings *l = &ctx->settings->standing_locomotion;
+	const CharacterAnimationSettings *l = ctx->settings;
 	float run  = l->walk_to_run_ratio + (1.0f - l->walk_to_run_ratio) * ctx->locomotion_param;
 	float walk = run * l->run_to_walk_ratio;
 	t3d_anim_set_speed(&ctx->animation->clip[ctx->def->run_animation],           run);
@@ -109,32 +109,32 @@ static void actorAnimation_setRunningSpeed(const AnimationParamCtx *ctx)
 	t3d_anim_set_speed(&ctx->animation->clip[ctx->def->turn_run_animation  + 1], run);
 	t3d_anim_set_speed(&ctx->animation->clip[ctx->def->turn_walk_animation],     walk);
 	t3d_anim_set_speed(&ctx->animation->clip[ctx->def->turn_walk_animation + 1], walk);
-	actorAnimation_setJumpFootingSpeed(ctx);
+	characterAnimation_setJumpFootingSpeed(ctx);
 }
 
-static void actorAnimation_setSprintingSpeed(const AnimationParamCtx *ctx)
+static void characterAnimation_setSprintingSpeed(const CharacterAnimationParamCtx *ctx)
 {
-	const ActorAnimationLocomotionSettings *l = &ctx->settings->standing_locomotion;
+	const CharacterAnimationSettings *l = ctx->settings;
 	float sprint = l->run_to_sprint_ratio + (1.0f - l->run_to_sprint_ratio) * ctx->locomotion_param;
 	float run    = sprint * l->sprint_to_run_ratio;
 	t3d_anim_set_speed(&ctx->animation->clip[ctx->def->sprint_animation],        sprint);
 	t3d_anim_set_speed(&ctx->animation->clip[ctx->def->run_animation],           run);
 	t3d_anim_set_speed(&ctx->animation->clip[ctx->def->turn_run_animation],      run);
 	t3d_anim_set_speed(&ctx->animation->clip[ctx->def->turn_run_animation  + 1], run);
-	actorAnimation_setJumpFootingSpeed(ctx);
+	characterAnimation_setJumpFootingSpeed(ctx);
 }
 
-typedef void (*SpeedSyncFn)(const AnimationParamCtx *);
-static const SpeedSyncFn actorAnimation_speedSync[ACTOR_STATE_SPRINTING + 1] = {
-	[ACTOR_STATE_IDLE] = actorAnimation_setIdleSpeed,
-	[ACTOR_STATE_WALKING]       = actorAnimation_setWalkingSpeed,
-	[ACTOR_STATE_RUNNING]       = actorAnimation_setRunningSpeed,
-	[ACTOR_STATE_SPRINTING]     = actorAnimation_setSprintingSpeed,
+typedef void (*CharacterAnimationSpeedSyncFn)(const CharacterAnimationParamCtx *);
+static const CharacterAnimationSpeedSyncFn characterAnimation_speedSync[MOVEMENT_STATE_SPRINTING + 1] = {
+	[MOVEMENT_STATE_IDLE] = characterAnimation_setIdleSpeed,
+	[MOVEMENT_STATE_WALKING]       = characterAnimation_setWalkingSpeed,
+	[MOVEMENT_STATE_RUNNING]       = characterAnimation_setRunningSpeed,
+	[MOVEMENT_STATE_SPRINTING]     = characterAnimation_setSprintingSpeed,
 };
 
-static void actorAnimation_snapWalkToRun(const AnimationParamCtx *ctx)
+static void characterAnimation_snapWalkToRun(const CharacterAnimationParamCtx *ctx)
 {
-	const ActorAnimationLocomotionSettings *l = &ctx->settings->standing_locomotion;
+	const CharacterAnimationSettings *l = ctx->settings;
 	T3DAnim *walk = &ctx->animation->clip[ctx->def->walk_animation];
 	T3DAnim *run  = &ctx->animation->clip[ctx->def->run_animation];
 
@@ -143,18 +143,18 @@ static void actorAnimation_snapWalkToRun(const AnimationParamCtx *ctx)
 	t3d_anim_set_time(&ctx->animation->clip[ctx->def->turn_run_animation + 1], run->time);
 }
 
-static void actorAnimation_snapRunToSprint(const AnimationParamCtx *ctx)
+static void characterAnimation_snapRunToSprint(const CharacterAnimationParamCtx *ctx)
 {
-	const ActorAnimationLocomotionSettings *l = &ctx->settings->standing_locomotion;
+	const CharacterAnimationSettings *l = ctx->settings;
 	T3DAnim *run    = &ctx->animation->clip[ctx->def->run_animation];
 	T3DAnim *sprint = &ctx->animation->clip[ctx->def->sprint_animation];
 
 	t3d_anim_set_time(sprint, run->time * l->run_to_sprint_ratio);
 }
 
-static void actorAnimation_snapSprintToRun(const AnimationParamCtx *ctx)
+static void characterAnimation_snapSprintToRun(const CharacterAnimationParamCtx *ctx)
 {
-	const ActorAnimationLocomotionSettings *l = &ctx->settings->standing_locomotion;
+	const CharacterAnimationSettings *l = ctx->settings;
 	T3DAnim *sprint = &ctx->animation->clip[ctx->def->sprint_animation];
 	T3DAnim *walk   = &ctx->animation->clip[ctx->def->walk_animation];
 	T3DAnim *run    = &ctx->animation->clip[ctx->def->run_animation];
@@ -166,7 +166,7 @@ static void actorAnimation_snapSprintToRun(const AnimationParamCtx *ctx)
 	t3d_anim_set_time(&ctx->animation->clip[ctx->def->turn_run_animation + 1],  run->time);
 }
 
-static void actorAnimation_snapRunToWalk(const AnimationParamCtx *ctx)
+static void characterAnimation_snapRunToWalk(const CharacterAnimationParamCtx *ctx)
 {
 	T3DAnim *walk = &ctx->animation->clip[ctx->def->walk_animation];
 
@@ -174,9 +174,9 @@ static void actorAnimation_snapRunToWalk(const AnimationParamCtx *ctx)
 	t3d_anim_set_time(&ctx->animation->clip[ctx->def->turn_walk_animation + 1], walk->time);
 }
 
-static void actorAnimation_snapRollToLocomotion(const AnimationParamCtx *ctx, bool left)
+static void characterAnimation_snapRollToLocomotion(const CharacterAnimationParamCtx *ctx, bool left)
 {
-	const ActorAnimationLocomotionSettings *l = &ctx->settings->standing_locomotion;
+	const CharacterAnimationSettings *l = ctx->settings;
 	float snap = left ? l->running_anim_length : l->running_anim_length_half;
 	float run_time  = snap;
 	float walk_time = snap * l->run_to_walk_ratio;
@@ -189,51 +189,51 @@ static void actorAnimation_snapRollToLocomotion(const AnimationParamCtx *ctx, bo
 	t3d_anim_set_time(&ctx->animation->clip[ctx->def->turn_walk_animation + 1], walk_time);
 }
 
-static void actorAnimation_syncTurnWalk(const AnimationParamCtx *ctx, float walk)
+static void characterAnimation_syncTurnWalk(const CharacterAnimationParamCtx *ctx, float walk)
 {
 	uint8_t idx = (walk < 0.0f) ? ctx->def->turn_walk_animation : ctx->def->turn_walk_animation + 1;
 	t3d_anim_set_time(&ctx->animation->clip[idx], ctx->animation->clip[ctx->def->walk_animation].time);
 }
 
-static void actorAnimation_syncTurnRun(const AnimationParamCtx *ctx, float run)
+static void characterAnimation_syncTurnRun(const CharacterAnimationParamCtx *ctx, float run)
 {
 	uint8_t idx = (run < 0.0f) ? ctx->def->turn_run_animation : ctx->def->turn_run_animation + 1;
 	t3d_anim_set_time(&ctx->animation->clip[idx], ctx->animation->clip[ctx->def->run_animation].time);
 }
 
-typedef void (*EntrySnapFn)(const AnimationParamCtx *);
-static const EntrySnapFn actorAnimation_entrySnap[ACTOR_STATE_SPRINTING + 1][ACTOR_STATE_SPRINTING + 1] = {
-	[ACTOR_STATE_WALKING  ][ACTOR_STATE_RUNNING  ] = actorAnimation_snapWalkToRun,
-	[ACTOR_STATE_RUNNING  ][ACTOR_STATE_WALKING  ] = actorAnimation_snapRunToWalk,
-	[ACTOR_STATE_RUNNING  ][ACTOR_STATE_SPRINTING] = actorAnimation_snapRunToSprint,
-	[ACTOR_STATE_SPRINTING][ACTOR_STATE_RUNNING  ] = actorAnimation_snapSprintToRun,
+typedef void (*CharacterAnimationEntrySnapFn)(const CharacterAnimationParamCtx *);
+static const CharacterAnimationEntrySnapFn characterAnimation_entrySnap[MOVEMENT_STATE_SPRINTING + 1][MOVEMENT_STATE_SPRINTING + 1] = {
+	[MOVEMENT_STATE_WALKING  ][MOVEMENT_STATE_RUNNING  ] = characterAnimation_snapWalkToRun,
+	[MOVEMENT_STATE_RUNNING  ][MOVEMENT_STATE_WALKING  ] = characterAnimation_snapRunToWalk,
+	[MOVEMENT_STATE_RUNNING  ][MOVEMENT_STATE_SPRINTING] = characterAnimation_snapRunToSprint,
+	[MOVEMENT_STATE_SPRINTING][MOVEMENT_STATE_RUNNING  ] = characterAnimation_snapSprintToRun,
 };
 
-static void actorAnimation_setLocomotionParam(const AnimationParamCtx *ctx)
+static void characterAnimation_setLocomotionParam(const CharacterAnimationParamCtx *ctx)
 {
 	float p = ctx->locomotion_param;
 
 	switch (ctx->speed_state)
 	{
-		case ACTOR_STATE_IDLE:
+		case MOVEMENT_STATE_IDLE:
 			ctx->animation->param[ANIMATION_PARAM_WALK]   = 0.0f;
 			ctx->animation->param[ANIMATION_PARAM_RUN]    = 0.0f;
 			ctx->animation->param[ANIMATION_PARAM_SPRINT] = 0.0f;
 			break;
 
-		case ACTOR_STATE_WALKING:
+		case MOVEMENT_STATE_WALKING:
 			ctx->animation->param[ANIMATION_PARAM_WALK]   = p;
 			ctx->animation->param[ANIMATION_PARAM_RUN]    = 0.0f;
 			ctx->animation->param[ANIMATION_PARAM_SPRINT] = 0.0f;
 			break;
 
-		case ACTOR_STATE_RUNNING:
+		case MOVEMENT_STATE_RUNNING:
 			ctx->animation->param[ANIMATION_PARAM_WALK]   = 1.0f - p;
 			ctx->animation->param[ANIMATION_PARAM_RUN]    = p;
 			ctx->animation->param[ANIMATION_PARAM_SPRINT] = 0.0f;
 			break;
 
-		case ACTOR_STATE_SPRINTING:
+		case MOVEMENT_STATE_SPRINTING:
 			ctx->animation->param[ANIMATION_PARAM_WALK]   = 0.0f;
 			ctx->animation->param[ANIMATION_PARAM_RUN]    = 1.0f - p;
 			ctx->animation->param[ANIMATION_PARAM_SPRINT] = p;
@@ -241,13 +241,13 @@ static void actorAnimation_setLocomotionParam(const AnimationParamCtx *ctx)
 	}
 }
 
-static void actorAnimation_setIdleRightParam(const AnimationParamCtx *ctx)
+static void characterAnimation_setIdleRightParam(const CharacterAnimationParamCtx *ctx)
 {
 	ctx->animation->param[ANIMATION_PARAM_IDLE_RIGHT] =
-		ctx->settings->standing_locomotion.action_idle_max_blending_ratio * ctx->locomotion_phase;
+		ctx->settings->action_idle_max_blending_ratio * ctx->locomotion_phase;
 }
 
-static float actorAnimation_getTurningAvg(ActorAnimation *animation, float current_yaw, float previous_yaw)
+static float characterAnimation_getTurningAvg(CharacterAnimation *animation, float current_yaw, float previous_yaw)
 {
 	float delta_yaw = current_yaw - previous_yaw;
 	if (delta_yaw >  180.0f) delta_yaw -= 360.0f;
@@ -268,21 +268,21 @@ static float actorAnimation_getTurningAvg(ActorAnimation *animation, float curre
 	return r;
 }
 
-static void actorAnimation_setTurningParam(const AnimationParamCtx *ctx)
+static void characterAnimation_setTurningParam(const CharacterAnimationParamCtx *ctx)
 {
 	float r = ctx->turning;
 	float walk, run;
 
 	switch (ctx->speed_state) {
-		case ACTOR_STATE_WALKING:
+		case MOVEMENT_STATE_WALKING:
 			walk = r * ctx->locomotion_param;
 			run  = 0.0f;
 			break;
-		case ACTOR_STATE_RUNNING:
+		case MOVEMENT_STATE_RUNNING:
 			walk = r * (1.0f - ctx->locomotion_param);
 			run  = r * ctx->locomotion_param;
 			break;
-		case ACTOR_STATE_SPRINTING:
+		case MOVEMENT_STATE_SPRINTING:
 			walk = 0.0f;
 			run  = r;
 			break;
@@ -294,33 +294,30 @@ static void actorAnimation_setTurningParam(const AnimationParamCtx *ctx)
 
 	float prev_walk = ctx->animation->param[ANIMATION_PARAM_TURN_WALK];
 	if (walk != 0.0f && (prev_walk == 0.0f || (prev_walk < 0.0f) != (walk < 0.0f)))
-		actorAnimation_syncTurnWalk(ctx, walk);
+		characterAnimation_syncTurnWalk(ctx, walk);
 
 	float prev_run = ctx->animation->param[ANIMATION_PARAM_TURN_RUN];
 	if (run != 0.0f && (prev_run == 0.0f || (prev_run < 0.0f) != (run < 0.0f)))
-		actorAnimation_syncTurnRun(ctx, run);
+		characterAnimation_syncTurnRun(ctx, run);
 
 	ctx->animation->param[ANIMATION_PARAM_TURN_WALK] = walk;
 	ctx->animation->param[ANIMATION_PARAM_TURN_RUN]  = run;
 }
 
-static void actorAnimation_setRollParam(const AnimationParamCtx *ctx)
+static void characterAnimation_setRollParam(const CharacterAnimationParamCtx *ctx)
 {
-	uint8_t  cur = ctx->actor->state.current;
+	uint8_t  cur = ctx->character->movement.current;
 	uint8_t *as  = &ctx->animation->action_state;
 
-	if (cur != ACTOR_STATE_ROLLING) {
-		if (*as == ACTOR_STATE_ROLLING) *as = cur;
-		ctx->animation->param[ANIMATION_PARAM_ROLL_RUN]       = 0.0f;
-		ctx->animation->param[ANIMATION_PARAM_ROLL_STAND]     = 0.0f;
-		ctx->animation->param[ANIMATION_PARAM_ROLL_DIR]       = 0.0f;
-		ctx->animation->param[ANIMATION_PARAM_STAND_ROLL_DIR] = 0.0f;
+	if (cur != MOVEMENT_STATE_ROLLING) {
+		if (*as == MOVEMENT_STATE_ROLLING) *as = cur;
+		ctx->animation->param[ANIMATION_PARAM_ROLL_RUN] = 0.0f;
+		ctx->animation->param[ANIMATION_PARAM_ROLL_DIR] = 0.0f;
 		return;
 	}
 
-	if (*as != ACTOR_STATE_ROLLING) {
-		bool    stand = (ctx->actor->state.locomotion == ACTOR_STATE_IDLE);
-		uint8_t base  = stand ? ctx->def->stand_roll_animation : ctx->def->roll_animation;
+	if (*as != MOVEMENT_STATE_ROLLING) {
+		uint8_t base = ctx->def->roll_animation;
 
 		t3d_anim_set_playing(&ctx->animation->clip[base],     true);
 		t3d_anim_set_time   (&ctx->animation->clip[base],     0.0f);
@@ -328,47 +325,39 @@ static void actorAnimation_setRollParam(const AnimationParamCtx *ctx)
 		t3d_anim_set_time   (&ctx->animation->clip[base + 1], 0.0f);
 
 		float dir = (ctx->locomotion_phase < 0.5f) ? -1.0f : 1.0f;
-		ctx->animation->param[ANIMATION_PARAM_ROLL_RUN]       = 0.0f;
-		ctx->animation->param[ANIMATION_PARAM_ROLL_STAND]     = 0.0f;
-		ctx->animation->param[ANIMATION_PARAM_ROLL_DIR]       = stand ? 0.0f : dir;
-		ctx->animation->param[ANIMATION_PARAM_STAND_ROLL_DIR] = stand ? dir  : 0.0f;
-		*as = ACTOR_STATE_ROLLING;
+		ctx->animation->param[ANIMATION_PARAM_ROLL_RUN] = 0.0f;
+		ctx->animation->param[ANIMATION_PARAM_ROLL_DIR] = dir;
+		*as = MOVEMENT_STATE_ROLLING;
 	}
 
-	const ActorAnimationRollSettings *r = &ctx->settings->roll;
-	bool  stand = ctx->animation->param[ANIMATION_PARAM_STAND_ROLL_DIR] != 0.0f;
-	float dir   = stand ? ctx->animation->param[ANIMATION_PARAM_STAND_ROLL_DIR] : ctx->animation->param[ANIMATION_PARAM_ROLL_DIR];
+	const CharacterAnimationSettings *r = ctx->settings;
+	float dir   = ctx->animation->param[ANIMATION_PARAM_ROLL_DIR];
 	bool  left  = dir < 0.0f;
-	uint8_t weight_param = stand ? ANIMATION_PARAM_ROLL_STAND : ANIMATION_PARAM_ROLL_RUN;
 
-	uint8_t base      = stand ? ctx->def->stand_roll_animation : ctx->def->roll_animation;
+	uint8_t base      = ctx->def->roll_animation;
 	uint8_t roll_idx  = left ? base : base + 1;
 	float   roll_time = ctx->animation->clip[roll_idx].time;
-	float   ratio     = ctx->animation->param[weight_param];
+	float   ratio     = ctx->animation->param[ANIMATION_PARAM_ROLL_RUN];
 
-	float ground  = stand ? r->stand_to_rolling_anim_ground : r->run_to_rolling_anim_ground;
-	float stand_t = stand ? r->stand_to_rolling_anim_stand  : r->run_to_rolling_anim_stand;
-	float length  = stand ? r->stand_to_rolling_anim_length : r->run_to_rolling_anim_length;
+	if (roll_time < r->run_to_rolling_anim_ground && ratio <= 1.0f)
+		ratio += ctx->delta / r->run_to_rolling_anim_ground;
 
-	if (roll_time < ground && ratio <= 1.0f)
-		ratio += ctx->delta / ground;
-
-	if (roll_time > stand_t && ratio > 0.0f)
-		ratio -= ctx->delta / (length - stand_t);
+	if (roll_time > r->run_to_rolling_anim_stand && ratio > 0.0f)
+		ratio -= ctx->delta / (r->run_to_rolling_anim_length - r->run_to_rolling_anim_stand);
 
 	if (ratio > 1.0f) {
 		ratio = 1.0f;
-		actorAnimation_snapRollToLocomotion(ctx, left);
+		characterAnimation_snapRollToLocomotion(ctx, left);
 	}
 
 	if (ratio < 0.0f) ratio = 0.0f;
 
-	ctx->animation->param[weight_param] = ratio;
+	ctx->animation->param[ANIMATION_PARAM_ROLL_RUN] = ratio;
 }
 
-static void actorAnimation_syncLandToJump(const AnimationParamCtx *ctx)
+static void characterAnimation_syncLandToJump(const CharacterAnimationParamCtx *ctx)
 {
-	const ActorAnimationJumpSettings *j = &ctx->settings->jump;
+	const CharacterAnimationSettings *j = ctx->settings;
 	T3DAnim *jump_l   = &ctx->animation->clip[ctx->def->jump_animation];
 	T3DAnim *jump_r   = &ctx->animation->clip[ctx->def->jump_animation + 1];
 	float    land_t   = ctx->animation->clip[ctx->def->land_animation].time;
@@ -386,7 +375,7 @@ static void actorAnimation_syncLandToJump(const AnimationParamCtx *ctx)
 	t3d_anim_set_time(jump_r, jump_t);
 }
 
-static void actorAnimation_snapToJump(const AnimationParamCtx *ctx)
+static void characterAnimation_snapToJump(const CharacterAnimationParamCtx *ctx)
 {
 	T3DAnim *jump_l   = &ctx->animation->clip[ctx->def->jump_animation];
 	T3DAnim *jump_r   = &ctx->animation->clip[ctx->def->jump_animation + 1];
@@ -405,14 +394,14 @@ static void actorAnimation_snapToJump(const AnimationParamCtx *ctx)
 		t3d_anim_set_time(jump_l, 0.0f);
 		t3d_anim_set_time(jump_r, 0.0f);
 	} else {
-		actorAnimation_syncLandToJump(ctx);
+		characterAnimation_syncLandToJump(ctx);
 	}
 
 	ctx->animation->param[ANIMATION_PARAM_JUMP_L] = 0.0f;
 	ctx->animation->param[ANIMATION_PARAM_JUMP_R] = 0.0f;
 }
 
-static void actorAnimation_snapToLand(const AnimationParamCtx *ctx)
+static void characterAnimation_snapToLand(const CharacterAnimationParamCtx *ctx)
 {
 	T3DAnim *land_l = &ctx->animation->clip[ctx->def->land_animation];
 	T3DAnim *land_r = &ctx->animation->clip[ctx->def->land_animation + 1];
@@ -424,38 +413,38 @@ static void actorAnimation_snapToLand(const AnimationParamCtx *ctx)
 	ctx->animation->param[ANIMATION_PARAM_LAND_R] = 0.0f;
 }
 
-static void actorAnimation_setJumpParams(const AnimationParamCtx *ctx)
+static void characterAnimation_setJumpParams(const CharacterAnimationParamCtx *ctx)
 {
-	const ActorAnimationJumpSettings *j   = &ctx->settings->jump;
+	const CharacterAnimationSettings *j   = ctx->settings;
 	float    delta     = ctx->delta;
 	T3DAnim *land_animation = &ctx->animation->clip[ctx->def->land_animation];
-	uint8_t  cur       = ctx->actor->state.current;
+	uint8_t  cur       = ctx->character->movement.current;
 	uint8_t *as        = &ctx->animation->action_state;
 	float    footing   = ctx->locomotion_phase;
 
 	float jump = ctx->animation->param[ANIMATION_PARAM_JUMP_L] + ctx->animation->param[ANIMATION_PARAM_JUMP_R];
 	float land = ctx->animation->param[ANIMATION_PARAM_LAND_L] + ctx->animation->param[ANIMATION_PARAM_LAND_R];
 
-	if (cur == ACTOR_STATE_JUMPING && *as != ACTOR_STATE_JUMPING) {
-		actorAnimation_snapToJump(ctx);
+	if (cur == MOVEMENT_STATE_JUMPING && *as != MOVEMENT_STATE_JUMPING) {
+		characterAnimation_snapToJump(ctx);
 		jump = 0.0f;
-		*as  = ACTOR_STATE_JUMPING;
+		*as  = MOVEMENT_STATE_JUMPING;
 	}
 
-	if (cur == ACTOR_STATE_FALLING && *as != ACTOR_STATE_FALLING) {
-		actorAnimation_snapToLand(ctx);
+	if (cur == MOVEMENT_STATE_FALLING && *as != MOVEMENT_STATE_FALLING) {
+		characterAnimation_snapToLand(ctx);
 		land = 0.0f;
-		*as  = ACTOR_STATE_FALLING;
+		*as  = MOVEMENT_STATE_FALLING;
 	}
 
-	if ((*as == ACTOR_STATE_JUMPING || *as == ACTOR_STATE_FALLING) && cur != ACTOR_STATE_JUMPING && cur != ACTOR_STATE_FALLING)
+	if ((*as == MOVEMENT_STATE_JUMPING || *as == MOVEMENT_STATE_FALLING) && cur != MOVEMENT_STATE_JUMPING && cur != MOVEMENT_STATE_FALLING)
 		*as = cur;
 
 	if (land_animation->isPlaying) {
 		float crouch_rate = j->jump_max_blending_ratio * delta / j->land_anim_crouch;
 
 		if (land_animation->time < j->land_anim_crouch) {
-			if (ctx->entity->transform.position.z < LAND_ANIMATION_STARTING_HEIGHT) {
+			if (ctx->character->body.position.z < LAND_ANIMATION_STARTING_HEIGHT) {
 				land += crouch_rate;
 				if (land > j->jump_max_blending_ratio) land = j->jump_max_blending_ratio;
 			}
@@ -473,7 +462,7 @@ static void actorAnimation_setJumpParams(const AnimationParamCtx *ctx)
 		if (jump < 0.0f) jump = 0.0f;
 	}
 
-	if (cur == ACTOR_STATE_JUMPING && jump < j->jump_max_blending_ratio) {
+	if (cur == MOVEMENT_STATE_JUMPING && jump < j->jump_max_blending_ratio) {
 		jump += j->jump_max_blending_ratio * delta / j->jump_anim_crouch;
 		if (jump > j->jump_max_blending_ratio) jump = j->jump_max_blending_ratio;
 	}
@@ -484,62 +473,60 @@ static void actorAnimation_setJumpParams(const AnimationParamCtx *ctx)
 	ctx->animation->param[ANIMATION_PARAM_LAND_R] = land * footing;
 }
 
-static void actorAnimation_setActiveNodes(const AnimationParamCtx *ctx)
+static void characterAnimation_setActiveNodes(const CharacterAnimationParamCtx *ctx)
 {
-	const AnimationDef *def = ctx->def;
-	ActorAnimation *animation = ctx->animation;
+	const CharacterAnimationDef *def = ctx->def;
+	CharacterAnimation *animation = ctx->animation;
 
 	for (int i = 0; i < def->node_count; i++) {
-		AnimationNodeType t = def->node[i].type;
+		CharacterAnimationNodeType t = def->node[i].type;
 		if (t == ANIMATION_NODE_SELECT || t == ANIMATION_NODE_SEQUENCE)
 			animation->node_active[i] = (animation->param[def->node[i].param] != 0.0f);
 	}
 }
 
-void actorAnimation_setParams(Entity *entity, const AnimationDef *def)
+void characterAnimation_setParams(Character *character, const CharacterAnimationDef *def)
 {
-	Actor *actor  = entity->actor;
-	ActorAnimation *animation = &actor->animation;
-	const ActorMotionSettings *motion = &actor->motion.settings;
-	float speed  = actor->motion.data.horizontal_speed;
+	CharacterAnimation *animation = &character->animation;
+	const CharacterMovementSettings *movement = character->movement.settings;
+	float speed  = character->movement.data.horizontal_speed;
 
-	AnimationParamCtx ctx = {
+	CharacterAnimationParamCtx ctx = {
 
-		.entity = entity,
-		.actor = actor,
+		.entity = character->entity,
+		.character = character,
 		.animation = animation,
 		.def = def,
-		.settings = &animation->settings,
+		.settings = def->settings,
 		.delta = time_get()->delta,
 	};
 
-	ctx.speed_state      = actorAnimation_getSpeedState(speed, motion);
-	ctx.locomotion_param = actorAnimation_getLocomotionWeight(speed, ctx.speed_state, motion);
-	ctx.locomotion_phase = actorAnimation_getLocomotionPhase(animation->clip[def->walk_animation].time, ctx.settings->standing_locomotion.walking_anim_length);
-	ctx.turning          = actorAnimation_getTurningAvg(animation, entity->transform.rotation.z, actor->motion.data.previous_yaw);
+	ctx.speed_state      = characterAnimation_getSpeedState(speed, movement);
+	ctx.locomotion_param = characterAnimation_getLocomotionWeight(speed, ctx.speed_state, movement);
+	ctx.locomotion_phase = characterAnimation_getLocomotionPhase(animation->clip[def->walk_animation].time, ctx.settings->walking_anim_length);
+	ctx.turning          = characterAnimation_getTurningAvg(animation, character->body.rotation.z, character->movement.data.previous_yaw);
 
-	actorAnimation_speedSync[ctx.speed_state](&ctx);
+	characterAnimation_speedSync[ctx.speed_state](&ctx);
 
 	uint8_t prev_speed = animation->prev_speed_state;
 	if (ctx.speed_state != prev_speed) {
-		EntrySnapFn snap = actorAnimation_entrySnap[prev_speed][ctx.speed_state];
+		CharacterAnimationEntrySnapFn snap = characterAnimation_entrySnap[prev_speed][ctx.speed_state];
 		if (snap) snap(&ctx);
 		animation->prev_speed_state = ctx.speed_state;
 	}
 
-	actorAnimation_setLocomotionParam (&ctx);
-	actorAnimation_setIdleRightParam (&ctx);
-	actorAnimation_setTurningParam (&ctx);
-	actorAnimation_setJumpParams (&ctx);
-	actorAnimation_setRollParam (&ctx);
-	actorAnimation_setActiveNodes (&ctx);
+	characterAnimation_setLocomotionParam (&ctx);
+	characterAnimation_setIdleRightParam (&ctx);
+	characterAnimation_setTurningParam (&ctx);
+	characterAnimation_setJumpParams (&ctx);
+	characterAnimation_setRollParam (&ctx);
+	characterAnimation_setActiveNodes (&ctx);
 }
 
-void actorAnimation_initGraph(Entity *entity, const AnimationDef *def)
+void characterAnimation_initGraph(Character *character, const CharacterAnimationDef *def)
 {
-	ActorAnimation *animation = &entity->actor->animation;
-	const T3DModel *model = entity->mesh->model;
-	entity->actor->animation_def = def;
+	CharacterAnimation *animation = &character->animation;
+	const T3DModel *model = character->entity->mesh->model;
 
 	animation->main = t3d_skeleton_create_buffered(model, FB_COUNT);
 
@@ -562,7 +549,7 @@ void actorAnimation_initGraph(Entity *entity, const AnimationDef *def)
 
 	for (int i = 0; i < def->clip_count; i++)
 	{
-		const AnimationClipDef *clip_def = &def->clip[i];
+		const CharacterAnimationClipDef *clip_def = &def->clip[i];
 
 		animation->clip[i] = t3d_anim_create(model, clip_def->name);
 
@@ -576,16 +563,16 @@ void actorAnimation_initGraph(Entity *entity, const AnimationDef *def)
 	}
 }
 
-void actorAnimation_evaluateGraph( const AnimationDef *def, const ActorAnimationSettings *settings, ActorAnimation *animation, float delta)
+void characterAnimation_evaluateGraph(const CharacterAnimationDef *def, CharacterAnimation *animation, float delta)
 {
-	ActorAnimationBuffer blend_buffer;
+	CharacterAnimationBuffer blend_buffer;
 	blend_buffer.count = 0;
 
 	for (int i = 0; i < def->node_count; i++)
 	{
 		if (!animation->node_active[i]) continue;
 
-		const AnimationNode *node = &def->node[i];
+		const CharacterAnimationNode *node = &def->node[i];
 		T3DAnim *clip = &animation->clip[node->animation];
 		float param_val = animation->param[node->param];
 
@@ -634,7 +621,7 @@ void actorAnimation_evaluateGraph( const AnimationDef *def, const ActorAnimation
 				if (param_val > 0.0f) {
 					T3DSkeleton *buf = (node->buffer == ANIMATION_SLOT_MAIN) ? &animation->main : &animation->buffer[node->buffer];
 					t3d_anim_update(clip, delta);
-					actorAnimation_addLayer(&blend_buffer, buf, param_val);
+					characterAnimation_addLayer(&blend_buffer, buf, param_val);
 				}
 
 				break;
@@ -645,7 +632,7 @@ void actorAnimation_evaluateGraph( const AnimationDef *def, const ActorAnimation
 				float abs_val = fabsf(param_val);
 				if (abs_val > 0.0f) {
 					T3DSkeleton *buf = (node->buffer == ANIMATION_SLOT_MAIN) ? &animation->main : &animation->buffer[node->buffer];
-					actorAnimation_addLayer(&blend_buffer, buf, abs_val);
+					characterAnimation_addLayer(&blend_buffer, buf, abs_val);
 				}
 
 				break;
@@ -653,15 +640,13 @@ void actorAnimation_evaluateGraph( const AnimationDef *def, const ActorAnimation
 		}
 	}
 
-	actorAnimation_blendLayers(&animation->main, &blend_buffer);
+	characterAnimation_blendLayers(&animation->main, &blend_buffer);
 
-	(void)settings;
 }
 
-void actor_setAnimation(Entity *entity)
+void character_setAnimation(Character *character)
 {
-	Actor *actor = entity->actor;
-	actorAnimation_setParams(entity, actor->animation_def);
-	actorAnimation_evaluateGraph(actor->animation_def, &actor->animation.settings, &actor->animation, time_get()->delta);
-	t3d_skeleton_update(&actor->animation.main);
+	characterAnimation_setParams(character, character->animation.def);
+	characterAnimation_evaluateGraph(character->animation.def, &character->animation, time_get()->delta);
+	t3d_skeleton_update(&character->animation.main);
 }

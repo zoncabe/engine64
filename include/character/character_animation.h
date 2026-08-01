@@ -1,5 +1,5 @@
-#ifndef ACTOR_ANIMATION_H
-#define ACTOR_ANIMATION_H
+#ifndef CHARACTER_ANIMATION_H
+#define CHARACTER_ANIMATION_H
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -8,8 +8,8 @@
 
 
 typedef struct Entity Entity;
-typedef struct Actor Actor;
-typedef struct ActorAnimation ActorAnimation;
+typedef struct Character Character;
+typedef struct CharacterAnimation CharacterAnimation;
 
 #define LAND_ANIMATION_STARTING_HEIGHT 130
 #define ANIMATION_MAX_LAYERS 16
@@ -30,14 +30,12 @@ typedef enum {
 	ANIMATION_PARAM_LAND_L,
 	ANIMATION_PARAM_LAND_R,
 	ANIMATION_PARAM_ROLL_RUN,
-	ANIMATION_PARAM_ROLL_STAND,
 	ANIMATION_PARAM_ROLL_DIR,
-	ANIMATION_PARAM_STAND_ROLL_DIR,
 	ANIMATION_PARAM_TURN_WALK,
 	ANIMATION_PARAM_TURN_RUN,
 	ANIMATION_PARAM_COUNT
 
-} AnimationParam;
+} CharacterAnimationParam;
 
 typedef enum {
 
@@ -47,7 +45,7 @@ typedef enum {
 	ANIMATION_NODE_BLEND,
 	ANIMATION_NODE_LAYER,
 
-} AnimationNodeType;
+} CharacterAnimationNodeType;
 
 typedef struct {
 
@@ -55,38 +53,17 @@ typedef struct {
 	uint8_t buffer;
 	bool is_looping;
 	
-} AnimationClipDef;
+} CharacterAnimationClipDef;
 
 typedef struct {
 
-	AnimationNodeType type;
+	CharacterAnimationNodeType type;
 	uint8_t animation;
 	uint8_t animation2;
 	uint8_t buffer;
 	uint8_t param;
 
-} AnimationNode;
-
-typedef struct {
-
-	const AnimationClipDef *clip;
-	const AnimationNode *node;
-
-	uint8_t clip_count;
-	uint8_t node_count;
-	uint8_t buffer_count;
-	uint8_t walk_animation;
-	uint8_t run_animation;
-	uint8_t sprint_animation;
-	uint8_t turn_walk_animation;
-	uint8_t turn_run_animation;
-	uint8_t jump_animation;
-	uint8_t fall_animation;
-	uint8_t land_animation;
-	uint8_t roll_animation;
-	uint8_t stand_roll_animation;
-
-} AnimationDef;
+} CharacterAnimationNode;
 
 typedef struct {
 
@@ -104,10 +81,6 @@ typedef struct {
 	float sprinting_anim_length_half;
 	float sprinting_anim_length;
 
-} ActorAnimationLocomotionSettings;
-
-typedef struct {
-
 	float jump_max_blending_ratio;
 	float jump_anim_length;
 	float jump_anim_crouch;
@@ -118,46 +91,52 @@ typedef struct {
 	float land_anim_crouch;
 	float land_anim_stand;
 
-} ActorAnimationJumpSettings;
-
-typedef struct {
-
 	float run_to_rolling_anim_ground;
 	float run_to_rolling_anim_grip;
 	float run_to_rolling_anim_stand;
 	float run_to_rolling_anim_length;
-	float stand_to_rolling_anim_ground;
-	float stand_to_rolling_anim_grip;
-	float stand_to_rolling_anim_stand;
-	float stand_to_rolling_anim_length;
 
-} ActorAnimationRollSettings;
+} CharacterAnimationSettings;
+
 
 typedef struct {
 
-	ActorAnimationLocomotionSettings standing_locomotion;
-	ActorAnimationJumpSettings       jump;
-	ActorAnimationRollSettings       roll;
+	const CharacterAnimationClipDef *clip;
+	const CharacterAnimationNode *node;
+	const CharacterAnimationSettings *settings;
 
-} ActorAnimationSettings;
+	uint8_t clip_count;
+	uint8_t node_count;
+	uint8_t buffer_count;
+	uint8_t walk_animation;
+	uint8_t run_animation;
+	uint8_t sprint_animation;
+	uint8_t turn_walk_animation;
+	uint8_t turn_run_animation;
+	uint8_t jump_animation;
+	uint8_t fall_animation;
+	uint8_t land_animation;
+	uint8_t roll_animation;
+
+} CharacterAnimationDef;
 
 typedef struct {
 
 	float delta;
 
 	Entity *entity;
-	Actor *actor;
+	Character *character;
 
-	ActorAnimation *animation;
-	const AnimationDef *def;
-	const ActorAnimationSettings *settings;
+	CharacterAnimation *animation;
+	const CharacterAnimationDef *def;
+	const CharacterAnimationSettings *settings;
 
 	uint8_t speed_state;
 	float locomotion_param;
 	float locomotion_phase;
 	float turning;
 
-} AnimationParamCtx;
+} CharacterAnimationParamCtx;
 
 
 typedef struct {
@@ -166,10 +145,11 @@ typedef struct {
 	float weight[ANIMATION_MAX_LAYERS];
 	uint8_t count;
 
-} ActorAnimationBuffer;
+} CharacterAnimationBuffer;
 
-typedef struct ActorAnimation {
+typedef struct CharacterAnimation {
 
+	const CharacterAnimationDef *def;
 	T3DSkeleton  main;
 	T3DSkeleton *buffer;
 	T3DAnim     *clip;
@@ -180,17 +160,16 @@ typedef struct ActorAnimation {
 	uint8_t      action_state;
 	float        turn_avg[ANIMATION_TURN_AVG_COUNT];
 	uint8_t      turn_avg_idx;
-	ActorAnimationSettings settings;
 
-} ActorAnimation;
+} CharacterAnimation;
 
 
-void actorAnimation_addLayer(ActorAnimationBuffer *buffer, const T3DSkeleton *skel, float weight);
-void actorAnimation_blendLayers(const T3DSkeleton *main, const ActorAnimationBuffer *buffer);
-void actorAnimation_initGraph(Entity *entity, const AnimationDef *def);
-void actorAnimation_setParams(Entity *entity, const AnimationDef *def);
-void actorAnimation_evaluateGraph(const AnimationDef *def, const ActorAnimationSettings *settings, ActorAnimation *animation, float delta);
+void characterAnimation_addLayer(CharacterAnimationBuffer *buffer, const T3DSkeleton *skel, float weight);
+void characterAnimation_blendLayers(const T3DSkeleton *main, const CharacterAnimationBuffer *buffer);
+void characterAnimation_initGraph(Character *character, const CharacterAnimationDef *def);
+void characterAnimation_setParams(Character *character, const CharacterAnimationDef *def);
+void characterAnimation_evaluateGraph(const CharacterAnimationDef *def, CharacterAnimation *animation, float delta);
 
-void actor_setAnimation(Entity *entity);
+void character_setAnimation(Character *character);
 
 #endif

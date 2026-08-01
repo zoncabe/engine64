@@ -4,16 +4,18 @@
 #define GAME_INITIAL_STATE GAME_STATE_MAIN_MENU
 
 typedef struct GameContext GameContext;
-typedef struct Game        Game;
+typedef struct Game Game;
 
 
 typedef enum {
-	GAME_STATE_INTRO      = 0,
-	GAME_STATE_MAIN_MENU  = 1,
-	GAME_STATE_GAMEPLAY   = 2,
-	GAME_STATE_PAUSE      = 3,
-	GAME_STATE_GAME_OVER  = 4,
+
+	GAME_STATE_INTRO,
+	GAME_STATE_MAIN_MENU,
+	GAME_STATE_GAMEPLAY,
+	GAME_STATE_PAUSE,
+	GAME_STATE_GAME_OVER,
 	GAME_STATE_COUNT
+	
 } GameState;
 
 

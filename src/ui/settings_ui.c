@@ -206,11 +206,11 @@ void settings_ui_init(void)
 			uint8_t label_idx = row_element_count++;
 			uint8_t value_idx = row_element_count++;
 
-			row_section->element[label_idx] = (ScreenElement){
+			row_section->element[label_idx] = (DrawElement){
 				.type = DRAW_TEXT, .position = { tab_x, y },
 				.text = { HEADLINER_14, MENU_STYLE_NORMAL, item->label, &h14_parms },
 			};
-			row_section->element[value_idx] = (ScreenElement){
+			row_section->element[value_idx] = (DrawElement){
 				.type = DRAW_TEXT, .position = { tab_x + 140.0f, y },
 				.text = { HEADLINER_14, MENU_STYLE_NORMAL, value_text[tab][row], &h14_parms },
 			};

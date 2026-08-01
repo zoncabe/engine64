@@ -9,19 +9,19 @@
 #include "physics/shapes/physics_shape.h"
 
 
-/* Forward declarations — resolved by physics_scene.c (shims). */
+/* Forward declarations — resolved by physics_world.c (shims). */
 struct ContactConstraint;
 
-void  physicsScene_allocShape (struct PhysicsScene *s, PhysicsShape **out);
-void  physicsScene_freeShape  (struct PhysicsScene *s, PhysicsShape  *shape);
-void  physicsScene_markNewShape(struct PhysicsScene *s);
+void  physicsWorld_allocShape (struct PhysicsWorld *s, PhysicsShape **out);
+void  physicsWorld_freeShape  (struct PhysicsWorld *s, PhysicsShape  *shape);
+void  physicsWorld_markNewShape(struct PhysicsWorld *s);
 
-void  broadPhase_insertShape_fromScene(struct PhysicsScene *s, PhysicsShape *shape, AABB aabb);
-void  broadPhase_removeShape_fromScene(struct PhysicsScene *s, const PhysicsShape *shape);
-void  broadPhase_updateShape          (struct PhysicsScene *s, int32_t index, AABB aabb);
+void  broadPhase_insertShape_fromWorld(struct PhysicsWorld *s, PhysicsShape *shape, AABB aabb);
+void  broadPhase_removeShape_fromWorld(struct PhysicsWorld *s, const PhysicsShape *shape);
+void  broadPhase_updateShape          (struct PhysicsWorld *s, int32_t index, AABB aabb);
 
-void  contactManager_removeContact_fromScene          (struct PhysicsScene *s, struct ContactConstraint *c);
-void  contactManager_removeContactsFromBody_fromScene(struct PhysicsScene *s, RigidBody *body);
+void  contactManager_removeContact_fromWorld          (struct PhysicsWorld *s, struct ContactConstraint *c);
+void  contactManager_removeContactsFromBody_fromWorld(struct PhysicsWorld *s, RigidBody *body);
 
 
 void rigidBodyDef_init(RigidBodyDef *d)
@@ -47,7 +47,7 @@ void rigidBodyDef_init(RigidBodyDef *d)
 }
 
 
-void rigidBody_init(RigidBody *b, const RigidBodyDef *def, struct PhysicsScene *scene)
+void rigidBody_init(RigidBody *b, const RigidBodyDef *def, struct PhysicsWorld *world)
 {
 	b->linear_velocity  = def->linear_velocity;
 	b->angular_velocity = def->angular_velocity;
@@ -63,7 +63,7 @@ void rigidBody_init(RigidBody *b, const RigidBodyDef *def, struct PhysicsScene *
 	b->gravity_scale   = def->gravity_scale;
 	b->layers          = def->layers;
 	b->owner           = def->owner;
-	b->scene           = scene;
+	b->world           = world;
 	b->flags           = 0;
 	b->linear_damping  = def->linear_damping;
 	b->angular_damping = def->angular_damping;
@@ -135,8 +135,8 @@ static PhysicsShape *rigidBody_attachShape(RigidBody *b, PhysicsShape *shape,
 
 	rigidBody_calculateMassData(b);
 
-	broadPhase_insertShape_fromScene(b->scene, shape, aabb);
-	physicsScene_markNewShape(b->scene);
+	broadPhase_insertShape_fromWorld(b->world, shape, aabb);
+	physicsWorld_markNewShape(b->world);
 
 	return shape;
 }
@@ -145,7 +145,7 @@ static PhysicsShape *rigidBody_attachShape(RigidBody *b, PhysicsShape *shape,
 PhysicsShape *rigidBody_addBox(RigidBody *b, const BoxDef *def)
 {
 	PhysicsShape *shape = NULL;
-	physicsScene_allocShape(b->scene, &shape);
+	physicsWorld_allocShape(b->world, &shape);
 
 	shape->type    = SHAPE_BOX;
 	shape->box.e   = def->e;
@@ -159,7 +159,7 @@ PhysicsShape *rigidBody_addBox(RigidBody *b, const BoxDef *def)
 PhysicsShape *rigidBody_addSphere(RigidBody *b, const SphereDef *def)
 {
 	PhysicsShape *shape = NULL;
-	physicsScene_allocShape(b->scene, &shape);
+	physicsWorld_allocShape(b->world, &shape);
 
 	shape->type           = SHAPE_SPHERE;
 	shape->sphere.radius  = def->radius;
@@ -173,7 +173,7 @@ PhysicsShape *rigidBody_addSphere(RigidBody *b, const SphereDef *def)
 PhysicsShape *rigidBody_addCapsule(RigidBody *b, const CapsuleDef *def)
 {
 	PhysicsShape *shape = NULL;
-	physicsScene_allocShape(b->scene, &shape);
+	physicsWorld_allocShape(b->world, &shape);
 
 	shape->type                 = SHAPE_CAPSULE;
 	shape->capsule.radius       = def->radius;
@@ -213,9 +213,9 @@ void rigidBody_removeShape(RigidBody *b, const PhysicsShape *shape)
 	   rigidBody_removeAllShapes below which uses the simpler body-wide purge. */
 	(void)shape;
 
-	broadPhase_removeShape_fromScene(b->scene, shape);
+	broadPhase_removeShape_fromWorld(b->world, shape);
 	rigidBody_calculateMassData(b);
-	physicsScene_freeShape(b->scene, (PhysicsShape *)shape);
+	physicsWorld_freeShape(b->world, (PhysicsShape *)shape);
 }
 
 
@@ -223,11 +223,11 @@ void rigidBody_removeAllShapes(RigidBody *b)
 {
 	while (b->shapes) {
 		PhysicsShape *next = b->shapes->next;
-		broadPhase_removeShape_fromScene(b->scene, b->shapes);
-		physicsScene_freeShape(b->scene, b->shapes);
+		broadPhase_removeShape_fromWorld(b->world, b->shapes);
+		physicsWorld_freeShape(b->world, b->shapes);
 		b->shapes = next;
 	}
-	contactManager_removeContactsFromBody_fromScene(b->scene, b);
+	contactManager_removeContactsFromBody_fromWorld(b->world, b);
 }
 
 
@@ -468,7 +468,7 @@ void rigidBody_synchronizeProxies(RigidBody *b)
 	PhysicsShape *shape = b->shapes;
 	while (shape) {
 		physicsShape_computeAABB(shape, &tx, &aabb);
-		broadPhase_updateShape(b->scene, shape->broadphase_index, aabb);
+		broadPhase_updateShape(b->world, shape->broadphase_index, aabb);
 		shape = shape->next;
 	}
 }

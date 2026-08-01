@@ -3,9 +3,9 @@
 
 #include "viewport/viewport.h"
 #include "entity/entity.h"
-#include "actor/actor.h"
-#include "actor/actor_motion.h"
-#include "actor/actor_animation.h"
+#include "character/character.h"
+#include "character/character_movement.h"
+#include "character/character_animation.h"
 #include "player/player.h"
 #include "time/time.h"
 
@@ -20,11 +20,12 @@ void player_init(void)
 		player[i] = (Player){0};
 }
 
-void player_setEntity(Player *player, Entity *entity)
+void player_setCharacter(Player *player, Character *character)
 {
-	player->entity = entity;
-	if (entity && entity->mesh)
-		t3d_matrix_set(entity->mesh->matrix_buffer, true);
+	player->character = character;
+	player->entity = character ? character->entity : NULL;
+	if (player->entity && player->entity->mesh)
+		t3d_matrix_set(player->entity->mesh->matrix_buffer, true);
 }
 
 
@@ -32,8 +33,8 @@ void player_update(void)
 {
 	const float dt = time_get()->delta;
 	for (int i = 0; i < PLAYER_COUNT; i++) {
-		actor_updateMotion(player[i].entity, &player[i].cmd, dt);
-		actor_setAnimation(player[i].entity);
+		character_updateMovement(player[i].character, &player[i].cmd, dt);
+		character_setAnimation(player[i].character);
 	}
 }
 

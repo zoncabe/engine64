@@ -14,27 +14,22 @@
 #include "control/player_control.h"
 #include "game/game.h"
 #include "viewport/viewport.h"
-#include "physics/world/physics_scene.h"
-#include "physics/math/math_common.h"
 #include "game/game_states.h"
-
-
-extern PhysicsScene *physics_getScene(void);
 
 
 typedef struct {
 
 	void (*update)(GameContext *);
 	void (*setDescriptor)(const GameContext *, GameRenderDescriptor *);
-	void (*bindActor)(void);
+	void (*bindCharacter)(void);
 	void (*onEnter)(void);
 	SceneID            scene_id;
 
 } GameStateDef;
 
-static void gameState_bindGameplayActor(void)
+static void gameState_bindGameplayCharacter(void)
 {
-	player_setEntity(&player_get()[0], scene_getActor(0));
+	player_setCharacter(&player_get()[0], scene_getCharacter(0));
 }
 
 static void gameState_updateIntro(GameContext *ctx)
@@ -60,20 +55,32 @@ static void gameState_updateGameplay(GameContext *ctx)
 
 	Controller *control = controller_get();
 	for (int i = 0; i < PLAYER_COUNT; i++)
-		player_setActorControl(&ctx->player[i], &control[i].actions, ctx->viewport);
+		player_setCharacterControl(&ctx->player[i], &control[i].actions, ctx->viewport);
 	player_update();
 
 	Scene *scene = scene_get();
-	float dt = time_get()->delta;
-
-	physics_step(physics_getScene());
-
 	uint8_t fb_index = ctx->viewport->fb_index;
-	for (int i = 0; i < scene->entity_count; i++) {
-		Entity *entity = scene->entity[i];
-		if (!entity->body || (entity->body->flags & BODY_FLAG_STATIC)) continue;
-		entity_syncTransformToBody(entity);
-		entity_setMatrix(entity, fb_index);
+
+	StaticColliders statics = {
+		.mesh              = scene->static_mesh,
+		.mesh_origin       = scene->static_mesh_origin,
+		.mesh_count        = scene->static_mesh_count,
+		.box               = scene->static_box,
+		.box_transform     = scene->static_box_transform,
+		.box_count         = scene->static_box_count,
+		.sphere            = scene->static_sphere,
+		.sphere_transform  = scene->static_sphere_transform,
+		.sphere_count      = scene->static_sphere_count,
+		.capsule           = scene->static_capsule,
+		.capsule_transform = scene->static_capsule_transform,
+		.capsule_count     = scene->static_capsule_count,
+	};
+
+	for (int i = 0; i < scene->character_count; i++) {
+		Character *character = scene->character[i];
+		characterPhysics_collide(character, &statics);
+		entity_setTransform(character->entity, &character->body);
+		entity_setMatrix(character->entity, fb_index);
 	}
 
 	viewport_updateCamera(&control[0].actions, &ctx->player[0].entity->transform.position);
@@ -87,7 +94,7 @@ static void gameState_updatePause(GameContext *ctx)
 	Scene *scene = scene_get();
 	for (int i = 0; i < scene->entity_count; i++) {
 		Entity *entity = scene->entity[i];
-		if (entity->type != ENTITY_ACTOR) continue;
+		if (entity->type != ENTITY_CHARACTER) continue;
 		for (int fb = 0; fb < FB_COUNT; fb++)
 			entity_setMatrix(entity, fb);
 	}
@@ -145,7 +152,7 @@ static const GameStateDef game_state[GAME_STATE_COUNT] = {
 	[GAME_STATE_INTRO] = {
 		.update        = gameState_updateIntro,
 		.setDescriptor = gameState_setIntroDescriptor,
-		.bindActor     = NULL,
+		.bindCharacter     = NULL,
 		.onEnter       = intro_init,
 		.scene_id      = SCENE_COUNT,
 	},
@@ -153,7 +160,7 @@ static const GameStateDef game_state[GAME_STATE_COUNT] = {
 	[GAME_STATE_MAIN_MENU] = {
 		.update        = gameState_updateMainMenu,
 		.setDescriptor = gameState_setMainMenuDescriptor,
-		.bindActor     = NULL,
+		.bindCharacter     = NULL,
 		.onEnter       = main_menu_startEnter,
 		.scene_id      = SCENE_COUNT,
 	},
@@ -161,7 +168,7 @@ static const GameStateDef game_state[GAME_STATE_COUNT] = {
 	[GAME_STATE_GAMEPLAY] = {
 		.update        = gameState_updateGameplay,
 		.setDescriptor = gameState_setGameplayDescriptor,
-		.bindActor     = gameState_bindGameplayActor,
+		.bindCharacter     = gameState_bindGameplayCharacter,
 		.onEnter       = gameplay_startEnter,
 		.scene_id      = SCENE_DEMO,
 	},
@@ -169,7 +176,7 @@ static const GameStateDef game_state[GAME_STATE_COUNT] = {
 	[GAME_STATE_PAUSE] = {
 		.update        = gameState_updatePause,
 		.setDescriptor = gameState_setPauseDescriptor,
-		.bindActor     = NULL,
+		.bindCharacter     = NULL,
 		.onEnter       = pause_startEnter,
 		.scene_id      = SCENE_COUNT,
 	},
@@ -177,7 +184,7 @@ static const GameStateDef game_state[GAME_STATE_COUNT] = {
 	[GAME_STATE_GAME_OVER] = {
 		.update        = gameState_updateGameOver,
 		.setDescriptor = gameState_setGameOverDescriptor,
-		.bindActor     = NULL,
+		.bindCharacter     = NULL,
 		.onEnter       = NULL,
 		.scene_id      = SCENE_COUNT,
 	},
@@ -189,7 +196,7 @@ static void gameState_load(GameState id)
 	resources_load(resources_forState(id));
 	if (game_state[id].scene_id != SCENE_COUNT) {
 		scene_load(scene_getDef(game_state[id].scene_id));
-		if (game_state[id].bindActor) game_state[id].bindActor();
+		if (game_state[id].bindCharacter) game_state[id].bindCharacter();
 	}
 	if (game_state[id].onEnter) game_state[id].onEnter();
 }

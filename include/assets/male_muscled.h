@@ -1,10 +1,23 @@
 #ifndef MALE_MUSCLED_H
 #define MALE_MUSCLED_H
 
-#include "actor/actor.h"
+#include "character/character.h"
 
 #define male_muscled_model "rom:/models/male_muscled.t3dm"
 #define gorilla_model "rom:/models/gorilla.t3dm"
+
+typedef enum {
+
+	MM_STATE_IDLE,
+	MM_STATE_WALKING,
+	MM_STATE_RUNNING,
+	MM_STATE_SPRINTING,
+	MM_STATE_ROLLING,
+	MM_STATE_JUMPING,
+	MM_STATE_FALLING,
+	MM_STATE_COUNT
+
+} MaleMusledStates;
 
 
 typedef enum {
@@ -22,7 +35,6 @@ typedef enum {
 	MM_SLOT_LAND_R,
 
 	MM_SLOT_ROLL_RUN,
-	MM_SLOT_ROLL_STAND,
 
 	MM_SLOT_TRANSITION,
 	
@@ -80,8 +92,6 @@ typedef enum {
 
 	MM_ANIM_ROLL_L,
 	MM_ANIM_ROLL_R,
-	MM_ANIM_STAND_ROLL_L,
-	MM_ANIM_STAND_ROLL_R,
 
 	MM_ANIM_SLIDE_L,
 	MM_ANIM_SLIDE_R,
@@ -94,8 +104,9 @@ typedef enum {
 } MaleMuscledAnim;
 
 
-extern const ActorMotionSettings    male_muscled_motion_settings;
-extern const ActorAnimationSettings male_muscled_animation_settings;
-extern const AnimationDef           male_muscled_animation_def;
+extern const CharacterMovementSettings    male_muscled_movement_settings;
+extern const CharacterColliderSettings    male_muscled_collider_settings;
+extern const CharacterAnimationSettings male_muscled_animation_settings;
+extern const CharacterAnimationDef           male_muscled_animation_def;
 
 #endif

@@ -1,16 +1,16 @@
 #include "player/player.h"
 #include "control/player_control.h"
-#include "control/actor_control.h"
+#include "control/character_control.h"
 #include "control/menu_control.h"
 #include "control/controller.h"
 #include "viewport/viewport.h"
 #include "game/game.h"
 
 
-void player_setActorControl(Player *player, const ControllerActions *actions, Viewport *viewport)
+void player_setCharacterControl(Player *player, const ControllerActions *actions, Viewport *viewport)
 {
-	actorControl_update(
-		player->entity->actor,
+	characterControl_update(
+		player->character,
 		&player->cmd,
 		actions,
 		viewport->camera.spherical.data.angle_around_center

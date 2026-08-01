@@ -3,92 +3,32 @@
 #include "assets/male_muscled.h"
 
 
-static const ActorDef male_muscled_actor_def = {
-	.motion_settings    = &male_muscled_motion_settings,
-	.animation_settings = &male_muscled_animation_settings,
+static const CharacterDef male_muscled_character_def = {
+	.movement_settings  = &male_muscled_movement_settings,
 	.animation_def      = &male_muscled_animation_def,
+	.collider_settings  = &male_muscled_collider_settings,
 };
 
 
-/* --- Body defs (body-side only; shape attaches separately). --- */
-
-static const RigidBodyDef player_body_def = {
-	.body_type       = BODY_KINEMATIC,
-	.gravity_scale   = 2.0f,
-	.layers          = 1,
-	.linear_damping  = 0.1f,
-	.angular_damping = 1.0f,
-	.allow_sleep     = 0,
-	.awake           = 1,
-	.active          = 1,
-	.lock_axis_x     = 1,
-	.lock_axis_y     = 1,
-};
-
-static const RigidBodyDef static_body_def = {
-	.body_type       = BODY_STATIC,
-	.layers          = 1,
-	.allow_sleep     = 1,
-	.awake           = 1,
-	.active          = 1,
-};
-
-static const RigidBodyDef dynamic_body_def = {
-	.body_type       = BODY_DYNAMIC,
-	.gravity_scale   = 1.0f,
-	.layers          = 1,
-	.linear_damping  = 0.05f,
-	.angular_damping = 0.1f,
-	.allow_sleep     = 1,
-	.awake           = 1,
-	.active          = 1,
-};
-
-
-/* --- Shape defs. --- */
-
-/* Shape dimensions are in physics units (metres). Render uses ×100. */
-
-static const EntityShapeDef player_shape_def = {
-	.type    = SHAPE_CAPSULE,
-	.capsule = {
-		.tx          = { .position = { 0.0f, 0.0f, 0.95f } },  /* lift so base sits at body z=0 */
-		.radius      = 0.30f,
-		.half_height = 0.65f,    /* total height = 2*(r + half_height) = 1.9 m */
-		.friction    = 0.5f,
-		.restitution = 0.0f,
-		.density     = 1.0f,
-	},
-};
-
-static const EntityShapeDef room_shape_def = {
-	.type = SHAPE_BOX,
-	.box = {
-		/* Thin floor slab, top surface at z = 0. */
-		.e           = { 30.0f, 30.0f, 0.02f },
-		.friction    = 0.6f,
-		.restitution = 0.0f,
-		.density     = 0.0f,
-	},
-};
+/* --- Static collider shapes for the test props (metres). --- */
 
 static const EntityShapeDef crate_shape_def = {
 	.type = SHAPE_BOX,
-	.box = {
-		.e           = { 0.5f, 0.5f, 0.5f },
-		.friction    = 0.6f,
-		.restitution = 0.0f,
-		.density     = 1.0f,
-	},
+	.box  = { .e = { 0.5f, 0.5f, 0.5f } },
 };
 
 static const EntityShapeDef ball_shape_def = {
 	.type   = SHAPE_SPHERE,
-	.sphere = {
-		.radius      = 0.25f,
-		.friction    = 0.4f,
-		.restitution = 0.3f,
-		.density     = 1.0f,
+	.sphere = { .radius = 0.5f },
+};
+
+/* The capsule model has its base at the origin: lift the shape to centre it. */
+static const EntityShapeDef pillar_shape_def = {
+	.type    = SHAPE_CAPSULE,
+	.capsule = {
+		.tx          = { .position = { 0.0f, 0.0f, 0.9f } },
+		.radius      = 0.354f,
+		.half_height = 0.546f,
 	},
 };
 
@@ -120,17 +60,14 @@ const SceneDef demo_scene = {
 			.position   = {-210.0f, -210.0f, 0.0f},
 			.rotation   = {0.0f, 0.0f, 200.0f},
 			.scale      = {1.0f, 1.0f, 1.0f},
-			.actor      = &male_muscled_actor_def,
-			.body       = &player_body_def,
-			.shape      = &player_shape_def,
+			.character      = &male_muscled_character_def,
 		},
 		[1] = {
-			.model_path = "rom:/models/room.t3dm",
+			.model_path     = "rom:/models/room.t3dm",
+			.collision_path = "rom:/collision/room.collision",
 			.position   = {0.0f, 0.0f, -2.0f},
 			.rotation   = {0.0f, 0.0f, 0.0f},
 			.scale      = {1.0f, 1.0f, 1.0f},
-			.body       = &static_body_def,
-			.shape      = &room_shape_def,
 		},
 		[2] = {
 			.model_path = "rom:/models/axis.t3dm",
@@ -139,77 +76,99 @@ const SceneDef demo_scene = {
 			.scale      = {1.5f, 1.5f, 1.5f},
 		},
 
+		/* Ramp battery: big tilted crates half-buried, increasing slope. */
 		[3] = {
 			.model_path = "rom:/models/green_box.t3dm",
-			.position   = {250.0f, -50.0f, 50.0f},
-			.scale      = {1.0f, 1.0f, 1.0f},
-			.body       = &dynamic_body_def,
+			.position   = {900.0f, -900.0f, -350.0f},
+			.rotation   = {0.0f, 20.0f, 0.0f},
+			.scale      = {10.0f, 10.0f, 10.0f},
 			.shape      = &crate_shape_def,
 		},
 		[4] = {
-			.model_path = "rom:/models/red_box.t3dm",
-			.position   = {250.0f, 50.0f, 50.0f},
-			.scale      = {1.0f, 1.0f, 1.0f},
-			.body       = &dynamic_body_def,
+			.model_path = "rom:/models/yellow_box.t3dm",
+			.position   = {1700.0f, 300.0f, -320.0f},
+			.rotation   = {0.0f, 35.0f, 15.0f},
+			.scale      = {10.0f, 10.0f, 10.0f},
 			.shape      = &crate_shape_def,
 		},
 		[5] = {
-			.model_path = "rom:/models/yellow_box.t3dm",
-			.position   = {350.0f, -50.0f, 50.0f},
-			.scale      = {1.0f, 1.0f, 1.0f},
-			.body       = &dynamic_body_def,
+			.model_path = "rom:/models/red_box.t3dm",
+			.position   = {-1300.0f, 900.0f, -400.0f},
+			.rotation   = {25.0f, 0.0f, 0.0f},
+			.scale      = {10.0f, 10.0f, 10.0f},
 			.shape      = &crate_shape_def,
 		},
+
+		/* Terrain mounds: spheres half-buried in the floor. */
 		[6] = {
-			.model_path = "rom:/models/green_box.t3dm",
-			.position   = {350.0f, 50.0f, 50.0f},
-			.scale      = {1.0f, 1.0f, 1.0f},
-			.body       = &dynamic_body_def,
-			.shape      = &crate_shape_def,
+			.model_path = "rom:/models/green_sphere.t3dm",
+			.position   = {-900.0f, -1500.0f, -250.0f},
+			.rotation   = {0.0f, 0.0f, 0.0f},
+			.scale      = {8.0f, 8.0f, 8.0f},
+			.shape      = &ball_shape_def,
 		},
 		[7] = {
-			.model_path = "rom:/models/red_box.t3dm",
-			.position   = {250.0f, -50.0f, 150.0f},
-			.scale      = {1.0f, 1.0f, 1.0f},
-			.body       = &dynamic_body_def,
-			.shape      = &crate_shape_def,
+			.model_path = "rom:/models/red_sphere.t3dm",
+			.position   = {500.0f, 1300.0f, -200.0f},
+			.rotation   = {0.0f, 0.0f, 0.0f},
+			.scale      = {6.0f, 6.0f, 6.0f},
+			.shape      = &ball_shape_def,
 		},
+
+		/* Stairs: three crates with 0.4 m rises. */
 		[8] = {
-			.model_path = "rom:/models/yellow_box.t3dm",
-			.position   = {250.0f, 50.0f, 150.0f},
-			.scale      = {1.0f, 1.0f, 1.0f},
-			.body       = &dynamic_body_def,
+			.model_path = "rom:/models/green_box.t3dm",
+			.position   = {-500.0f, -900.0f, -60.0f},
+			.rotation   = {0.0f, 0.0f, 0.0f},
+			.scale      = {2.0f, 2.0f, 2.0f},
 			.shape      = &crate_shape_def,
 		},
 		[9] = {
-			.model_path = "rom:/models/green_box.t3dm",
-			.position   = {350.0f, -50.0f, 150.0f},
-			.scale      = {1.0f, 1.0f, 1.0f},
-			.body       = &dynamic_body_def,
+			.model_path = "rom:/models/yellow_box.t3dm",
+			.position   = {-500.0f, -1100.0f, -20.0f},
+			.rotation   = {0.0f, 0.0f, 0.0f},
+			.scale      = {2.0f, 2.0f, 2.0f},
 			.shape      = &crate_shape_def,
 		},
 		[10] = {
 			.model_path = "rom:/models/red_box.t3dm",
-			.position   = {350.0f, 50.0f, 150.0f},
-			.scale      = {1.0f, 1.0f, 1.0f},
-			.body       = &dynamic_body_def,
+			.position   = {-500.0f, -1300.0f, 20.0f},
+			.rotation   = {0.0f, 0.0f, 0.0f},
+			.scale      = {2.0f, 2.0f, 2.0f},
 			.shape      = &crate_shape_def,
 		},
 
+		/* Two capsule pillars with a bar bridging them at jump height. */
 		[11] = {
-			.model_path = "rom:/models/red_sphere.t3dm",
-			.position   = {200.0f, -300.0f, 25.0f},
-			.scale      = {0.5f, 0.5f, 0.5f},
-			.body       = &dynamic_body_def,
-			.shape      = &ball_shape_def,
+			.model_path = "rom:/models/capsule.t3dm",
+			.position   = {0.0f, 700.0f, -2.0f},
+			.rotation   = {0.0f, 0.0f, 0.0f},
+			.scale      = {2.0f, 2.0f, 2.0f},
+			.shape      = &pillar_shape_def,
 		},
 		[12] = {
-			.model_path = "rom:/models/yellow_sphere.t3dm",
-			.position   = {-300.0f, 200.0f, 25.0f},
-			.scale      = {0.5f, 0.5f, 0.5f},
-			.body       = &dynamic_body_def,
-			.shape      = &ball_shape_def,
+			.model_path = "rom:/models/capsule.t3dm",
+			.position   = {300.0f, 700.0f, -2.0f},
+			.rotation   = {0.0f, 0.0f, 0.0f},
+			.scale      = {2.0f, 2.0f, 2.0f},
+			.shape      = &pillar_shape_def,
+		},
+		[13] = {
+			.model_path = "rom:/models/yellow_box.t3dm",
+			.position   = {150.0f, 700.0f, 250.0f},
+			.rotation   = {0.0f, 0.0f, 0.0f},
+			.scale      = {4.0f, 1.0f, 1.0f},
+			.shape      = &crate_shape_def,
+		},
+
+		/* Tilted low ceiling slab to test collision from below. */
+		[14] = {
+			.model_path = "rom:/models/red_box.t3dm",
+			.position   = {-300.0f, -400.0f, 300.0f},
+			.rotation   = {0.0f, 10.0f, 0.0f},
+			.scale      = {4.0f, 4.0f, 1.0f},
+			.shape      = &crate_shape_def,
 		},
 	},
-	.entity_count = 13,
+	.entity_count = 15,
 };

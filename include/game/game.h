@@ -44,7 +44,7 @@ GameRenderDescriptor game_getRenderDescriptor(const GameContext *ctx);
 
 
 void game_init(void);
-void game_runFrame(void);
+void game_runStep(void);
 void game_close(void);
 
 

@@ -40,14 +40,14 @@ static void cameraSpherical_setVelocity(Camera *camera, float dt)
 	float target_offset     = aiming ? settings->offset_angle_aim         : settings->offset_angle_default;
 	float target_distance   = aiming ? settings->distance_from_center_aim : settings->distance_from_center_default;
 
-	float factor_x = fm_exp(-settings->response_rate.x * dt);
-	float factor_y = fm_exp(-settings->response_rate.y * dt);
+	float factor_x = fm_expf(-settings->response_rate.x * dt);
+	float factor_y = fm_expf(-settings->response_rate.y * dt);
 	data->velocity.x = data->velocity.x * factor_x + (data->target_velocity.x * velocity_scale) * (1.0f - factor_x);
 	data->velocity.y = data->velocity.y * factor_y + (data->target_velocity.y * velocity_scale) * (1.0f - factor_y);
 
-	camera->field_of_view      = lerpf(camera->field_of_view,      target_fov,      1.0f - fm_exp(-settings->zoom_response_rate   * dt));
-	data->offset_angle         = lerpf(data->offset_angle,         target_offset,   1.0f - fm_exp(-settings->offset_response_rate * dt));
-	data->distance_from_center = lerpf(data->distance_from_center, target_distance, 1.0f - fm_exp(-settings->zoom_response_rate   * dt));
+	camera->field_of_view      = lerpf(camera->field_of_view,      target_fov,      1.0f - fm_expf(-settings->zoom_response_rate   * dt));
+	data->offset_angle         = lerpf(data->offset_angle,         target_offset,   1.0f - fm_expf(-settings->offset_response_rate * dt));
+	data->distance_from_center = lerpf(data->distance_from_center, target_distance, 1.0f - fm_expf(-settings->zoom_response_rate   * dt));
 }
 
 

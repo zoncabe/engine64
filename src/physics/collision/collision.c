@@ -778,6 +778,158 @@ void capsuleToCapsule(ContactManifold *m, PhysicsShape *a, PhysicsShape *b)
 }
 
 
+/* --- Capsule vs Box without RigidBody: static geometry placed by a
+   world transform. Same logic as capsuleToBox. Capsule is A, Box is B. --- */
+void capsuleToStaticBox(ContactManifold *m, const Capsule *capsule, const Transform *capsule_world,
+                        const Box *box, const Transform *box_world)
+{
+	float   r = capsule->radius;
+	float   h = capsule->half_height;
+	Vector3 local_top    = { 0.0f, 0.0f,  h };
+	Vector3 local_bottom = { 0.0f, 0.0f, -h };
+
+	/* Capsule segment endpoints in box-local space. */
+	Vector3 top_world = transform_mulVector(capsule_world, &local_top);
+	Vector3 bot_world = transform_mulVector(capsule_world, &local_bottom);
+	Vector3 top_local = transform_mulVectorTransposed(box_world, &top_world);
+	Vector3 bot_local = transform_mulVectorTransposed(box_world, &bot_world);
+
+	Vector3 e = box->e;
+	AABB    box_local = { { -e.x, -e.y, -e.z }, { e.x, e.y, e.z } };
+
+	Vector3 c_on_box = aabb_closestToSegment(&box_local, &bot_local, &top_local);
+	Vector3 c_on_seg = segment_closestToPoint(&bot_local, &top_local, &c_on_box);
+	Vector3 d_local  = vector3_difference(&c_on_seg, &c_on_box);
+	float   dist2    = vector3_dot(&d_local, &d_local);
+	if (dist2 > r * r) return;
+
+	/* Contact lives on the box surface; normal goes capsule→box. */
+	Vector3 box_point = transform_mulVector(box_world, &c_on_box);
+	Vector3 seg_point = transform_mulVector(box_world, &c_on_seg);
+	Vector3 to_box    = vector3_difference(&box_point, &seg_point);
+	float   len       = vector3_magnitude(&to_box);
+	Vector3 normal;
+	if (len > 1.0e-6f) normal = vector3_scaled(&to_box, 1.0f / len);
+	else               normal = vector3_create(0.0f, 0.0f, 1.0f);
+
+	m->normal        = normal;
+	m->contact_count = 1;
+	ContactPoint *c  = m->contacts;
+	c->position      = box_point;
+	c->penetration   = len - r;
+	c->fp.key        = 0;
+}
+
+
+/* --- Capsule vs Sphere without RigidBody. Capsule is A, sphere is B. --- */
+void capsuleToStaticSphere(ContactManifold *m, const Capsule *capsule, const Transform *capsule_world,
+                           const Sphere *sphere, const Transform *sphere_world)
+{
+	Vector3 top, bot;
+	capsule_getSegment(capsule, capsule_world, &bot, &top);
+
+	Vector3 on_seg = segment_closestToPoint(&bot, &top, &sphere_world->position);
+	Vector3 d      = vector3_difference(&sphere_world->position, &on_seg);
+	float   rsum   = capsule->radius + sphere->radius;
+	float   dist2  = vector3_dot(&d, &d);
+	if (dist2 > rsum * rsum) return;
+
+	float dist = sqrtf(dist2);
+	Vector3 n = (dist > 1.0e-6f)
+		? vector3_scaled(&d, 1.0f / dist)
+		: vector3_create(0.0f, 0.0f, 1.0f);
+
+	m->normal        = n;
+	m->contact_count = 1;
+	ContactPoint *c  = m->contacts;
+	Vector3 off      = vector3_scaled(&n, -sphere->radius);
+	c->position      = vector3_sum(&sphere_world->position, &off);
+	c->penetration   = dist - rsum;
+	c->fp.key        = 0;
+}
+
+
+/* --- Capsule vs Capsule without RigidBody. A is the moving capsule. --- */
+void capsuleToStaticCapsule(ContactManifold *m, const Capsule *capsule, const Transform *capsule_world,
+                            const Capsule *other, const Transform *other_world)
+{
+	Vector3 pa1, pa2, pb1, pb2;
+	capsule_getSegment(capsule, capsule_world, &pa1, &pa2);
+	capsule_getSegment(other, other_world, &pb1, &pb2);
+
+	Vector3 ca, cb;
+	segment_closestToSegment(&pa1, &pa2, &pb1, &pb2, &ca, &cb);
+
+	Vector3 d    = vector3_difference(&cb, &ca);
+	float   rsum = capsule->radius + other->radius;
+	float   d2   = vector3_dot(&d, &d);
+	if (d2 > rsum * rsum) return;
+
+	float dist = sqrtf(d2);
+	Vector3 n = (dist > 1.0e-6f)
+		? vector3_scaled(&d, 1.0f / dist)
+		: vector3_create(0.0f, 0.0f, 1.0f);
+
+	m->normal        = n;
+	m->contact_count = 1;
+	ContactPoint *c  = m->contacts;
+	Vector3 off      = vector3_scaled(&n, -other->radius);
+	c->position      = vector3_sum(&cb, &off);
+	c->penetration   = dist - rsum;
+	c->fp.key        = 0;
+}
+
+
+/* --- Capsule vs Triangle. The capsule is A, the triangle is B.
+   Reference point on the segment via plane intersection, then one
+   closest-point refinement. --- */
+void capsuleToTriangle(ContactManifold *m, const Capsule *capsule, const Transform *world,
+                       const Triangle *triangle)
+{
+	const Vector3 *vertices        = triangle->vertices;
+	const Vector3 *triangle_normal = &triangle->normal;
+
+	float r = capsule->radius;
+	float h = capsule->half_height;
+
+	Vector3 local_top    = { 0.0f, 0.0f,  h };
+	Vector3 local_bottom = { 0.0f, 0.0f, -h };
+	Vector3 top = transform_mulVector(world, &local_top);
+	Vector3 bot = transform_mulVector(world, &local_bottom);
+
+	/* Reference point: where the segment crosses the triangle plane. */
+	Vector3 seg   = vector3_difference(&top, &bot);
+	Vector3 to_v0 = vector3_difference(&vertices[0], &bot);
+	float   denom = vector3_dot(triangle_normal, &seg);
+	float   t     = 0.0f;
+	if (fabsf(denom) > 1.0e-6f)
+		t = clampf(vector3_dot(triangle_normal, &to_v0) / denom, 0.0f, 1.0f);
+	Vector3 ref = bot;
+	vector3_addScaledVector(&ref, &seg, t);
+
+	Vector3 tri_pt = triangle_closestToPoint(&vertices[0], &vertices[1], &vertices[2], &ref);
+	Vector3 center = segment_closestToPoint(&bot, &top, &tri_pt);
+	tri_pt = triangle_closestToPoint(&vertices[0], &vertices[1], &vertices[2], &center);
+
+	Vector3 d     = vector3_difference(&tri_pt, &center);
+	float   dist2 = vector3_dot(&d, &d);
+	if (dist2 > r * r) return;
+
+	float dist = sqrtf(dist2);
+	Vector3 n = (dist > 1.0e-6f)
+		? vector3_scaled(&d, 1.0f / dist)
+		: vector3_inverted(triangle_normal);
+
+	m->normal        = n;
+	m->contact_count = 1;
+	ContactPoint *c  = m->contacts;
+	Vector3 off      = vector3_scaled(&n, r);
+	c->position      = vector3_sum(&center, &off);
+	c->penetration   = dist - r;
+	c->fp.key        = 0;
+}
+
+
 /* --- collision: type-based dispatcher. --- */
 void collision(ContactManifold *m, PhysicsShape *a, PhysicsShape *b)
 {

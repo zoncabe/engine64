@@ -2,7 +2,7 @@
 #define PLAYER_H
 
 #include "entity/entity.h"
-#include "actor/actor_motion.h"
+#include "character/character_movement.h"
 
 #define PLAYER_COUNT 1
 
@@ -16,16 +16,17 @@ typedef struct {
 
 typedef struct Player {
 
+	Character *character;
 	Entity *entity;
 	PlayerStats stats;
-	MotionCommand cmd;
+	MovementCommand cmd;
 
 } Player;
 
 
 Player *player_get(void);
 void player_init(void);
-void player_setEntity(Player *player, Entity *entity);
+void player_setCharacter(Player *player, Character *character);
 void player_update(void);
 void player_setMatrix(uint8_t fb_index);
 

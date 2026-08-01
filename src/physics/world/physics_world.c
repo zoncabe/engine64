@@ -1,12 +1,12 @@
 /*
-	physics_scene.c — world assembly, step, body/shape management.
+	physics_world.c — world assembly, step, body/shape management.
 	Ported 1-a-1 from qu3e q3Scene.cpp.
 */
 #include <assert.h>
 #include <stddef.h>
 #include <string.h>
 
-#include "physics/world/physics_scene.h"
+#include "physics/world/physics_world.h"
 #include "physics/world/physics_island.h"
 #include "physics/collision/contact.h"
 #include "physics/collision/contact_solver.h"
@@ -17,42 +17,42 @@
 
 /* --- Shims exposed to rigid_body.c and broad_phase.c. --- */
 
-void physicsScene_allocShape(PhysicsScene *s, PhysicsShape **out)
+void physicsWorld_allocShape(PhysicsWorld *s, PhysicsShape **out)
 {
 	*out = (PhysicsShape *)physicsPagedAllocator_allocate(&s->shape_allocator);
 }
 
-void physicsScene_freeShape(PhysicsScene *s, PhysicsShape *shape)
+void physicsWorld_freeShape(PhysicsWorld *s, PhysicsShape *shape)
 {
 	physicsPagedAllocator_free(&s->shape_allocator, shape);
 }
 
-void physicsScene_markNewShape(PhysicsScene *s)
+void physicsWorld_markNewShape(PhysicsWorld *s)
 {
 	s->new_shape = 1;
 }
 
-void broadPhase_insertShape_fromScene(PhysicsScene *s, PhysicsShape *shape, AABB aabb)
+void broadPhase_insertShape_fromWorld(PhysicsWorld *s, PhysicsShape *shape, AABB aabb)
 {
 	broadPhase_insertShape(&s->contact_manager.broadphase, shape, aabb);
 }
 
-void broadPhase_removeShape_fromScene(PhysicsScene *s, const PhysicsShape *shape)
+void broadPhase_removeShape_fromWorld(PhysicsWorld *s, const PhysicsShape *shape)
 {
 	broadPhase_removeShape(&s->contact_manager.broadphase, shape);
 }
 
-void broadPhase_updateShape(PhysicsScene *s, int32_t index, AABB aabb)
+void broadPhase_updateShape(PhysicsWorld *s, int32_t index, AABB aabb)
 {
 	broadPhase_update(&s->contact_manager.broadphase, index, aabb);
 }
 
-void contactManager_removeContact_fromScene(PhysicsScene *s, ContactConstraint *c)
+void contactManager_removeContact_fromWorld(PhysicsWorld *s, ContactConstraint *c)
 {
 	contactManager_removeContact(&s->contact_manager, c);
 }
 
-void contactManager_removeContactsFromBody_fromScene(PhysicsScene *s, RigidBody *body)
+void contactManager_removeContactsFromBody_fromWorld(PhysicsWorld *s, RigidBody *body)
 {
 	contactManager_removeContactsFromBody(&s->contact_manager, body);
 }
@@ -60,7 +60,7 @@ void contactManager_removeContactsFromBody_fromScene(PhysicsScene *s, RigidBody 
 
 /* --- lifecycle --- */
 
-void physicsScene_init(PhysicsScene *s, float dt, Vector3 gravity, int32_t iterations)
+void physicsWorld_init(PhysicsWorld *s, float dt, Vector3 gravity, int32_t iterations)
 {
 	physicsStack_init(&s->stack);
 	physicsHeap_init (&s->heap);
@@ -79,7 +79,7 @@ void physicsScene_init(PhysicsScene *s, float dt, Vector3 gravity, int32_t itera
 }
 
 
-void physicsScene_removeAllBodies(PhysicsScene *s)
+void physicsWorld_removeAllBodies(PhysicsWorld *s)
 {
 	RigidBody *body = s->body_list;
 	while (body) {
@@ -93,9 +93,9 @@ void physicsScene_removeAllBodies(PhysicsScene *s)
 }
 
 
-void physicsScene_shutdown(PhysicsScene *s)
+void physicsWorld_shutdown(PhysicsWorld *s)
 {
-	physicsScene_removeAllBodies(s);
+	physicsWorld_removeAllBodies(s);
 	physicsPagedAllocator_shutdown(&s->shape_allocator);
 	contactManager_shutdown(&s->contact_manager);
 	physicsHeap_shutdown(&s->heap);
@@ -105,7 +105,7 @@ void physicsScene_shutdown(PhysicsScene *s)
 
 /* --- step --- */
 
-void physics_step(PhysicsScene *s)
+void physics_step(PhysicsWorld *s)
 {
 	if (s->new_shape) {
 		broadPhase_updatePairs(&s->contact_manager.broadphase);
@@ -220,7 +220,7 @@ void physics_step(PhysicsScene *s)
 
 /* --- body management --- */
 
-RigidBody *physicsScene_createBody(PhysicsScene *s, const RigidBodyDef *def)
+RigidBody *physicsWorld_createBody(PhysicsWorld *s, const RigidBodyDef *def)
 {
 	RigidBody *body = (RigidBody *)physicsHeap_allocate(&s->heap, (int32_t)sizeof(RigidBody));
 	rigidBody_init(body, def, s);
@@ -234,7 +234,7 @@ RigidBody *physicsScene_createBody(PhysicsScene *s, const RigidBodyDef *def)
 }
 
 
-void physicsScene_removeBody(PhysicsScene *s, RigidBody *body)
+void physicsWorld_removeBody(PhysicsWorld *s, RigidBody *body)
 {
 	assert(s->body_count > 0);
 
@@ -252,7 +252,7 @@ void physicsScene_removeBody(PhysicsScene *s, RigidBody *body)
 
 /* --- settings --- */
 
-void physicsScene_setAllowSleep(PhysicsScene *s, int allow_sleep)
+void physicsWorld_setAllowSleep(PhysicsWorld *s, int allow_sleep)
 {
 	s->allow_sleep = allow_sleep;
 	if (!allow_sleep) {
@@ -261,23 +261,23 @@ void physicsScene_setAllowSleep(PhysicsScene *s, int allow_sleep)
 }
 
 
-void physicsScene_setIterations(PhysicsScene *s, int32_t iterations)
+void physicsWorld_setIterations(PhysicsWorld *s, int32_t iterations)
 {
 	s->iterations = (iterations > 1) ? iterations : 1;
 }
 
 
-void physicsScene_setEnableFriction(PhysicsScene *s, int enabled)
+void physicsWorld_setEnableFriction(PhysicsWorld *s, int enabled)
 {
 	s->enable_friction = enabled;
 }
 
 
-Vector3 physicsScene_getGravity(const PhysicsScene *s)       { return s->gravity; }
-void    physicsScene_setGravity(PhysicsScene *s, Vector3 g)  { s->gravity = g; }
+Vector3 physicsWorld_getGravity(const PhysicsWorld *s)       { return s->gravity; }
+void    physicsWorld_setGravity(PhysicsWorld *s, Vector3 g)  { s->gravity = g; }
 
 
-void physicsScene_setContactListener(PhysicsScene *s, ContactListener *listener)
+void physicsWorld_setContactListener(PhysicsWorld *s, ContactListener *listener)
 {
 	s->contact_listener = listener;
 	s->contact_manager.contact_listener = listener;
@@ -288,7 +288,7 @@ void physicsScene_setContactListener(PhysicsScene *s, ContactListener *listener)
 
 typedef struct QueryAABB_ctx {
 	const BroadPhase         *broadphase;
-	PhysicsSceneQueryCallback cb;
+	PhysicsWorldQueryCallback cb;
 	void                     *cb_user_data;
 	AABB                      aabb;
 } QueryAABB_ctx;
@@ -306,7 +306,7 @@ static int queryAABB_cb(void *ctx_v, int32_t id)
 	return 1;
 }
 
-void physicsScene_queryAABB(const PhysicsScene *s, void *cb_user_data, PhysicsSceneQueryCallback cb, AABB aabb)
+void physicsWorld_queryAABB(const PhysicsWorld *s, void *cb_user_data, PhysicsWorldQueryCallback cb, AABB aabb)
 {
 	QueryAABB_ctx ctx;
 	ctx.broadphase   = &s->contact_manager.broadphase;
@@ -319,7 +319,7 @@ void physicsScene_queryAABB(const PhysicsScene *s, void *cb_user_data, PhysicsSc
 
 typedef struct QueryPoint_ctx {
 	const BroadPhase         *broadphase;
-	PhysicsSceneQueryCallback cb;
+	PhysicsWorldQueryCallback cb;
 	void                     *cb_user_data;
 	Vector3                   point;
 } QueryPoint_ctx;
@@ -335,7 +335,7 @@ static int queryPoint_cb(void *ctx_v, int32_t id)
 	return 1;
 }
 
-void physicsScene_queryPoint(const PhysicsScene *s, void *cb_user_data, PhysicsSceneQueryCallback cb, Vector3 point)
+void physicsWorld_queryPoint(const PhysicsWorld *s, void *cb_user_data, PhysicsWorldQueryCallback cb, Vector3 point)
 {
 	QueryPoint_ctx ctx;
 	ctx.broadphase   = &s->contact_manager.broadphase;
@@ -354,7 +354,7 @@ void physicsScene_queryPoint(const PhysicsScene *s, void *cb_user_data, PhysicsS
 
 typedef struct QueryRaycast_ctx {
 	const BroadPhase         *broadphase;
-	PhysicsSceneQueryCallback cb;
+	PhysicsWorldQueryCallback cb;
 	void                     *cb_user_data;
 	RaycastData              *raycast;
 } QueryRaycast_ctx;
@@ -370,7 +370,7 @@ static int queryRaycast_cb(void *ctx_v, int32_t id)
 	return 1;
 }
 
-void physicsScene_rayCast(const PhysicsScene *s, void *cb_user_data, PhysicsSceneQueryCallback cb, RaycastData *raycast)
+void physicsWorld_rayCast(const PhysicsWorld *s, void *cb_user_data, PhysicsWorldQueryCallback cb, RaycastData *raycast)
 {
 	QueryRaycast_ctx ctx;
 	ctx.broadphase   = &s->contact_manager.broadphase;

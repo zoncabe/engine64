@@ -19,8 +19,6 @@
 typedef struct Scene          Scene;
 typedef struct Screen         Screen;
 
-/* Render-side transform: position, rotation as Euler degrees, non-uniform scale.
-   Consumed by mesh_setMatrix → t3d_mat4fp_from_srt. */
 typedef struct RenderTransform {
 	Vector3 position;
 	Vector3 rotation;

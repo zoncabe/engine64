@@ -10,8 +10,7 @@ int main()
 
     game_init();
 
-    for (;;)
-        game_runFrame();
+    for (;;) game_runStep();
 
     game_close();
 
