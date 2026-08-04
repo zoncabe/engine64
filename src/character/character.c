@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <malloc.h>
+#include <string.h>
 #include <libdragon.h>
 #include <t3d/t3dmodel.h>
 
@@ -18,6 +19,7 @@ Character *character_create(const CharacterDef *def, Entity *entity)
 		.body      = (KinematicBody){ .position = vector3_scaled(&entity->transform.position, RENDER_SCALE_INV), .rotation = entity->transform.rotation },
 		.movement  = (CharacterMovement){ .settings = def->movement_settings, .data.is_grounded = true, .current = MOVEMENT_STATE_IDLE },
 		.animation = (CharacterAnimation){ .def = def->animation_def },
+		.weapons   = (CharacterWeapons){ .def = def->weapons_def, .drawn = CHARACTER_WEAPON_DRAWN_NONE },
 	};
 
 	characterCollider_init(&character->collider,
@@ -28,9 +30,10 @@ Character *character_create(const CharacterDef *def, Entity *entity)
 	characterAnimation_initGraph(character, def->animation_def);
 	entity->mesh->skeleton = &character->animation.main;
 
-	rspq_block_begin();
-	t3d_model_draw_skinned(entity->mesh->model, &character->animation.main);
-	entity->mesh->dl = rspq_block_end();
+	/* Part 0 = body, parts 1..N = one per weapon object, def order.
+	   Only the body starts visible; equipping turns weapon bits on. */
+	mesh_recordParts(entity->mesh, def->weapons_def->mesh, def->weapons_def->mesh_count,
+		(const T3DMat4FP *)t3d_segment_placeholder(T3D_SEGMENT_SKELETON));
 
 	return character;
 }

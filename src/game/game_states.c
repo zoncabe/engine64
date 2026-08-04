@@ -61,24 +61,9 @@ static void gameState_updateGameplay(GameContext *ctx)
 	Scene *scene = scene_get();
 	uint8_t fb_index = ctx->viewport->fb_index;
 
-	StaticColliders statics = {
-		.mesh              = scene->static_mesh,
-		.mesh_origin       = scene->static_mesh_origin,
-		.mesh_count        = scene->static_mesh_count,
-		.box               = scene->static_box,
-		.box_transform     = scene->static_box_transform,
-		.box_count         = scene->static_box_count,
-		.sphere            = scene->static_sphere,
-		.sphere_transform  = scene->static_sphere_transform,
-		.sphere_count      = scene->static_sphere_count,
-		.capsule           = scene->static_capsule,
-		.capsule_transform = scene->static_capsule_transform,
-		.capsule_count     = scene->static_capsule_count,
-	};
-
 	for (int i = 0; i < scene->character_count; i++) {
 		Character *character = scene->character[i];
-		characterPhysics_collide(character, &statics);
+		characterPhysics_collide(character, scene->static_shape, scene->static_shape_count);
 		entity_setTransform(character->entity, &character->body);
 		entity_setMatrix(character->entity, fb_index);
 	}

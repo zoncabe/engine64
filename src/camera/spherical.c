@@ -17,13 +17,13 @@ static const CameraSphericalSettings default_spherical_settings = {
 	.offset_response_rate  = 6.0f,
 
 	.distance_from_center_default = 200.0f,
-	.distance_from_center_aim     = 200.0f,
+	.distance_from_center_aim     = 260.0f,
 
 	.field_of_view_default = 60.0f,
-	.field_of_view_aim     = 40.0f,
+	.field_of_view_aim     = 38.0f,
 
 	.offset_angle_default = 30.0f,
-	.offset_angle_aim     = 40.0f,
+	.offset_angle_aim     = 34.0f,
 
 	.max_pitch = 70.0f,
 };

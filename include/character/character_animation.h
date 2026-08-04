@@ -16,23 +16,22 @@ typedef struct CharacterAnimation CharacterAnimation;
 
 #define ANIMATION_SLOT_MAIN          0xFF
 #define ANIMATION_TURN_AVG_COUNT  5
-#define ANIMATION_TURN_MAX_ANGLE  5.0f
 
 typedef enum {
 
-	ANIMATION_PARAM_WALK,
-	ANIMATION_PARAM_RUN,
-	ANIMATION_PARAM_SPRINT,
 	ANIMATION_PARAM_IDLE_RIGHT,
-	ANIMATION_PARAM_TURNING,
+	ANIMATION_PARAM_WALK,   /* peso del grid de marcha sobre el idle */
+	ANIMATION_PARAM_WALK_GAIT,   /* posicion en el eje de gaits, [0,1] sobre la tabla de movement */
+	ANIMATION_PARAM_WALK_TURN,   /* eje de giro: 0 izquierda, 0.5 recto, 1 derecha */
+	ANIMATION_PARAM_STRAFE,
+	ANIMATION_PARAM_STRAFE_GAIT,
+	ANIMATION_PARAM_STRAFE_DIR,
 	ANIMATION_PARAM_JUMP_L,
 	ANIMATION_PARAM_JUMP_R,
 	ANIMATION_PARAM_LAND_L,
 	ANIMATION_PARAM_LAND_R,
 	ANIMATION_PARAM_ROLL_RUN,
 	ANIMATION_PARAM_ROLL_DIR,
-	ANIMATION_PARAM_TURN_WALK,
-	ANIMATION_PARAM_TURN_RUN,
 	ANIMATION_PARAM_COUNT
 
 } CharacterAnimationParam;
@@ -43,6 +42,7 @@ typedef enum {
 	ANIMATION_NODE_SELECT,
 	ANIMATION_NODE_SEQUENCE,
 	ANIMATION_NODE_BLEND,
+	ANIMATION_NODE_BLEND_2D,
 	ANIMATION_NODE_LAYER,
 
 } CharacterAnimationNodeType;
@@ -58,28 +58,24 @@ typedef struct {
 typedef struct {
 
 	CharacterAnimationNodeType type;
-	uint8_t animation;
-	uint8_t animation2;
+	const uint8_t *animation;
+	uint8_t cols;
+	uint8_t rows;
 	uint8_t buffer;
-	uint8_t param;
+	uint8_t param_cols;
+	uint8_t param_rows;
+	uint8_t param_weight;   /* BLEND_2D: peso con el que el grid compuesto entra al main */
 
 } CharacterAnimationNode;
+
+#define ANIMATION_CLIPS(...) ((const uint8_t[]){ __VA_ARGS__ })
 
 typedef struct {
 
 	float action_idle_max_blending_ratio;
-	float run_to_walk_ratio;
-	float walk_to_run_ratio;
-	float sprint_to_run_ratio;
-	float run_to_sprint_ratio;
-	float sprint_to_walk_ratio;
-	float walk_to_sprint_ratio;
-	float walking_anim_length_half;
-	float walking_anim_length;
-	float running_anim_length_half;
-	float running_anim_length;
-	float sprinting_anim_length_half;
-	float sprinting_anim_length;
+
+	float turn_max_angle;
+	float turn_max_weight;
 
 	float jump_max_blending_ratio;
 	float jump_anim_length;
@@ -95,6 +91,9 @@ typedef struct {
 	float run_to_rolling_anim_grip;
 	float run_to_rolling_anim_stand;
 	float run_to_rolling_anim_length;
+
+	float strafe_turn_rate;
+	float strafe_blend_rate;
 
 } CharacterAnimationSettings;
 
@@ -117,6 +116,8 @@ typedef struct {
 	uint8_t fall_animation;
 	uint8_t land_animation;
 	uint8_t roll_animation;
+	uint8_t locomotion_node;
+	uint8_t strafe_node;
 
 } CharacterAnimationDef;
 
@@ -132,7 +133,7 @@ typedef struct {
 	const CharacterAnimationSettings *settings;
 
 	uint8_t speed_state;
-	float locomotion_param;
+	float gait_param;
 	float locomotion_phase;
 	float turning;
 
@@ -160,6 +161,8 @@ typedef struct CharacterAnimation {
 	uint8_t      action_state;
 	float        turn_avg[ANIMATION_TURN_AVG_COUNT];
 	uint8_t      turn_avg_idx;
+	bool         strafe_turning;
+	float        strafe_blend;
 
 } CharacterAnimation;
 

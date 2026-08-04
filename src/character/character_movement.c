@@ -7,13 +7,11 @@
 
 
 static const bool movement_updates_locomotion[MOVEMENT_STATE_COUNT] = {
-	[MOVEMENT_STATE_IDLE]      = true,
-	[MOVEMENT_STATE_WALKING]   = true,
-	[MOVEMENT_STATE_RUNNING]   = true,
-	[MOVEMENT_STATE_SPRINTING] = true,
-	[MOVEMENT_STATE_ROLLING]   = false,
-	[MOVEMENT_STATE_JUMPING]   = false,
-	[MOVEMENT_STATE_FALLING]   = false,
+	[MOVEMENT_STATE_IDLE]    = true,
+	[MOVEMENT_STATE_WALKING] = true,
+	[MOVEMENT_STATE_ROLLING] = false,
+	[MOVEMENT_STATE_JUMPING] = false,
+	[MOVEMENT_STATE_FALLING] = false,
 };
 
 void characterMovement_setMode(CharacterMovement *movement, uint8_t new_mode)
@@ -37,46 +35,33 @@ static void characterMovement_evaluateTransitions(Character *character)
 }
 
 
-static float characterMovement_targetSpeed(const CharacterMovementSettings *settings, uint8_t state)
+static const CharacterGaitSettings *characterMovement_gait(const Character *character)
 {
-	switch (state) {
-		case MOVEMENT_STATE_WALKING:   return settings->walk_target_speed;
-		case MOVEMENT_STATE_RUNNING:   return settings->run_target_speed;
-		case MOVEMENT_STATE_SPRINTING: return settings->sprint_target_speed;
-		default:                       return settings->idle_target_speed;
-	}
+	const CharacterMovementSettings *settings = character->movement.settings;
+	uint8_t gait = character->movement.data.gait;
+	if (gait >= settings->gait_count) gait = settings->gait_count - 1;
+	return &settings->gait[gait];
 }
 
-static float characterMovement_accelerationRate(const CharacterMovementSettings *settings, uint8_t state)
+static float characterMovement_targetSpeed(const Character *character, uint8_t state)
 {
-	switch (state) {
-		case MOVEMENT_STATE_WALKING:   return settings->walk_acceleration_rate;
-		case MOVEMENT_STATE_RUNNING:   return settings->run_acceleration_rate;
-		case MOVEMENT_STATE_SPRINTING: return settings->sprint_acceleration_rate;
-		default:                       return settings->idle_acceleration_rate;
-	}
+	if (state == MOVEMENT_STATE_WALKING) return characterMovement_gait(character)->target_speed;
+	return character->movement.settings->idle_target_speed;
 }
 
-static float characterMovement_rotationAccelerationRate(const CharacterMovementSettings *settings, uint8_t state)
+static float characterMovement_accelerationRate(const Character *character, uint8_t state)
 {
-	switch (state) {
-		case MOVEMENT_STATE_WALKING:   return settings->walk_rotation_acceleration_rate;
-		case MOVEMENT_STATE_RUNNING:   return settings->run_rotation_acceleration_rate;
-		case MOVEMENT_STATE_SPRINTING: return settings->sprint_rotation_acceleration_rate;
-		default:                       return settings->idle_rotation_acceleration_rate;
-	}
+	if (state == MOVEMENT_STATE_WALKING) return characterMovement_gait(character)->acceleration_rate;
+	return character->movement.settings->idle_acceleration_rate;
 }
 
-static float characterMovement_rollTargetSpeed(const CharacterMovementSettings *settings, uint8_t state)
+static float characterMovement_rotationAccelerationRate(const Character *character, uint8_t state)
 {
-	switch (state) {
-		case MOVEMENT_STATE_RUNNING:   return settings->roll_target_speed_run;
-		case MOVEMENT_STATE_SPRINTING: return settings->roll_target_speed_sprint;
-		default:                       return settings->roll_target_speed_walk;
-	}
+	if (state == MOVEMENT_STATE_WALKING) return characterMovement_gait(character)->rotation_acceleration_rate;
+	return character->movement.settings->idle_rotation_acceleration_rate;
 }
 
-static void characterMovement_setHorizontalVelocityExp(Character *character, float yaw, float target_speed, float acceleration_rate, float dt)
+static void characterMovement_setHorizontalVelocity(Character *character, float yaw, float target_speed, float acceleration_rate, float dt)
 {
 	KinematicBody *body = &character->body;
 
@@ -88,6 +73,7 @@ static void characterMovement_setHorizontalVelocityExp(Character *character, flo
 	body->velocity.y = body->velocity.y * factor + target_vy * (1.0f - factor);
 }
 
+/*
 static void characterMovement_setHorizontalVelocity(Character *character, float yaw, float target_speed, float acceleration_rate, float dt)
 {
 	KinematicBody *body = &character->body;
@@ -101,27 +87,36 @@ static void characterMovement_setHorizontalVelocity(Character *character, float 
 	body->velocity.x += body->acceleration.x * dt;
 	body->velocity.y += body->acceleration.y * dt;
 }
+*/
 
 static void characterMovement_setRotation(Character *character, float dt)
 {
 	KinematicBody *body = &character->body;
 	CharacterMovementData *data = &character->movement.data;
-	const CharacterMovementSettings *settings = character->movement.settings;
 
-	if (body->velocity.x == 0 && body->velocity.y == 0) return;
+	bool moving = body->velocity.x != 0 || body->velocity.y != 0;
 
-	Vector2 horizontal_velocity = {body->velocity.x, body->velocity.y};
-	data->horizontal_speed = vector2_magnitude(&horizontal_velocity);
+	if (moving) {
+		Vector2 horizontal_velocity = {body->velocity.x, body->velocity.y};
+		data->horizontal_speed = vector2_magnitude(&horizontal_velocity);
+	}
 
-	const float velocity_yaw = rad_to_deg(fm_atan2f(-body->velocity.x, -body->velocity.y));
+	float facing_yaw;
+	if (data->strafe) {
+		if (!moving) return;
+		facing_yaw = data->strafe_yaw;
+	} else {
+		if (!moving) return;
+		facing_yaw = rad_to_deg(fm_atan2f(-body->velocity.x, -body->velocity.y));
 
-	if (data->rotation_mode == CHARACTER_ROTATION_MODE_SNAP) {
-		body->rotation.z = angle_wrap(velocity_yaw);
-		return;
+		if (data->rotation_mode == CHARACTER_ROTATION_MODE_SNAP) {
+			body->rotation.z = angle_wrap(facing_yaw);
+			return;
+		}
 	}
 
 	const float current_yaw = body->rotation.z;
-	const float target_yaw = angle_wrap_relative(velocity_yaw, current_yaw);
+	const float target_yaw = angle_wrap_relative(facing_yaw, current_yaw);
 
 	if (fabsf(target_yaw - current_yaw) <= CHARACTER_ROTATION_SNAP_THRESHOLD) {
 		body->rotation.z = target_yaw;
@@ -131,7 +126,7 @@ static void characterMovement_setRotation(Character *character, float dt)
 	uint8_t state = character->movement.current;
 	if (state == MOVEMENT_STATE_ROLLING || state == MOVEMENT_STATE_JUMPING || state == MOVEMENT_STATE_FALLING)
 		state = character->movement.locomotion;
-	float acceleration_rate = characterMovement_rotationAccelerationRate(settings, state);
+	float acceleration_rate = characterMovement_rotationAccelerationRate(character, state);
 	float factor = fm_expf(-acceleration_rate * dt);
 	body->rotation.z = angle_wrap(current_yaw * factor + target_yaw * (1.0f - factor));
 }
@@ -160,9 +155,8 @@ static void characterMovement_updateBody(Character *character, float dt)
 
 static void characterMovement_setLocomotion(Character *character, MovementCommand *cmd, float dt)
 {
-	const CharacterMovementSettings *settings = character->movement.settings;
 	uint8_t state = character->movement.current;
-	characterMovement_setHorizontalVelocity(character, cmd->target_yaw, characterMovement_targetSpeed(settings, state), characterMovement_accelerationRate(settings, state), dt);
+	characterMovement_setHorizontalVelocity(character, cmd->target_yaw, characterMovement_targetSpeed(character, state), characterMovement_accelerationRate(character, state), dt);
 }
 
 static uint8_t characterMovement_rollPhase(const CharacterMovementData *data, const MovementCommand *cmd, const CharacterMovementSettings *settings)
@@ -175,8 +169,9 @@ static uint8_t characterMovement_rollPhase(const CharacterMovementData *data, co
 
 static void characterMovement_rollLaunch(Character *character, MovementCommand *cmd, const CharacterMovementSettings *settings, uint8_t locomotion, float dt)
 {
+	(void)locomotion;
 	CharacterMovementData *data = &character->movement.data;
-	characterMovement_setHorizontalVelocity(character, cmd->target_yaw, characterMovement_rollTargetSpeed(settings, locomotion), settings->roll_launch_acceleration_rate, dt);
+	characterMovement_setHorizontalVelocity(character, data->roll_yaw, settings->roll_target_speed, settings->roll_launch_acceleration_rate, dt);
 	data->roll_timer += dt;
 	if (data->roll_timer >= settings->roll_ground_time) cmd->roll_triggered = false;
 }
@@ -207,7 +202,8 @@ static void characterMovement_setRolling(Character *character, MovementCommand *
 	const CharacterMovementSettings *settings = character->movement.settings;
 	uint8_t locomotion = character->movement.locomotion;
 
-	data->rotation_mode = CHARACTER_ROTATION_MODE_SNAP;
+	/* the stick yaw is taken once on entry and held until grip */
+	if (data->roll_timer == 0.0f) data->roll_yaw = cmd->target_yaw;
 
 	switch (characterMovement_rollPhase(data, cmd, settings)) {
 		case CHARACTER_ROLL_PHASE_LAUNCH: characterMovement_rollLaunch(character, cmd, settings, locomotion, dt); break;
@@ -304,13 +300,11 @@ static void characterMovement_setFalling(Character *character, MovementCommand *
 }
 
 static void (*characterMovement_handler[MOVEMENT_STATE_COUNT])(Character *, MovementCommand *, float) = {
-	[MOVEMENT_STATE_IDLE]      = characterMovement_setLocomotion,
-	[MOVEMENT_STATE_WALKING]   = characterMovement_setLocomotion,
-	[MOVEMENT_STATE_RUNNING]   = characterMovement_setLocomotion,
-	[MOVEMENT_STATE_SPRINTING] = characterMovement_setLocomotion,
-	[MOVEMENT_STATE_ROLLING]   = characterMovement_setRolling,
-	[MOVEMENT_STATE_JUMPING]   = characterMovement_setJump,
-	[MOVEMENT_STATE_FALLING]   = characterMovement_setFalling,
+	[MOVEMENT_STATE_IDLE]    = characterMovement_setLocomotion,
+	[MOVEMENT_STATE_WALKING] = characterMovement_setLocomotion,
+	[MOVEMENT_STATE_ROLLING] = characterMovement_setRolling,
+	[MOVEMENT_STATE_JUMPING] = characterMovement_setJump,
+	[MOVEMENT_STATE_FALLING] = characterMovement_setFalling,
 };
 
 _Static_assert(sizeof(characterMovement_handler) / sizeof(characterMovement_handler[0]) == MOVEMENT_STATE_COUNT, "characterMovement_handler must have one entry per character state");
@@ -326,6 +320,9 @@ void character_updateMovement(Character *character, MovementCommand *cmd, float 
 	assert(characterMovement_handler[character->movement.current] != NULL);
 
 	character->movement.data.rotation_mode = CHARACTER_ROTATION_MODE_LERP;
+	character->movement.data.strafe     = cmd->strafe;
+	character->movement.data.strafe_yaw = cmd->strafe_yaw;
+	character->movement.data.gait       = cmd->gait;
 	character->movement.next = MOVEMENT_STATE_NONE;
 
 	characterMovement_handler[character->movement.current](character, cmd, dt);

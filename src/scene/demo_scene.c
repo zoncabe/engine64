@@ -3,11 +3,6 @@
 #include "assets/male_muscled.h"
 
 
-static const CharacterDef male_muscled_character_def = {
-	.movement_settings  = &male_muscled_movement_settings,
-	.animation_def      = &male_muscled_animation_def,
-	.collider_settings  = &male_muscled_collider_settings,
-};
 
 
 /* --- Static collider shapes for the test props (metres). --- */
@@ -60,7 +55,12 @@ const SceneDef demo_scene = {
 			.position   = {-210.0f, -210.0f, 0.0f},
 			.rotation   = {0.0f, 0.0f, 200.0f},
 			.scale      = {1.0f, 1.0f, 1.0f},
-			.character      = &male_muscled_character_def,
+			.character  = &male_muscled_character_def,
+			.weapon = {
+				[WEAPON_SLOT_WAIST] = &weapon_m1911,
+				[WEAPON_SLOT_BACK]  = &weapon_ak47,
+				[WEAPON_SLOT_MELEE] = &weapon_knife,
+			},
 		},
 		[1] = {
 			.model_path     = "rom:/models/room.t3dm",

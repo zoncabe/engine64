@@ -13,6 +13,7 @@
 #include "character/character_physics.h"
 #include "character/character_movement.h"
 #include "character/character_animation.h"
+#include "character/character_weapon.h"
 
 typedef struct Entity Entity;
 
@@ -21,6 +22,7 @@ typedef struct CharacterDef {
 	const CharacterMovementSettings *movement_settings;
 	const CharacterAnimationDef *animation_def;
 	const CharacterColliderSettings *collider_settings;
+	const CharacterWeaponsDef *weapons_def;
 
 } CharacterDef;
 
@@ -31,6 +33,7 @@ typedef struct Character {
 	CharacterCollider   collider;
 	CharacterMovement   movement;
 	CharacterAnimation  animation;
+	CharacterWeapons    weapons;
 
 } Character;
 

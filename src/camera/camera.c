@@ -12,8 +12,8 @@ void camera_init(Camera *camera)
 		.position      = { 0.0f, 1.0f, 0.0f },
 		.target        = { 0.0f, 0.0f, 0.0f },
 		.field_of_view = 60.0f,
-		.near_clipping = 100.0f,
-		.far_clipping  = 4000.0f,
+		.near_clipping = 50.0f,
+		.far_clipping  = 3000.0f,
 		.type          = CAMERA_TYPE_NONE,
 	};
 }

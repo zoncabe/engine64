@@ -3,9 +3,7 @@
 
 #include "physics/math/vector3.h"
 #include "physics/math/transform.h"
-#include "physics/shapes/box.h"
-#include "physics/shapes/sphere.h"
-#include "physics/shapes/capsule.h"
+#include "physics/shapes/physics_shape.h"
 #include "physics/collision/contact.h"
 
 
@@ -54,30 +52,9 @@ void characterContact_set  (CharacterContact *contact, const ContactManifold *m,
 
 void characterCollision_setResponse(Character *character, CharacterContact *contact, CharacterCollider *collider);
 
-
-/* View over the scene's static colliders, grouped to keep the driver
-   signature flat. Pointers reference the scene arrays, nothing is copied. */
-typedef struct StaticColliders {
-	CollisionMesh *const *mesh;
-	const Vector3        *mesh_origin;
-	int                   mesh_count;
-
-	const Box       *box;
-	const Transform *box_transform;
-	int              box_count;
-
-	const Sphere    *sphere;
-	const Transform *sphere_transform;
-	int              sphere_count;
-
-	const Capsule   *capsule;
-	const Transform *capsule_transform;
-	int              capsule_count;
-} StaticColliders;
-
-/* Collide and slide against the static colliders, then snap to the floor.
+/* Collide and slide against the static shapes, then snap to the floor.
    Runs after the movement update, before the render sync. */
-void characterPhysics_collide(Character *character, const StaticColliders *statics);
+void characterPhysics_collide(Character *character, const PhysicsShape *shapes, int shape_count);
 
 
 #endif

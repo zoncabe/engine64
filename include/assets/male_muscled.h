@@ -6,19 +6,6 @@
 #define male_muscled_model "rom:/models/male_muscled.t3dm"
 #define gorilla_model "rom:/models/gorilla.t3dm"
 
-typedef enum {
-
-	MM_STATE_IDLE,
-	MM_STATE_WALKING,
-	MM_STATE_RUNNING,
-	MM_STATE_SPRINTING,
-	MM_STATE_ROLLING,
-	MM_STATE_JUMPING,
-	MM_STATE_FALLING,
-	MM_STATE_COUNT
-
-} MaleMusledStates;
-
 
 typedef enum {
 
@@ -28,6 +15,8 @@ typedef enum {
 	MM_SLOT_SPRINT,
 	MM_SLOT_TURN_WALK,
 	MM_SLOT_TURN_RUN,
+	MM_SLOT_STRAFE_WALK,
+	MM_SLOT_STRAFE_RUN,
 
 	MM_SLOT_JUMP_L,
 	MM_SLOT_JUMP_R,
@@ -41,6 +30,25 @@ typedef enum {
 	MM_SLOT_COUNT
 
 } MaleMuscledSlot;
+
+typedef enum {
+
+	MM_NODE_IDLE,
+	MM_NODE_IDLE_R,
+	MM_NODE_LOCOMOTION,
+	MM_NODE_JUMP_L,
+	MM_NODE_JUMP_R,
+	MM_NODE_JUMP_L_LAYER,
+	MM_NODE_JUMP_R_LAYER,
+	MM_NODE_LAND_L,
+	MM_NODE_LAND_R,
+	MM_NODE_ROLL,
+	MM_NODE_ROLL_LAYER,
+	MM_NODE_STRAFE,
+
+	MM_NODE_COUNT
+
+} MaleMuscledNode;
 
 typedef enum {
 
@@ -106,6 +114,14 @@ typedef enum {
 
 extern const CharacterMovementSettings    male_muscled_movement_settings;
 extern const CharacterColliderSettings    male_muscled_collider_settings;
+
+extern const char *const male_muscled_weapon_meshes[];
+extern const CharacterWeaponsDef male_muscled_weapons_def;
+extern const CharacterDef male_muscled_character_def;
+
+extern const WeaponDef weapon_ak47;
+extern const WeaponDef weapon_m1911;
+extern const WeaponDef weapon_knife;
 extern const CharacterAnimationSettings male_muscled_animation_settings;
 extern const CharacterAnimationDef           male_muscled_animation_def;
 

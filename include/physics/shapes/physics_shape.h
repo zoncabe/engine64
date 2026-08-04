@@ -22,12 +22,14 @@
 
 
 struct RigidBody;
+struct CollisionMesh;
 
 
 typedef enum ShapeType {
 	SHAPE_BOX     = 0,
 	SHAPE_SPHERE  = 1,
 	SHAPE_CAPSULE = 2,
+	SHAPE_MESH    = 3,   /* static-only: no rigid body simulation */
 } ShapeType;
 
 
@@ -55,6 +57,7 @@ typedef struct PhysicsShape {
 		Box     box;
 		Sphere  sphere;
 		Capsule capsule;
+		struct CollisionMesh *mesh;
 	};
 } PhysicsShape;
 

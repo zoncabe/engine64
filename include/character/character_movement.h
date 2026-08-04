@@ -12,6 +12,8 @@ typedef struct Character Character;
 
 #define CHARACTER_ROTATION_SNAP_THRESHOLD 1.0f
 
+#define CHARACTER_STRAFE_YAW_OFFSET 0.0f
+
 #define CHARACTER_ROTATION_MODE_LERP 0
 #define CHARACTER_ROTATION_MODE_SNAP 1
 
@@ -35,8 +37,6 @@ typedef struct Character Character;
 typedef enum {
 	MOVEMENT_STATE_IDLE,
 	MOVEMENT_STATE_WALKING,
-	MOVEMENT_STATE_RUNNING,
-	MOVEMENT_STATE_SPRINTING,
 	MOVEMENT_STATE_ROLLING,
 	MOVEMENT_STATE_JUMPING,
 	MOVEMENT_STATE_FALLING,
@@ -44,33 +44,30 @@ typedef enum {
 	MOVEMENT_STATE_NONE
 } MovementState;
 
+/* Fase de gait del estado WALKING. El dev define cuantas y sus valores;
+   el orden es de menor a mayor target_speed. */
+typedef struct {
+	float target_speed;
+	float acceleration_rate;
+	float rotation_acceleration_rate;
+} CharacterGaitSettings;
+
 typedef struct {
 
 	float idle_target_speed;
 	float idle_acceleration_rate;
 	float idle_rotation_acceleration_rate;
 
-	float walk_target_speed;
-	float walk_acceleration_rate;
-	float walk_rotation_acceleration_rate;
+	const CharacterGaitSettings *gait;
+	uint8_t gait_count;
 
-	float run_target_speed;
-	float run_acceleration_rate;
-	float run_rotation_acceleration_rate;
-
-	float sprint_target_speed;
-	float sprint_acceleration_rate;
-	float sprint_rotation_acceleration_rate;
-
+	float roll_target_speed;
 	float roll_launch_acceleration_rate;
 	float roll_spin_acceleration_rate;
 	float roll_grip_acceleration_rate;
 	float roll_ground_time;
 	float roll_grip_time;
 	float roll_timer_max;
-	float roll_target_speed_walk;
-	float roll_target_speed_run;
-	float roll_target_speed_sprint;
 
 	float jump_acceleration_rate;
 	float jump_force_multiplier;
@@ -86,8 +83,12 @@ typedef struct {
 	Vector3 jump_initial_velocity;
 	float jump_force;
 	float jump_timer;
+	float roll_yaw;
 	bool is_grounded;
 	uint8_t rotation_mode;
+	bool strafe;
+	float strafe_yaw;
+	uint8_t gait;
 } CharacterMovementData;
 
 typedef struct {
@@ -95,6 +96,9 @@ typedef struct {
 	bool roll_triggered;
 	bool jump_held;
 	bool jump_triggered;
+	bool strafe;
+	float strafe_yaw;
+	uint8_t gait;
 } MovementCommand;
 
 typedef struct CharacterMovement {

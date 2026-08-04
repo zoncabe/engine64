@@ -14,6 +14,7 @@ int physicsShape_testPoint(const PhysicsShape *shape, const Transform *body_tx, 
 		case SHAPE_BOX:     return box_testPoint    (&shape->box,     &world, p);
 		case SHAPE_SPHERE:  return sphere_testPoint (&shape->sphere,  &world, p);
 		case SHAPE_CAPSULE: return capsule_testPoint(&shape->capsule, &world, p);
+		case SHAPE_MESH:    break;   /* static-only, never on a rigid body */
 	}
 	return 0;
 }
@@ -27,6 +28,7 @@ int physicsShape_raycast(const PhysicsShape *shape, const Transform *body_tx, Ra
 		case SHAPE_BOX:     return box_raycast    (&shape->box,     &world, raycast);
 		case SHAPE_SPHERE:  return sphere_raycast (&shape->sphere,  &world, raycast);
 		case SHAPE_CAPSULE: return capsule_raycast(&shape->capsule, &world, raycast);
+		case SHAPE_MESH:    break;   /* static-only, never on a rigid body */
 	}
 	return 0;
 }
@@ -40,6 +42,7 @@ void physicsShape_computeAABB(const PhysicsShape *shape, const Transform *body_t
 		case SHAPE_BOX:     box_computeAABB    (&shape->box,     &world, aabb); break;
 		case SHAPE_SPHERE:  sphere_computeAABB (&shape->sphere,  &world, aabb); break;
 		case SHAPE_CAPSULE: capsule_computeAABB(&shape->capsule, &world, aabb); break;
+		case SHAPE_MESH:    break;   /* static-only, never on a rigid body */
 	}
 }
 
@@ -50,5 +53,6 @@ void physicsShape_computeMass(const PhysicsShape *shape, MassData *md)
 		case SHAPE_BOX:     box_computeMass    (&shape->box,     &shape->local, shape->density, md); break;
 		case SHAPE_SPHERE:  sphere_computeMass (&shape->sphere,  &shape->local, shape->density, md); break;
 		case SHAPE_CAPSULE: capsule_computeMass(&shape->capsule, &shape->local, shape->density, md); break;
+		case SHAPE_MESH:    break;   /* static-only, never on a rigid body */
 	}
 }

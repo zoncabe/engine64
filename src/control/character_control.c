@@ -43,19 +43,34 @@ static void characterControl_setLocomotionWithStick(Character *character, Moveme
 
 	if (!characterMovement_isLocomotion(movement->current)) return;
 
-	if (stick_magnitude == 0)
+	if (stick_magnitude == 0) {
 		characterMovement_setMode(movement, MOVEMENT_STATE_IDLE);
-	else if (stick_magnitude <= PLAYER_STICK_WALK_THRESHOLD)
-		characterMovement_setMode(movement, MOVEMENT_STATE_WALKING);
-	else if (actions->sprint)
-		characterMovement_setMode(movement, MOVEMENT_STATE_SPRINTING);
+		return;
+	}
+
+	const CharacterMovementSettings *settings = movement->settings;
+	uint8_t last_gait = settings->gait_count - 1;
+
+	characterMovement_setMode(movement, MOVEMENT_STATE_WALKING);
+
+	if (stick_magnitude <= PLAYER_STICK_WALK_THRESHOLD)
+		cmd->gait = 0;
+	else if (actions->sprint && !actions->camera_aim)
+		cmd->gait = last_gait;
 	else
-		characterMovement_setMode(movement, MOVEMENT_STATE_RUNNING);
+		cmd->gait = (last_gait > 1) ? 1 : last_gait;
+}
+
+static void characterControl_setStrafe(Character *character, MovementCommand *cmd, const ControllerActions *actions, float camera_angle_around)
+{
+	cmd->strafe     = actions->camera_aim && characterMovement_isLocomotion(character->movement.current);
+	cmd->strafe_yaw = angle_wrap(camera_angle_around + 180.0f + CHARACTER_STRAFE_YAW_OFFSET);
 }
 
 void characterControl_update(Character *character, MovementCommand *cmd, const ControllerActions *actions, float camera_angle_around)
 {
 	characterControl_setRoll(character, cmd, actions);
 	characterControl_setJump(character, cmd, actions);
+	characterControl_setStrafe(character, cmd, actions, camera_angle_around);
 	characterControl_setLocomotionWithStick(character, cmd, actions, camera_angle_around);
 }

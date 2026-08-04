@@ -13,10 +13,7 @@
 #define SCENE_MAX_SCENERY 12
 
 #define SCENE_MAX_ENTITIES 32
-#define SCENE_MAX_STATIC_MESHES 8
-#define SCENE_MAX_STATIC_BOXES 12
-#define SCENE_MAX_STATIC_SPHERES 8
-#define SCENE_MAX_STATIC_CAPSULES 8
+#define SCENE_MAX_STATIC_SHAPES 32
 
 
 typedef struct {
@@ -53,21 +50,8 @@ typedef struct Scene {
 	Character *character[SCENE_MAX_CHARACTERS];
 	uint8_t character_count;
 
-	CollisionMesh *static_mesh[SCENE_MAX_STATIC_MESHES];
-	Vector3 static_mesh_origin[SCENE_MAX_STATIC_MESHES];
-	uint8_t static_mesh_count;
-
-	Box static_box[SCENE_MAX_STATIC_BOXES];
-	Transform static_box_transform[SCENE_MAX_STATIC_BOXES];
-	uint8_t static_box_count;
-
-	Sphere static_sphere[SCENE_MAX_STATIC_SPHERES];
-	Transform static_sphere_transform[SCENE_MAX_STATIC_SPHERES];
-	uint8_t static_sphere_count;
-
-	Capsule static_capsule[SCENE_MAX_STATIC_CAPSULES];
-	Transform static_capsule_transform[SCENE_MAX_STATIC_CAPSULES];
-	uint8_t static_capsule_count;
+	PhysicsShape static_shape[SCENE_MAX_STATIC_SHAPES];
+	uint8_t static_shape_count;
 
 } Scene;
 

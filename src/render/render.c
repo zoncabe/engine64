@@ -61,7 +61,11 @@ static void render_setSceneContext(RenderContext *ctx, const Scene *s, uint8_t f
 		Mesh *mesh  = e->mesh;
 		T3DMat4FP  *matrix = mesh->matrix_buffer ? &mesh->matrix_buffer[fb_index] : NULL;
 		T3DSkeleton *skel  = mesh->skeleton;
-		ctx->object[ctx->object_count++] = (T3DElement){ mesh->dl, matrix, skel };
+
+		for (int part = 0; part < mesh->dl_count; part++) {
+			if (!(mesh->visible & (1u << part))) continue;
+			ctx->object[ctx->object_count++] = (T3DElement){ mesh->dl[part], matrix, skel };
+		}
 	}
 }
 

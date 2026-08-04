@@ -239,44 +239,31 @@ static int characterPhysics_deepestContact(const CharacterCollider *collider,
 }
 
 static int characterPhysics_deepestContactAll(const CharacterCollider *collider,
-                                              const StaticColliders *statics,
+                                              const PhysicsShape *shapes, int shape_count,
                                               ContactManifold *out)
 {
 	int found = 0;
 
-	for (int i = 0; i < statics->mesh_count; i++) {
-		ContactManifold m;
-		if (!characterPhysics_deepestContact(collider, statics->mesh[i], &statics->mesh_origin[i], &m)) continue;
-		if (!found || m.contacts[0].penetration < out->contacts[0].penetration) {
-			*out  = m;
-			found = 1;
-		}
-	}
-
-	for (int i = 0; i < statics->box_count; i++) {
+	for (int i = 0; i < shape_count; i++) {
+		const PhysicsShape *shape = &shapes[i];
 		ContactManifold m = {0};
-		capsuleToStaticBox(&m, &collider->shape, &collider->world, &statics->box[i], &statics->box_transform[i]);
-		if (!m.contact_count) continue;
-		if (!found || m.contacts[0].penetration < out->contacts[0].penetration) {
-			*out  = m;
-			found = 1;
-		}
-	}
 
-	for (int i = 0; i < statics->sphere_count; i++) {
-		ContactManifold m = {0};
-		capsuleToStaticSphere(&m, &collider->shape, &collider->world, &statics->sphere[i], &statics->sphere_transform[i]);
-		if (!m.contact_count) continue;
-		if (!found || m.contacts[0].penetration < out->contacts[0].penetration) {
-			*out  = m;
-			found = 1;
+		switch (shape->type) {
+			case SHAPE_MESH:
+				if (!characterPhysics_deepestContact(collider, shape->mesh, &shape->local.position, &m)) continue;
+				break;
+			case SHAPE_BOX:
+				capsuleToStaticBox(&m, &collider->shape, &collider->world, &shape->box, &shape->local);
+				break;
+			case SHAPE_SPHERE:
+				capsuleToStaticSphere(&m, &collider->shape, &collider->world, &shape->sphere, &shape->local);
+				break;
+			case SHAPE_CAPSULE:
+				capsuleToStaticCapsule(&m, &collider->shape, &collider->world, &shape->capsule, &shape->local);
+				break;
 		}
-	}
-
-	for (int i = 0; i < statics->capsule_count; i++) {
-		ContactManifold m = {0};
-		capsuleToStaticCapsule(&m, &collider->shape, &collider->world, &statics->capsule[i], &statics->capsule_transform[i]);
 		if (!m.contact_count) continue;
+
 		if (!found || m.contacts[0].penetration < out->contacts[0].penetration) {
 			*out  = m;
 			found = 1;
@@ -320,7 +307,68 @@ static void floorProbe_consider(FloorProbe *probe, const Vector3 *center, float 
 	}
 }
 
-static void characterPhysics_findFloor(const Character *character, const StaticColliders *statics, FloorProbe *probe)
+static void characterPhysics_probeFloor(const PhysicsShape *shapes, int shape_count, const Vector3 *center, float radius, FloorProbe *probe)
+{
+	*probe = (FloorProbe){0};
+
+	for (int i = 0; i < shape_count; i++) {
+		const PhysicsShape *shape = &shapes[i];
+
+		switch (shape->type) {
+			case SHAPE_MESH: {
+				Vector3 local_center = vector3_difference(center, &shape->local.position);
+
+				AABB aabb = {
+					{ local_center.x - radius, local_center.y - radius, local_center.z - radius },
+					{ local_center.x + radius, local_center.y + radius, local_center.z + radius },
+				};
+
+				TriangleQuery query = { .mesh = shape->mesh };
+				collisionMesh_queryAABB(shape->mesh, &query, characterPhysics_collectTriangle, aabb);
+
+				for (int t = 0; t < query.count; t++) {
+					Triangle triangle;
+					collisionMesh_getTriangle(shape->mesh, query.triangle[t], &triangle);
+					Vector3 closest = triangle_closestToPoint(&triangle.vertices[0], &triangle.vertices[1], &triangle.vertices[2], &local_center);
+					floorProbe_consider(probe, &local_center, radius, &closest);
+				}
+				break;
+			}
+			case SHAPE_BOX: {
+				Vector3 local_center = transform_mulVectorTransposed(&shape->local, center);
+
+				Vector3 e = shape->box.e;
+				AABB box_local = { { -e.x, -e.y, -e.z }, { e.x, e.y, e.z } };
+				Vector3 closest_local = aabb_closestToPoint(&box_local, &local_center);
+				Vector3 closest = transform_mulVector(&shape->local, &closest_local);
+				floorProbe_consider(probe, center, radius, &closest);
+				break;
+			}
+			case SHAPE_SPHERE: {
+				const Vector3 *pos = &shape->local.position;
+				Vector3 d = vector3_difference(center, pos);
+				Vector3 dir = vector3_normalized(&d);
+				Vector3 closest = *pos;
+				vector3_addScaledVector(&closest, &dir, shape->sphere.radius);
+				floorProbe_consider(probe, center, radius, &closest);
+				break;
+			}
+			case SHAPE_CAPSULE: {
+				Vector3 a, b;
+				capsule_getSegment(&shape->capsule, &shape->local, &a, &b);
+				Vector3 on_seg = segment_closestToPoint(&a, &b, center);
+				Vector3 d = vector3_difference(center, &on_seg);
+				Vector3 dir = vector3_normalized(&d);
+				Vector3 closest = on_seg;
+				vector3_addScaledVector(&closest, &dir, shape->capsule.radius);
+				floorProbe_consider(probe, center, radius, &closest);
+				break;
+			}
+		}
+	}
+}
+
+static void characterPhysics_findFloor(const Character *character, const PhysicsShape *shapes, int shape_count, FloorProbe *probe)
 {
 	float radius = character->collider.shape.radius;
 
@@ -328,58 +376,7 @@ static void characterPhysics_findFloor(const Character *character, const StaticC
 	Vector3 center = character->body.position;
 	center.z += radius - CHARACTER_FLOOR_SNAP_LENGTH;
 
-	*probe = (FloorProbe){0};
-
-	for (int i = 0; i < statics->mesh_count; i++) {
-		const CollisionMesh *mesh = statics->mesh[i];
-		Vector3 local_center = vector3_difference(&center, &statics->mesh_origin[i]);
-
-		AABB aabb = {
-			{ local_center.x - radius, local_center.y - radius, local_center.z - radius },
-			{ local_center.x + radius, local_center.y + radius, local_center.z + radius },
-		};
-
-		TriangleQuery query = { .mesh = mesh };
-		collisionMesh_queryAABB(mesh, &query, characterPhysics_collectTriangle, aabb);
-
-		for (int t = 0; t < query.count; t++) {
-			Triangle triangle;
-			collisionMesh_getTriangle(mesh, query.triangle[t], &triangle);
-			Vector3 closest = triangle_closestToPoint(&triangle.vertices[0], &triangle.vertices[1], &triangle.vertices[2], &local_center);
-			floorProbe_consider(probe, &local_center, radius, &closest);
-		}
-	}
-
-	for (int i = 0; i < statics->box_count; i++) {
-		const Transform *world = &statics->box_transform[i];
-		Vector3 local_center = transform_mulVectorTransposed(world, &center);
-
-		Vector3 e = statics->box[i].e;
-		AABB box_local = { { -e.x, -e.y, -e.z }, { e.x, e.y, e.z } };
-		Vector3 closest_local = aabb_closestToPoint(&box_local, &local_center);
-		Vector3 closest = transform_mulVector(world, &closest_local);
-		floorProbe_consider(probe, &center, radius, &closest);
-	}
-
-	for (int i = 0; i < statics->sphere_count; i++) {
-		const Vector3 *pos = &statics->sphere_transform[i].position;
-		Vector3 d = vector3_difference(&center, pos);
-		Vector3 dir = vector3_normalized(&d);
-		Vector3 closest = *pos;
-		vector3_addScaledVector(&closest, &dir, statics->sphere[i].radius);
-		floorProbe_consider(probe, &center, radius, &closest);
-	}
-
-	for (int i = 0; i < statics->capsule_count; i++) {
-		Vector3 a, b;
-		capsule_getSegment(&statics->capsule[i], &statics->capsule_transform[i], &a, &b);
-		Vector3 on_seg = segment_closestToPoint(&a, &b, &center);
-		Vector3 d = vector3_difference(&center, &on_seg);
-		Vector3 dir = vector3_normalized(&d);
-		Vector3 closest = on_seg;
-		vector3_addScaledVector(&closest, &dir, statics->capsule[i].radius);
-		floorProbe_consider(probe, &center, radius, &closest);
-	}
+	characterPhysics_probeFloor(shapes, shape_count, &center, radius, probe);
 }
 
 /* Godot's _snap_on_floor conditions: only when the character was on the
@@ -398,7 +395,7 @@ static void characterPhysics_snapToFloor(Character *character, const FloorProbe 
 	characterCollision_setGroundResponse(character);
 }
 
-void characterPhysics_collide(Character *character, const StaticColliders *statics)
+void characterPhysics_collide(Character *character, const PhysicsShape *shapes, int shape_count)
 {
 	CharacterMovementData *data = &character->movement.data;
 
@@ -410,7 +407,7 @@ void characterPhysics_collide(Character *character, const StaticColliders *stati
 
 	for (int slide = 0; slide < CHARACTER_MAX_SLIDES; slide++) {
 		ContactManifold m;
-		if (!characterPhysics_deepestContactAll(&character->collider, statics, &m)) break;
+		if (!characterPhysics_deepestContactAll(&character->collider, shapes, shape_count, &m)) break;
 
 		CharacterContact contact;
 		characterContact_clear(&contact);
@@ -419,7 +416,7 @@ void characterPhysics_collide(Character *character, const StaticColliders *stati
 	}
 
 	FloorProbe floor;
-	characterPhysics_findFloor(character, statics, &floor);
+	characterPhysics_findFloor(character, shapes, shape_count, &floor);
 
 	characterPhysics_snapToFloor(character, &floor, was_on_floor, velocity_facing_up);
 
