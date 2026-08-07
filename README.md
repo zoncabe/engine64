@@ -36,6 +36,6 @@ Camera system with a spherical third person camera implemented, and the structur
 make
 ```
 
-download the latest build on the [itch.io](https://zoncabe.itch.io/engine64) page<br/>
+Download the latest build on the [itch.io](https://zoncabe.itch.io/engine64) page.<br/>
 
-hit the [N64brew Discord](https://discord.gg/r86zSRwDDY) for more<br/>
+Hit the [N64brew Discord](https://discord.gg/r86zSRwDDY) for more.<br/>
