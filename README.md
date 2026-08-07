@@ -1,8 +1,6 @@
 # Engine 64
 
-N64 game engine written in C on top of the open source SDK [Libdragon](https://github.com/DragonMinded/libdragon) and the 3D ucode & library [Tiny3D](https://github.com/HailToDodongo/tiny3d).
-
-It works as a framework: you build your game calling the engine functions directly, declaring scenes, entities and screens in code, everything statically compiled. Asset pipelines with custom binary formats are on the todo list, for now everything is declared in source.
+Framework type game engine written in C on top of the open source SDK [Libdragon](https://github.com/DragonMinded/libdragon) and the 3D ucode & library [Tiny3D](https://github.com/HailToDodongo/tiny3d).
 
 ### Features
 
