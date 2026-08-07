@@ -1,4 +1,4 @@
-# Engine64
+# Engine 64
 
 N64 game engine written in C on top of the open source SDK [Libdragon](https://github.com/DragonMinded/libdragon) and the 3D ucode & library [Tiny3D](https://github.com/HailToDodongo/tiny3d).
 
