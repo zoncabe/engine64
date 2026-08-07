@@ -4,26 +4,26 @@ Framework type game engine. Written in C on top of the open source SDK [Libdrago
 
 ### Features
 
-**Physics engine**
+**Physics engine**<br/>
 A port of [qu3e](https://github.com/RandyGaul/qu3e) by Randy Gaul, expanded to use all basic primitives plus triangle meshes. Rigid bodies with island solving and sleeping, sequential impulse contact solver with warm starting, friction and restitution.<br/>
 Cloth simulation implemented using the [Advanced Character Physics](https://www.cs.cmu.edu/afs/cs/academic/class/15462-s13/www/lec_slides/Jakobsen.pdf) papers, a Verlet method developed by Thomas Jakobsen at IO Interactive for the Hitman games.
 
-**Character physics**
+**Character physics**<br/>
 Collide and slide based character collision, resolved against boxes, spheres, capsules and triangle meshes. Floor detection and snapping.
 
-**Character movement**
+**Character movement**<br/>
 Gait based movement system: each gait defines its target speed, acceleration and rotation response. Movement accelerates towards a target velocity, with per asset settings for jump force, air control and roll timings.
 
-**Character animation**
+**Character animation**<br/>
 Blend tree based animation system: poses are sampled from clips and combined by weighted bone blending. Supports clip playback, selection, sequencing, 1D and 2D blend spaces and layering.
 
-**Screen system**
+**Screen system**<br/>
 2D screen system with a track based animation engine. Handles rectangles, sprites and text grouped in scissor sections, with easing curves, timed visibility windows and state driven lookups.
 
-**Scenes**
+**Scenes**<br/>
 Scene definitions hold the level content: entities with model, transform and collider shapes, characters, and the physics world.
 
-**Camera**
+**Camera**<br/>
 Camera system with a spherical third person camera implemented, and the structure in place to add new camera types.
 
 ### Building
