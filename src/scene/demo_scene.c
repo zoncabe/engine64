@@ -12,8 +12,8 @@
 static const PhysicsShapeDef room_shapes[] = {
 	{ .type = SHAPE_MESH, .mesh = {
 		.path        = "rom:/collision/room.collision",
-		.friction    = 0.6f,
-		.restitution = 0.0f,
+		.friction    = 0.9f,
+		.restitution = 0.1f,
 	}},
 };
 

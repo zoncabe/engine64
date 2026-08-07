@@ -10,7 +10,7 @@
 #define PHYSICS_BAUMGARTE         0.2f
 #define PHYSICS_PENETRATION_SLOP  0.05f
 
-#define PHYSICS_SOLVER_ITERATIONS 4
+#define PHYSICS_SOLVER_ITERATIONS 2
 #define PHYSICS_TIMESTEP          (1.0f / 60.0f)
 
 /* Cap on the steps a single frame may run. Without it a long frame queues up

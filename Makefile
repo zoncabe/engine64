@@ -50,8 +50,7 @@ assets_conv = $(addprefix filesystem/textures/,$(notdir $(assets_png:%.png=%.spr
 
 # Models with a collision mesh (declared one per line)
 assets_collision = filesystem/collision/room.collision \
-                   filesystem/collision/brew_flag.collision \
-                   filesystem/collision/bandera_uruguay.collision
+                   filesystem/collision/brew_flag.collision
 
 
 all: $(PROJECT_NAME).z64
