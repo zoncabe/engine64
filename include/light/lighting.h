@@ -1,8 +1,9 @@
 #ifndef LIGHT_H
 #define LIGHT_H
 
-#define DIRECTIONAL_LIGHT_COUNT 1
-#define POINT_LIGHT_COUNT 0
+/* t3d shares seven slots between directional and point lights. */
+#define DIRECTIONAL_LIGHT_COUNT 0
+#define POINT_LIGHT_COUNT 2
 
 
 typedef struct{

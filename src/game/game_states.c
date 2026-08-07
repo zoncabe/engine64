@@ -8,8 +8,8 @@
 #include "ui/main_menu_ui.h"
 #include "ui/pause_ui.h"
 #include "ui/gameplay_ui.h"
+#include "ui/credits_ui.h"
 #include "menu/menu.h"
-#include "ui/settings_ui.h"
 #include "player/player.h"
 #include "control/player_control.h"
 #include "game/game.h"
@@ -42,11 +42,13 @@ static void gameState_updateIntro(GameContext *ctx)
 static void gameState_updateMainMenu(GameContext *ctx)
 {
 	(void)ctx;
-	if (menuStack_current() != NULL) {
-		settings_ui_update();
-		return;
-	}
 	main_menu_update();
+}
+
+static void gameState_updateCredits(GameContext *ctx)
+{
+	(void)ctx;
+	credits_update();
 }
 
 static void gameState_updateGameplay(GameContext *ctx)
@@ -61,12 +63,20 @@ static void gameState_updateGameplay(GameContext *ctx)
 	Scene *scene = scene_get();
 	uint8_t fb_index = ctx->viewport->fb_index;
 
+	physics_update(scene_getPhysics(), time_get()->delta);
+
 	for (int i = 0; i < scene->character_count; i++) {
 		Character *character = scene->character[i];
-		characterPhysics_collide(character, scene->static_shape, scene->static_shape_count);
+		characterPhysics_collide(character, scene_getPhysics());
+		characterPhysics_syncBody(character);
 		entity_setTransform(character->entity, &character->body);
 		entity_setMatrix(character->entity, fb_index);
 	}
+
+	/* Simulated props are placed by the solver, so their matrix comes from the
+	   body. Static ones keep the one scene_load wrote. */
+	for (int i = 0; i < scene->entity_count; i++)
+		entity_setMatrixFromBody(scene->entity[i], fb_index);
 
 	viewport_updateCamera(&control[0].actions, &ctx->player[0].entity->transform.position);
 	gameplay_update();
@@ -77,16 +87,16 @@ static void gameState_updatePause(GameContext *ctx)
 {
 	(void)ctx;
 	Scene *scene = scene_get();
+	/* Matrices are per framebuffer and gameplay only writes the current one, so
+	   the three hold three different instants. Frozen, that reads as a shake:
+	   everything that moves has to fill all three. */
 	for (int i = 0; i < scene->entity_count; i++) {
 		Entity *entity = scene->entity[i];
-		if (entity->type != ENTITY_CHARACTER) continue;
-		for (int fb = 0; fb < FB_COUNT; fb++)
-			entity_setMatrix(entity, fb);
-	}
 
-	if (menuStack_current() != NULL) {
-		settings_ui_update();
-		return;
+		for (int fb = 0; fb < FB_COUNT; fb++) {
+			if (entity->type == ENTITY_CHARACTER) entity_setMatrix(entity, fb);
+			entity_setMatrixFromBody(entity, fb);
+		}
 	}
 
 	pause_update();
@@ -108,8 +118,14 @@ static void gameState_setMainMenuDescriptor(const GameContext *ctx, GameRenderDe
 {
 	(void)ctx;
 	descriptor->scene  = NULL;
-	Screen *top = menuStack_current();
-	descriptor->screen = top ? top : &main_menu_screen;
+	descriptor->screen = &main_menu_screen;
+}
+
+static void gameState_setCreditsDescriptor(const GameContext *ctx, GameRenderDescriptor *descriptor)
+{
+	(void)ctx;
+	descriptor->scene  = NULL;
+	descriptor->screen = &credits_screen;
 }
 
 static void gameState_setGameplayDescriptor(const GameContext *ctx, GameRenderDescriptor *descriptor)
@@ -121,8 +137,7 @@ static void gameState_setGameplayDescriptor(const GameContext *ctx, GameRenderDe
 static void gameState_setPauseDescriptor(const GameContext *ctx, GameRenderDescriptor *descriptor)
 {
 	descriptor->scene  = ctx->scene;
-	Screen *top = menuStack_current();
-	descriptor->screen = top ? top : &pause_screen;
+	descriptor->screen = &pause_screen;
 }
 
 static void gameState_setGameOverDescriptor(const GameContext *ctx, GameRenderDescriptor *descriptor)
@@ -147,6 +162,14 @@ static const GameStateDef game_state[GAME_STATE_COUNT] = {
 		.setDescriptor = gameState_setMainMenuDescriptor,
 		.bindCharacter     = NULL,
 		.onEnter       = main_menu_startEnter,
+		.scene_id      = SCENE_COUNT,
+	},
+
+	[GAME_STATE_CREDITS] = {
+		.update        = gameState_updateCredits,
+		.setDescriptor = gameState_setCreditsDescriptor,
+		.bindCharacter     = NULL,
+		.onEnter       = credits_startEnter,
 		.scene_id      = SCENE_COUNT,
 	},
 

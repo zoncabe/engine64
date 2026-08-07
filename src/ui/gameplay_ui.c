@@ -19,7 +19,7 @@ static ScreenAnimationTrack gameplay_track[];
 
 static const ScreenAnimation gameplay_animation = {
 	.track       = gameplay_track,
-	.track_count = 1,
+	.track_count = 2,
 };
 
 Screen gameplay_screen = {
@@ -38,6 +38,10 @@ Screen gameplay_screen = {
 static ScreenAnimationTrack gameplay_track[] = {
 
 	{ .target_u8 = &gameplay_screen.section[0].element[GAMEPLAY_FADE].rectangle.color.a, .from = 255.0f, .to = 0.0f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+
+	/* Visible solo mientras dura el fade: terminado, el rect no manda ningun
+	   comando al RDP. En reverse la ventana se espeja y lo destapa sola. */
+	{ .target_bool = &gameplay_screen.section[0].element[GAMEPLAY_FADE].is_hidden, .from_bool = true, .to_bool = false, .duration = 0.25f },
 };
 
 

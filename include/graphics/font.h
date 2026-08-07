@@ -9,9 +9,11 @@
 #define HEADLINER_14  3
 #define HEADLINER_20  4
 #define HEADLINER_40  5
+#define HEADLINER_60  6
 
 #define MENU_STYLE_NORMAL   1
 #define MENU_STYLE_SELECTED 2
+#define TEXT_STYLE_RED      3
 
 
 typedef struct {

@@ -48,28 +48,28 @@ typedef enum {
    el orden es de menor a mayor target_speed. */
 typedef struct {
 	float target_speed;
-	float acceleration_rate;
-	float rotation_acceleration_rate;
+	float response_rate;
+	float rotation_response_rate;
 } CharacterGaitSettings;
 
 typedef struct {
 
 	float idle_target_speed;
-	float idle_acceleration_rate;
-	float idle_rotation_acceleration_rate;
+	float idle_response_rate;
+	float idle_rotation_response_rate;
 
 	const CharacterGaitSettings *gait;
 	uint8_t gait_count;
 
 	float roll_target_speed;
-	float roll_launch_acceleration_rate;
-	float roll_spin_acceleration_rate;
-	float roll_grip_acceleration_rate;
+	float roll_launch_response_rate;
+	float roll_spin_response_rate;
+	float roll_grip_response_rate;
 	float roll_ground_time;
 	float roll_grip_time;
 	float roll_timer_max;
 
-	float jump_acceleration_rate;
+	float jump_response_rate;
 	float jump_force_multiplier;
 	float jump_minimum_speed;
 	float jump_timer_max;

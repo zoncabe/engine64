@@ -52,7 +52,9 @@ void light_setPoint(PointLight* light)
 {
 	for (int i = 0; i < POINT_LIGHT_COUNT; i++) {
 
-		t3d_light_set_point(i, &light[i].color.r, &light[i].position, light[i].size, false);
+		/* The slots are shared with the directionals, which took the first ones. */
+		t3d_light_set_point(DIRECTIONAL_LIGHT_COUNT + i, &light[i].color.r,
+		                    &light[i].position, light[i].size, false);
 	}
 }
 

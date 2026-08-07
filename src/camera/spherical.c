@@ -25,7 +25,7 @@ static const CameraSphericalSettings default_spherical_settings = {
 	.offset_angle_default = 30.0f,
 	.offset_angle_aim     = 34.0f,
 
-	.max_pitch = 70.0f,
+	.max_pitch = 80.0f,
 };
 
 

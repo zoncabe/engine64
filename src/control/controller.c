@@ -43,6 +43,8 @@ static void controller_mapActions(Controller *controller)
 		.pause      = button_getPressed(&raw->pressed, bind->pause),
 		.menu_up        = button_getPressed(&raw->pressed, bind->menu_up),
 		.menu_down      = button_getPressed(&raw->pressed, bind->menu_down),
+		.menu_up_held   = button_getPressed(&raw->held,    bind->menu_up),
+		.menu_down_held = button_getPressed(&raw->held,    bind->menu_down),
 		.menu_left      = button_getPressed(&raw->pressed, bind->menu_left),
 		.menu_right     = button_getPressed(&raw->pressed, bind->menu_right),
 		.menu_tab_left  = button_getPressed(&raw->pressed, bind->menu_tab_left),

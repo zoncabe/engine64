@@ -577,9 +577,17 @@ void characterAnimation_setParams(Character *character, const CharacterAnimation
 		.delta = time_get()->delta,
 	};
 
-	T3DAnim *base = &animation->clip[def->walk_animation];
+	ctx.gait_param = characterAnimation_getGaitParam(speed, movement);
 
-	ctx.gait_param       = characterAnimation_getGaitParam(speed, movement);
+	/* the footing is read from the clip that is actually running: the center
+	   column of the row the gait sits on */
+	const CharacterAnimationNode *locomotion = &def->node[def->locomotion_node];
+	float row_t;
+	uint8_t row = characterAnimation_blendSegment(ctx.gait_param, locomotion->rows, &row_t);
+	if (row_t > 0.5f) row++;
+
+	T3DAnim *base = &animation->clip[locomotion->animation[row * locomotion->cols + locomotion->cols / 2]];
+
 	ctx.locomotion_phase = characterAnimation_getLocomotionPhase(base->time, t3d_anim_get_length(base));
 	ctx.turning          = characterAnimation_getTurningAvg(animation, ctx.settings, character->body.rotation.z, character->movement.data.previous_yaw);
 

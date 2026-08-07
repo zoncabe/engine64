@@ -142,6 +142,23 @@ static PhysicsShape *rigidBody_attachShape(RigidBody *b, PhysicsShape *shape,
 }
 
 
+/* Type-agnostic entry point: the def carries its own geometry and offset, and
+   the scale is applied on the way in. */
+PhysicsShape *rigidBody_addShape(RigidBody *b, const PhysicsShapeDef *def, Vector3 scale)
+{
+	PhysicsShape *shape = NULL;
+	physicsWorld_allocShape(b->world, &shape);
+
+	if (!physicsShape_fromDef(shape, def, scale)) return NULL;
+
+	Transform local = shape->local;
+
+	return rigidBody_attachShape(b, shape, &local,
+	                              shape->friction, shape->restitution,
+	                              shape->density, shape->sensor);
+}
+
+
 PhysicsShape *rigidBody_addBox(RigidBody *b, const BoxDef *def)
 {
 	PhysicsShape *shape = NULL;
@@ -224,6 +241,7 @@ void rigidBody_removeAllShapes(RigidBody *b)
 	while (b->shapes) {
 		PhysicsShape *next = b->shapes->next;
 		broadPhase_removeShape_fromWorld(b->world, b->shapes);
+		physicsShape_release(b->shapes);
 		physicsWorld_freeShape(b->world, b->shapes);
 		b->shapes = next;
 	}

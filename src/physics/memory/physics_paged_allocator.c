@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stddef.h>
 
 #include "physics/memory/physics_paged_allocator.h"
@@ -28,7 +29,13 @@ void *physicsPagedAllocator_allocate(PhysicsPagedAllocator *a)
 		return data;
 	}
 
+	/* One page is block_size * blocks_per_page in a single allocation, which
+	   for contacts is over 150 KB. On a fragmented heap that malloc fails, and
+	   building the free list through the NULL below writes pointers from
+	   address zero onwards — the corruption only shows up later, inside the
+	   solver, on data that looks nothing like this. */
 	PhysicsPage *page = (PhysicsPage *)physics_alloc(a->block_size * a->blocks_per_page + (int32_t)sizeof(PhysicsPage));
+	assert(page);
 	++a->page_count;
 
 	page->next = a->pages;

@@ -9,6 +9,7 @@
 #ifndef PHYSICS_SHAPE_H
 #define PHYSICS_SHAPE_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "physics/math/matrix3.h"
@@ -19,6 +20,7 @@
 #include "physics/shapes/box.h"
 #include "physics/shapes/sphere.h"
 #include "physics/shapes/capsule.h"
+#include "physics/collision/collision_mesh.h"
 
 
 struct RigidBody;
@@ -60,6 +62,33 @@ typedef struct PhysicsShape {
 		struct CollisionMesh *mesh;
 	};
 } PhysicsShape;
+
+
+/* Authoring-side counterpart of PhysicsShape: the geometry plus its offset,
+   before it is placed in a body or in the world. */
+typedef struct PhysicsShapeDef {
+	ShapeType type;
+	union {
+		BoxDef           box;
+		SphereDef        sphere;
+		CapsuleDef       capsule;
+		CollisionMeshDef mesh;
+	};
+} PhysicsShapeDef;
+
+
+/* Shape defs usually initialise .tx with a position only, leaving the rotation
+   matrix zeroed: this reads an all-zero rotation as identity. */
+Transform shapeDef_localTransform(const Transform *tx);
+
+/* Builds a shape from its def, scaling both geometry and offset so one def
+   serves any prop size. The offset lands in shape->local, for the caller to
+   compose with wherever the shape ends up. Returns false for types that are
+   not built from defs, so callers can skip them. */
+bool physicsShape_fromDef(PhysicsShape *shape, const PhysicsShapeDef *def, Vector3 scale);
+
+/* Frees whatever the shape owns. Only the mesh case owns anything. */
+void physicsShape_release(PhysicsShape *shape);
 
 
 /* Narrowphase / body dispatch — switches on shape->type. */

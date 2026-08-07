@@ -7,6 +7,7 @@
 #include <math.h>
 
 #include "physics/collision/collision.h"
+#include "physics/collision/collision_mesh.h"
 #include "physics/body/rigid_body.h"
 #include "physics/math/math_functions.h"    /* segment_closestToPoint */
 
@@ -930,6 +931,186 @@ void capsuleToTriangle(ContactManifold *m, const Capsule *capsule, const Transfo
 }
 
 
+/* --- Convex shape against a static triangle mesh. ---
+
+   A mesh is not a convex piece, so it cannot be fed to the SAT routines above.
+   Instead the shape's AABB queries the mesh tree and every triangle it touches
+   is resolved on its own, with the results merged into the one manifold the
+   contact holds. That manifold carries a single normal, so the deepest contact
+   sets it: on a floor or a ramp all the triangles agree anyway, and where they
+   do not, the deepest one is the constraint that matters. */
+
+#define MESH_QUERY_MAX 24
+
+typedef struct {
+	const CollisionMesh *mesh;
+	int32_t              triangle[MESH_QUERY_MAX];
+	int32_t              count;
+} MeshQuery;
+
+
+static int collision_collectTriangle(void *cb, int32_t id)
+{
+	MeshQuery *query = cb;
+	if (query->count >= MESH_QUERY_MAX) return 0;
+
+	query->triangle[query->count++] =
+		(int32_t)(intptr_t)dynamicAABBTree_getUserData(&query->mesh->tree, id);
+	return 1;
+}
+
+
+/* Closest point on the triangle to the sphere centre: exact, and the only
+   test a sphere needs. */
+static void sphereToTriangle(ContactManifold *m, const Sphere *sphere, const Vector3 *center,
+                             const Triangle *triangle)
+{
+	Vector3 closest = triangle_closestToPoint(&triangle->vertices[0], &triangle->vertices[1],
+	                                          &triangle->vertices[2], center);
+	Vector3 d     = vector3_difference(&closest, center);
+	float   dist2 = vector3_dot(&d, &d);
+	float   r     = sphere->radius;
+
+	if (dist2 > r * r) return;
+
+	float dist = sqrtf(dist2);
+	Vector3 n = (dist > 1.0e-6f) ? vector3_scaled(&d, 1.0f / dist)
+	                             : vector3_inverted(&triangle->normal);
+
+	m->normal        = n;
+	m->contact_count = 1;
+	m->contacts[0].position    = closest;
+	m->contacts[0].penetration = dist - r;
+	m->contacts[0].fp.key      = 0;
+}
+
+
+/* Box corners against the triangle's plane. A resting box meets a floor
+   triangle with its whole face, so this yields the several points a stack
+   needs to stay up; a box caught on a bare edge gets a coarser answer than
+   full SAT would give, which is the trade for keeping this cheap. */
+static void boxToTriangle(ContactManifold *m, const Box *box, const Transform *world,
+                          const Triangle *triangle)
+{
+	m->contact_count = 0;
+	m->normal        = vector3_inverted(&triangle->normal);
+
+	const Vector3 *v0 = &triangle->vertices[0];
+
+	for (int i = 0; i < 8; i++) {
+		Vector3 local = {
+			(i & 1) ? box->e.x : -box->e.x,
+			(i & 2) ? box->e.y : -box->e.y,
+			(i & 4) ? box->e.z : -box->e.z,
+		};
+		Vector3 corner = transform_mulVector(world, &local);
+
+		/* Signed distance to the plane; only corners behind it touch. */
+		Vector3 to_corner = vector3_difference(&corner, v0);
+		float   depth     = vector3_dot(&triangle->normal, &to_corner);
+		if (depth >= 0.0f) continue;
+
+		/* Behind the plane is not enough: it has to be behind the face. */
+		Vector3 on_plane = corner;
+		Vector3 lift     = vector3_scaled(&triangle->normal, -depth);
+		on_plane = vector3_sum(&on_plane, &lift);
+
+		Vector3 closest = triangle_closestToPoint(&triangle->vertices[0], &triangle->vertices[1],
+		                                          &triangle->vertices[2], &on_plane);
+		Vector3 slip  = vector3_difference(&closest, &on_plane);
+		if (vector3_dot(&slip, &slip) > 1.0e-6f) continue;
+
+		if (m->contact_count >= 8) break;
+
+		ContactPoint *c = &m->contacts[m->contact_count++];
+		c->position    = corner;
+		c->penetration = depth;
+		c->fp.key      = (uint32_t)i;
+	}
+}
+
+
+/* Runs the shape against every triangle its AABB reaches and merges the hits.
+   The mesh tree is in mesh-local space, so the shape moves by -origin going in
+   and the contact points move back on the way out. */
+static void shapeToMesh(ContactManifold *m, PhysicsShape *shape, PhysicsShape *mesh_shape)
+{
+	/* The contact manager runs computeBasis on this normal without checking
+	   the contact count, so it must always hold a unit vector: uninitialised
+	   memory blows up on the normalise, and so does a zero vector. */
+	m->contact_count = 0;
+	m->normal        = (Vector3){ 0.0f, 0.0f, 1.0f };
+
+	const CollisionMesh *mesh = mesh_shape->mesh;
+	if (mesh == NULL) return;
+
+	Vector3 origin = mesh_shape->local.position;
+	if (mesh_shape->body) {
+		Transform world = transform_product(&mesh_shape->body->tx, &mesh_shape->local);
+		origin = world.position;
+	}
+
+	Transform shape_world = shape->local;
+	if (shape->body) shape_world = transform_product(&shape->body->tx, &shape->local);
+
+	Transform local_world = shape_world;
+	local_world.position  = vector3_difference(&shape_world.position, &origin);
+
+	PhysicsShape probe = *shape;
+	probe.body  = NULL;
+	probe.local = local_world;
+
+	AABB aabb;
+	Transform identity;
+	transform_init(&identity);
+	physicsShape_computeAABB(&probe, &identity, &aabb);
+
+	MeshQuery query = { .mesh = mesh };
+	collisionMesh_queryAABB(mesh, &query, collision_collectTriangle, aabb);
+
+	/* Starts at infinity, not at zero: a contact that merely touches still has
+	   to set the normal, or the deepest-wins test below never fires. */
+	float deepest = FLT_MAX;
+
+	for (int32_t t = 0; t < query.count; t++) {
+		Triangle triangle;
+		collisionMesh_getTriangle(mesh, query.triangle[t], &triangle);
+
+		ContactManifold hit = {0};
+
+		switch (shape->type) {
+			case SHAPE_SPHERE:
+				sphereToTriangle(&hit, &shape->sphere, &local_world.position, &triangle);
+				break;
+			case SHAPE_BOX:
+				boxToTriangle(&hit, &shape->box, &local_world, &triangle);
+				break;
+			case SHAPE_CAPSULE:
+				capsuleToTriangle(&hit, &shape->capsule, &local_world, &triangle);
+				break;
+			default:
+				break;
+		}
+
+		for (int32_t i = 0; i < hit.contact_count; i++) {
+			if (m->contact_count >= 8) break;
+
+			ContactPoint *c = &m->contacts[m->contact_count];
+			*c = hit.contacts[i];
+			c->position = vector3_sum(&c->position, &origin);
+			/* Key by triangle so warm starting can match points across steps. */
+			c->fp.key   = ((uint32_t)query.triangle[t] << 4) | (c->fp.key & 0xF);
+			m->contact_count++;
+
+			if (c->penetration < deepest) {
+				deepest  = c->penetration;
+				m->normal = hit.normal;
+			}
+		}
+	}
+}
+
+
 /* --- collision: type-based dispatcher. --- */
 void collision(ContactManifold *m, PhysicsShape *a, PhysicsShape *b)
 {
@@ -965,5 +1146,15 @@ void collision(ContactManifold *m, PhysicsShape *a, PhysicsShape *b)
 	else if (ta == SHAPE_BOX && tb == SHAPE_CAPSULE) {
 		capsuleToBox(m, b, a);
 		m->normal = vector3_inverted(&m->normal);
+	}
+	/* Mesh is static-only, so the pair always has one convex side. */
+	else if (tb == SHAPE_MESH) {
+		shapeToMesh(m, a, b);
+	}
+	else if (ta == SHAPE_MESH) {
+		shapeToMesh(m, b, a);
+		/* No contact means no normal was written: inverting it would be
+		   reading whatever the manifold happened to hold. */
+		if (m->contact_count) m->normal = vector3_inverted(&m->normal);
 	}
 }

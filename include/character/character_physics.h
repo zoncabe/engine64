@@ -9,6 +9,7 @@
 
 typedef struct Character Character;
 typedef struct CollisionMesh CollisionMesh;
+typedef struct PhysicsWorld PhysicsWorld;
 
 
 typedef struct KinematicBody {
@@ -16,6 +17,11 @@ typedef struct KinematicBody {
 	Vector3 velocity;
 	Vector3 acceleration;
 	Vector3 rotation;
+
+	/* Its standing in the physics world. The solver never moves it — the fields
+	   above do — but registering it is what makes the broadphase pair it with
+	   rigid bodies, so the character can shove them. */
+	struct RigidBody *rigid;
 } KinematicBody;
 
 
@@ -52,9 +58,16 @@ void characterContact_set  (CharacterContact *contact, const ContactManifold *m,
 
 void characterCollision_setResponse(Character *character, CharacterContact *contact, CharacterCollider *collider);
 
-/* Collide and slide against the static shapes, then snap to the floor.
-   Runs after the movement update, before the render sync. */
-void characterPhysics_collide(Character *character, const PhysicsShape *shapes, int shape_count);
+/* Collide and slide against the world's static bodies, then snap to the floor.
+   Runs after the movement update, before the render sync. The character is not
+   simulated by the solver: it reads those shapes and resolves on its own. */
+void characterPhysics_collide(Character *character, const PhysicsWorld *world);
+
+/* The character's standing in the world: created once, written every frame
+   after collide, so the solver sees where it ended up and how fast it got
+   there. Without this the character passes through every rigid body. */
+void characterPhysics_createBody(Character *character, PhysicsWorld *world);
+void characterPhysics_syncBody  (Character *character);
 
 
 #endif

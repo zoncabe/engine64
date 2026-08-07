@@ -66,6 +66,10 @@ typedef struct CharacterWeaponsDef {
 	const char *const *mesh;
 	uint8_t mesh_count;
 
+	/* What the character starts carrying. Only seeds the slots: equipping and
+	   unequipping afterwards is runtime state on the Character. */
+	const WeaponDef *weapon[WEAPON_SLOT_COUNT];
+
 } CharacterWeaponsDef;
 
 typedef struct CharacterWeapons {

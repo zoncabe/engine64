@@ -9,10 +9,11 @@ static const char *font_paths[] = {
 	[HEADLINER_14] = "rom:/fonts/Headliner14.font64",
 	[HEADLINER_20] = "rom:/fonts/Headliner20.font64",
 	[HEADLINER_40] = "rom:/fonts/Headliner40.font64",
+	[HEADLINER_60] = "rom:/fonts/Headliner60.font64",
 
 };
 
-static rdpq_font_t *fonts[6];
+static rdpq_font_t *fonts[7];
 
 
 void font_loadAsset(uint8_t id)
@@ -28,8 +29,14 @@ void font_loadAsset(uint8_t id)
 		rdpq_font_style(fonts[id], MENU_STYLE_NORMAL,   &(rdpq_fontstyle_t){RGBA32(200, 200, 200, 255)});
 		rdpq_font_style(fonts[id], MENU_STYLE_SELECTED, &(rdpq_fontstyle_t){RGBA32(255, 220, 30,  255)});
 	}
-	if (id == HEADLINER_40)
+	if (id == HEADLINER_40) {
 		rdpq_font_style(fonts[id], MENU_STYLE_NORMAL,   &(rdpq_fontstyle_t){RGBA32(255, 255, 255, 200)});
+		rdpq_font_style(fonts[id], TEXT_STYLE_RED,      &(rdpq_fontstyle_t){RGBA32(230, 30, 30, 255)});
+	}
+	if (id == HEADLINER_60) {
+		rdpq_font_style(fonts[id], MENU_STYLE_NORMAL,   &(rdpq_fontstyle_t){RGBA32(255, 255, 255, 200)});
+		rdpq_font_style(fonts[id], TEXT_STYLE_RED,      &(rdpq_fontstyle_t){RGBA32(230, 30, 30, 255)});
+	}
 
 	rdpq_text_register_font(id, fonts[id]);
 }

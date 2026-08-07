@@ -28,7 +28,6 @@ typedef struct BoxDef {
 	int       sensor;
 } BoxDef;
 
-
 int   box_testPoint(const Box *b, const Transform *world, const Vector3 *p);
 int   box_raycast(const Box *b, const Transform *world, RaycastData *raycast);
 void  box_computeAABB(const Box *b, const Transform *world, AABB *aabb);

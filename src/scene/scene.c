@@ -1,7 +1,9 @@
 #include <assert.h>
+#include <malloc.h>
 
 #include <t3d/t3dmath.h>
 
+#include "shaders/mesh_deform.h"
 #include "viewport/viewport.h"
 #include "light/lighting.h"
 #include "entity/entity.h"
@@ -17,7 +19,8 @@
 static Scene scene;
 static PhysicsWorld g_physics;
 
-Scene *scene_get(void) { return &scene; }
+Scene        *scene_get(void)        { return &scene; }
+PhysicsWorld *scene_getPhysics(void) { return &g_physics; }
 PhysicsWorld *physics_getWorld(void) { return &g_physics; }
 
 void scene_load(const SceneDef *def)
@@ -44,16 +47,20 @@ void scene_load(const SceneDef *def)
 
 	Vector3 gravity = { 0.0f, 0.0f, -9.8f };
 	physicsWorld_init(&g_physics, PHYSICS_TIMESTEP, gravity, PHYSICS_SOLVER_ITERATIONS);
+	physicsWorld_setWind(&g_physics, def->wind);
 
 	for (int i = 0; i < def->entity_count; i++) {
 		const EntityDef *entity_def = &def->entity[i];
 		Entity *entity = entity_create(entity_def);
 
-		if (entity_def->body) {
+		if (entity_def->collider)
 			entity_attachPhysics(entity, entity_def, &g_physics);
-		} else if (entity_def->shape) {
-			assert(scene.static_shape_count < SCENE_MAX_STATIC_SHAPES);
-			entity_attachStaticShape(entity_def, &scene.static_shape[scene.static_shape_count++]);
+
+		if (entity_def->cloth) {
+			Cloth *cloth = physicsWorld_createCloth(&g_physics, entity_def->cloth);
+			/* The cloth runs in metres, the vertex buffer in render units. */
+			if (cloth) mesh_setDeform(entity->mesh, cloth->position, cloth->normal,
+			                         cloth->particle_count, RENDER_SCALE);
 		}
 
 		if (entity_def->character) {
@@ -61,16 +68,12 @@ void scene_load(const SceneDef *def)
 			Character *character = character_create(entity_def->character, entity);
 			scene.character[scene.character_count++] = character;
 
-			for (int slot = 0; slot < WEAPON_SLOT_COUNT; slot++)
-				if (entity_def->weapon[slot])
-					character_equipWeapon(character, slot, entity_def->weapon[slot]);
-		}
+			characterPhysics_createBody(character, &g_physics);
 
-		if (entity_def->collision_path) {
-			assert(scene.static_shape_count < SCENE_MAX_STATIC_SHAPES);
-			PhysicsShape *shape = &scene.static_shape[scene.static_shape_count++];
-			*shape = (PhysicsShape){ .type = SHAPE_MESH, .local = entity_colliderTransform(entity_def) };
-			shape->mesh = collisionMesh_load(entity_def->collision_path);
+			const CharacterWeaponsDef *weapons = entity_def->character->weapons_def;
+			for (int slot = 0; weapons && slot < WEAPON_SLOT_COUNT; slot++)
+				if (weapons->weapon[slot])
+					character_equipWeapon(character, slot, weapons->weapon[slot]);
 		}
 
 		if (!entity_def->character) {
@@ -91,9 +94,6 @@ void scene_unload(void)
 {
 	for (int i = 0; i < scene.character_count; i++)
 		character_delete(scene.character[i]);
-	for (int i = 0; i < scene.static_shape_count; i++)
-		if (scene.static_shape[i].type == SHAPE_MESH)
-			collisionMesh_delete(scene.static_shape[i].mesh);
 	for (int i = 0; i < scene.entity_count; i++)
 		entity_delete(scene.entity[i]);
 	scene_clear();

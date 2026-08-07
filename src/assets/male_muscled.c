@@ -121,30 +121,30 @@ const CharacterAnimationDef male_muscled_animation_def = {
 
 static const CharacterGaitSettings male_muscled_gaits[] = {
 
-	{ .target_speed = 1.55f, .acceleration_rate =  8.0f, .rotation_acceleration_rate = 12.0f },
-	{ .target_speed = 3.2f,  .acceleration_rate =  9.0f, .rotation_acceleration_rate = 15.0f },
-	{ .target_speed = 4.4f,  .acceleration_rate = 10.0f, .rotation_acceleration_rate = 14.0f },
+	{ .target_speed = 1.55f, .response_rate =  8.0f, .rotation_response_rate = 12.0f },
+	{ .target_speed = 3.2f,  .response_rate =  9.0f, .rotation_response_rate = 15.0f },
+	{ .target_speed = 4.4f,  .response_rate = 10.0f, .rotation_response_rate = 14.0f },
 
 };
 
 const CharacterMovementSettings male_muscled_movement_settings = {
 
 	.idle_target_speed            = 0,
-	.idle_acceleration_rate           = 10.0f,
-	.idle_rotation_acceleration_rate  = 8.0f,
+	.idle_response_rate           = 10.0f,
+	.idle_rotation_response_rate  = 8.0f,
 
 	.gait       = male_muscled_gaits,
 	.gait_count = sizeof(male_muscled_gaits) / sizeof(male_muscled_gaits[0]),
 
 	.roll_target_speed         = 4.6f,
-	.roll_launch_acceleration_rate = 15.0f,
-	.roll_spin_acceleration_rate   = 5.0f,
-	.roll_grip_acceleration_rate   = 2.0f,
+	.roll_launch_response_rate = 15.0f,
+	.roll_spin_response_rate   = 5.0f,
+	.roll_grip_response_rate   = 2.0f,
 	.roll_ground_time          = 0.3f,
 	.roll_grip_time            = 0.9f,
 	.roll_timer_max            = 1.166666f,
 
-	.jump_acceleration_rate    = 0.5f,
+	.jump_response_rate    = 0.5f,
 	.jump_force_multiplier = 30.0f,
 	.jump_minimum_speed    = 4.4f,
 	.jump_timer_max        = 0.233333f,
@@ -166,6 +166,12 @@ const char *const male_muscled_weapon_meshes[] = { "ak47", "knife", "m1911" };
 const CharacterWeaponsDef male_muscled_weapons_def = {
 	.mesh       = male_muscled_weapon_meshes,
 	.mesh_count = 3,
+	/* Off for the demo capture. Restore these to carry the loadout again. */
+	.weapon = {
+		//[WEAPON_SLOT_WAIST] = &weapon_m1911,
+		//[WEAPON_SLOT_BACK]  = &weapon_ak47,
+		//[WEAPON_SLOT_MELEE] = &weapon_knife,
+	},
 };
 
 const WeaponDef weapon_ak47 = {

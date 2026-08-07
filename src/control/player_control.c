@@ -13,7 +13,7 @@ void player_setCharacterControl(Player *player, const ControllerActions *actions
 		player->character,
 		&player->cmd,
 		actions,
-		viewport->camera.spherical.data.angle_around_center
+		camera_getAngleAround(&viewport->camera, &player->character->entity->transform.position)
 	);
 }
 

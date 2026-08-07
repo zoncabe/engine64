@@ -11,9 +11,20 @@
 #include <stdint.h>
 
 #include "physics/math/vector3.h"
+#include "physics/math/transform.h"
 #include "physics/geometry/aabb.h"
 #include "physics/geometry/triangle.h"
 #include "physics/broadphase/dynamic_aabb_tree.h"
+
+
+/* Authoring side, matching the other shape defs. There is no density: a mesh
+   only ever hangs off a static body, so it has no mass to compute. */
+typedef struct CollisionMeshDef {
+	Transform   tx;
+	const char *path;
+	float       friction;
+	float       restitution;
+} CollisionMeshDef;
 
 
 typedef struct CollisionMesh {

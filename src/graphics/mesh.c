@@ -5,7 +5,24 @@
 #include <t3d/t3dmodel.h>
 
 #include "graphics/mesh.h"
+#include "shaders/mesh_deform.h"
 #include "physics/math/math_common.h"
+#include "physics/math/quaternion.h"
+
+
+/* A simulated body tumbles, and euler angles cannot describe that without
+   picking an order and losing the tumble at the poles. The body already keeps
+   a quaternion, so it goes straight to the matrix. */
+void mesh_setMatrixFromBody(Mesh *mesh, const Vector3 *position, const Quaternion *rotation,
+                            const Vector3 *scale, uint8_t fb_index)
+{
+	t3d_mat4fp_from_srt(
+		&mesh->matrix_buffer[fb_index],
+		(float[3]){ scale->x, scale->y, scale->z },
+		(float[4]){ rotation->x, rotation->y, rotation->z, rotation->w },
+		(float[3]){ position->x * RENDER_SCALE, position->y * RENDER_SCALE, position->z * RENDER_SCALE }
+	);
+}
 
 
 void mesh_setMatrix(Mesh *mesh, const RenderTransform *transform, uint8_t fb_index)
@@ -18,6 +35,45 @@ void mesh_setMatrix(Mesh *mesh, const RenderTransform *transform, uint8_t fb_ind
 		(float[3]){deg_to_rad(transform->rotation.x), deg_to_rad(transform->rotation.y), deg_to_rad(transform->rotation.z)},
 		(float[3]){transform->position.x,      transform->position.y,      transform->position.z}
 	);
+}
+
+
+bool mesh_setDeform(Mesh *mesh, const Vector3 *source, const Vector3 *source_normal,
+                    uint16_t source_count, float scale)
+{
+	MeshDeform *deform = malloc(sizeof(MeshDeform));
+	assert(deform);
+
+	if (!meshDeform_bind(deform, mesh->model, source, source_normal, source_count, scale)) {
+		free(deform);
+		return false;
+	}
+
+	/* The binding rewrote the model's vertex addresses as segment references,
+	   and the display list was recorded before that with the old absolute
+	   ones. Record it again so the draw goes through the segment. */
+	for (int i = 0; i < mesh->dl_count; i++) rspq_block_free(mesh->dl[i]);
+
+	rspq_block_begin();
+	t3d_model_draw(mesh->model);
+	mesh->dl[0]    = rspq_block_end();
+	mesh->dl_count = 1;
+
+	mesh->deform = deform;
+	return true;
+}
+
+
+void mesh_updateDeform(Mesh *mesh, uint8_t fb_index)
+{
+	if (mesh->deform) meshDeform_apply(mesh->deform, fb_index);
+}
+
+/* Separate from the update because it has to run at draw time, in front of the
+   display list, not when the vertices are written. */
+void mesh_bindDeformFrame(Mesh *mesh, uint8_t fb_index)
+{
+	if (mesh->deform) meshDeform_bindFrame(mesh->deform, fb_index);
 }
 
 

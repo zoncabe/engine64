@@ -13,7 +13,9 @@
 #include "physics/math/vector3.h"
 
 #define RENDER_MAX_DRAW_ELEMENT  128
-#define RENDER_MAX_T3D_OBJECT     32
+/* One entry per visible mesh part, not per entity: a skinned character alone
+   contributes several, so this has to clear the scene's entity budget. */
+#define RENDER_MAX_T3D_OBJECT     64
 #define RENDER_MAX_SECTION         8
 
 typedef struct Scene          Scene;

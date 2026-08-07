@@ -5,6 +5,7 @@
 #include <t3d/t3dskeleton.h>
 
 #include "entity/entity.h"
+#include "shaders/mesh_deform.h"
 #include "character/character_animation.h"
 #include "viewport/viewport.h"
 #include "physics/math/math_common.h"
@@ -36,6 +37,7 @@ Entity *entity_create(const EntityDef *def)
 	t3d_mat4fp_identity(entity->mesh->matrix_buffer);
 
 	entity->mesh->skeleton = NULL;
+	entity->mesh->deform   = NULL;
 
 	if (def->character) {
 		entity->mesh->dl = NULL;   /* character_create builds the skinned parts */
@@ -59,6 +61,10 @@ void entity_delete(Entity *entity)
 	for (int i = 0; i < entity->mesh->dl_count; i++)
 		rspq_block_free(entity->mesh->dl[i]);
 	free(entity->mesh->dl);
+	if (entity->mesh->deform) {
+		meshDeform_delete(entity->mesh->deform);
+		free(entity->mesh->deform);
+	}
 	free_uncached(entity->mesh->matrix_buffer);
 	t3d_model_free(entity->mesh->model);
 	free(entity->mesh);
@@ -76,6 +82,17 @@ void entity_setTransform(Entity *entity, const KinematicBody *body)
 void entity_setMatrix(Entity *entity, uint8_t fb_index)
 {
 	mesh_setMatrix(entity->mesh, &entity->transform, fb_index);
+}
+
+/* For entities the solver moves: their placement lives in the body, not in the
+   render transform, and a tumbling body needs its quaternion rather than the
+   euler angles the transform carries. No-op for anything else. */
+void entity_setMatrixFromBody(Entity *entity, uint8_t fb_index)
+{
+	if (entity->body == NULL || !(entity->body->flags & BODY_FLAG_DYNAMIC)) return;
+
+	mesh_setMatrixFromBody(entity->mesh, &entity->body->tx.position, &entity->body->q,
+	                       &entity->transform.scale, fb_index);
 }
 
 
@@ -104,66 +121,9 @@ Transform entity_colliderTransform(const EntityDef *def)
 	};
 }
 
-/* Shape defs usually initialise .tx with a position only, leaving the
-   rotation matrix zeroed: treat an all-zero rotation as identity. */
-static Transform shape_localTransform(const Transform *tx)
-{
-	Transform local = *tx;
-	if (vector3_squaredMagnitude(&local.rotation.ex) == 0.0f &&
-	    vector3_squaredMagnitude(&local.rotation.ey) == 0.0f &&
-	    vector3_squaredMagnitude(&local.rotation.ez) == 0.0f)
-		local.rotation = matrix3_identity();
-	return local;
-}
-
-/* Entities with a shape and no rigid body become static colliders. */
-void entity_attachStaticShape(const EntityDef *def, PhysicsShape *shape)
-{
-	Transform world = entity_colliderTransform(def);
-
-	/* The entity scale applies to the collider too, so one shape def
-	   serves any prop size and visuals and collision cannot diverge. */
-	Vector3 scale = def->scale;
-
-	*shape = (PhysicsShape){ .type = def->shape->type };
-
-	switch (def->shape->type) {
-		case SHAPE_BOX: {
-			Transform local = shape_localTransform(&def->shape->box.tx);
-			local.position = (Vector3){ local.position.x * scale.x, local.position.y * scale.y, local.position.z * scale.z };
-			shape->local = transform_product(&world, &local);
-			shape->box = (Box){ .e = {
-				def->shape->box.e.x * scale.x,
-				def->shape->box.e.y * scale.y,
-				def->shape->box.e.z * scale.z,
-			}};
-			break;
-		}
-		case SHAPE_SPHERE: {
-			Transform local = shape_localTransform(&def->shape->sphere.tx);
-			local.position = (Vector3){ local.position.x * scale.x, local.position.y * scale.y, local.position.z * scale.z };
-			shape->local = transform_product(&world, &local);
-			shape->sphere = (Sphere){ .radius = def->shape->sphere.radius * scale.x };
-			break;
-		}
-		case SHAPE_CAPSULE: {
-			Transform local = shape_localTransform(&def->shape->capsule.tx);
-			local.position = (Vector3){ local.position.x * scale.x, local.position.y * scale.y, local.position.z * scale.z };
-			shape->local = transform_product(&world, &local);
-			shape->capsule = (Capsule){
-				.radius      = def->shape->capsule.radius * scale.x,
-				.half_height = def->shape->capsule.half_height * scale.z,
-			};
-			break;
-		}
-		case SHAPE_MESH:
-			break;   /* meshes load from collision_path, not from shape defs */
-	}
-}
-
 /* Copies the body-def override bits on top of the freshly-initialised body
    (position, orientation) and then attaches the entity's shape to it. */
-void entity_attachPhysics(Entity *entity, const EntityDef *def, PhysicsWorld *world)
+RigidBody *entity_attachPhysics(Entity *entity, const EntityDef *def, PhysicsWorld *world)
 {
 	RigidBodyDef body_def;
 	rigidBodyDef_init(&body_def);
@@ -194,15 +154,14 @@ void entity_attachPhysics(Entity *entity, const EntityDef *def, PhysicsWorld *wo
 	body_def.angle = 0.0f;
 
 	RigidBody *body = physicsWorld_createBody(world, &body_def);
-	body->owner = entity;
+	body->owner   = entity;
+	entity->body  = body;
 
-	if (def->shape) {
-		switch (def->shape->type) {
-			case SHAPE_BOX:     rigidBody_addBox    (body, &def->shape->box);     break;
-			case SHAPE_SPHERE:  rigidBody_addSphere (body, &def->shape->sphere);  break;
-			case SHAPE_CAPSULE: rigidBody_addCapsule(body, &def->shape->capsule); break;
-			case SHAPE_MESH:    break;   /* static-only, never on a rigid body */
-		}
+	if (def->collider) {
+		for (uint8_t i = 0; i < def->collider->count; i++)
+			rigidBody_addShape(body, &def->collider->shape[i], def->scale);
 	}
+
+	return body;
 }
 

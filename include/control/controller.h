@@ -37,6 +37,8 @@ typedef struct ControllerActions {
 	bool  pause;
 	bool  menu_up;
 	bool  menu_down;
+	bool  menu_up_held;
+	bool  menu_down_held;
 	bool  menu_left;
 	bool  menu_right;
 	bool  menu_tab_left;

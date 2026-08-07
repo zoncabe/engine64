@@ -5,10 +5,10 @@
 
 
 static const SpriteID intro_sprite[] = {
-	SPRITE_N64LOGO, SPRITE_LIBDRAGON, SPRITE_TINY3D, SPRITE_ZONCABE,
+	SPRITE_N64LOGO, SPRITE_LIBDRAGON, SPRITE_TINY3D,
 };
 
-static const uint8_t intro_font[] = { DROID_SANS };
+static const uint8_t intro_font[] = { DROID_SANS, HEADLINER_60 };
 
 static const SpriteID mainmenu_sprite[] = {
 	SPRITE_GORILLA, SPRITE_BTN_A, SPRITE_BTN_B, SPRITE_D_UP, SPRITE_D_DOWN, SPRITE_D_LEFT, SPRITE_D_RIGHT,
@@ -16,6 +16,14 @@ static const SpriteID mainmenu_sprite[] = {
 
 static const uint8_t mainmenu_font[] = {
 	DROID_SANS, HEADLINER_14, HEADLINER_20, HEADLINER_40,
+};
+
+static const SpriteID credits_sprite[] = {
+	SPRITE_BTN_B, SPRITE_D_UP, SPRITE_D_DOWN,
+};
+
+static const uint8_t credits_font[] = {
+	DROID_SANS, HEADLINER_14, HEADLINER_40,
 };
 
 static const uint8_t gameplay_font[] = { DROID_SANS };
@@ -32,6 +40,7 @@ static const ResourceSet state_resource[GAME_STATE_COUNT] = {
 
 	[GAME_STATE_INTRO]     = RESOURCES(intro_sprite,    intro_font),
 	[GAME_STATE_MAIN_MENU] = RESOURCES(mainmenu_sprite, mainmenu_font),
+	[GAME_STATE_CREDITS]   = RESOURCES(credits_sprite,  credits_font),
 	[GAME_STATE_GAMEPLAY]  = { NULL, 0, gameplay_font, sizeof(gameplay_font)/sizeof(*gameplay_font) },
 	[GAME_STATE_PAUSE]     = RESOURCES(pause_sprite,    pause_font),
 	[GAME_STATE_GAME_OVER] = NO_RESOURCES,

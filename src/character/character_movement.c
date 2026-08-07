@@ -51,38 +51,38 @@ static float characterMovement_targetSpeed(const Character *character, uint8_t s
 
 static float characterMovement_accelerationRate(const Character *character, uint8_t state)
 {
-	if (state == MOVEMENT_STATE_WALKING) return characterMovement_gait(character)->acceleration_rate;
-	return character->movement.settings->idle_acceleration_rate;
+	if (state == MOVEMENT_STATE_WALKING) return characterMovement_gait(character)->response_rate;
+	return character->movement.settings->idle_response_rate;
 }
 
 static float characterMovement_rotationAccelerationRate(const Character *character, uint8_t state)
 {
-	if (state == MOVEMENT_STATE_WALKING) return characterMovement_gait(character)->rotation_acceleration_rate;
-	return character->movement.settings->idle_rotation_acceleration_rate;
+	if (state == MOVEMENT_STATE_WALKING) return characterMovement_gait(character)->rotation_response_rate;
+	return character->movement.settings->idle_rotation_response_rate;
 }
 
-static void characterMovement_setHorizontalVelocity(Character *character, float yaw, float target_speed, float acceleration_rate, float dt)
+static void characterMovement_setHorizontalVelocity(Character *character, float yaw, float target_speed, float response_rate, float dt)
 {
 	KinematicBody *body = &character->body;
 
 	float target_vx = target_speed *  fm_sinf(deg_to_rad(yaw));
 	float target_vy = target_speed * -fm_cosf(deg_to_rad(yaw));
 
-	float factor = fm_expf(-acceleration_rate * dt);
+	float factor = fm_expf(-response_rate * dt);
 	body->velocity.x = body->velocity.x * factor + target_vx * (1.0f - factor);
 	body->velocity.y = body->velocity.y * factor + target_vy * (1.0f - factor);
 }
 
 /*
-static void characterMovement_setHorizontalVelocity(Character *character, float yaw, float target_speed, float acceleration_rate, float dt)
+static void characterMovement_setHorizontalVelocity(Character *character, float yaw, float target_speed, float response_rate, float dt)
 {
 	KinematicBody *body = &character->body;
 
 	float target_vx = target_speed *  fm_sinf(deg_to_rad(yaw));
 	float target_vy = target_speed * -fm_cosf(deg_to_rad(yaw));
 
-	body->acceleration.x = acceleration_rate * (target_vx - body->velocity.x);
-	body->acceleration.y = acceleration_rate * (target_vy - body->velocity.y);
+	body->acceleration.x = response_rate * (target_vx - body->velocity.x);
+	body->acceleration.y = response_rate * (target_vy - body->velocity.y);
 
 	body->velocity.x += body->acceleration.x * dt;
 	body->velocity.y += body->acceleration.y * dt;
@@ -126,8 +126,8 @@ static void characterMovement_setRotation(Character *character, float dt)
 	uint8_t state = character->movement.current;
 	if (state == MOVEMENT_STATE_ROLLING || state == MOVEMENT_STATE_JUMPING || state == MOVEMENT_STATE_FALLING)
 		state = character->movement.locomotion;
-	float acceleration_rate = characterMovement_rotationAccelerationRate(character, state);
-	float factor = fm_expf(-acceleration_rate * dt);
+	float response_rate = characterMovement_rotationAccelerationRate(character, state);
+	float factor = fm_expf(-response_rate * dt);
 	body->rotation.z = angle_wrap(current_yaw * factor + target_yaw * (1.0f - factor));
 }
 
@@ -171,7 +171,7 @@ static void characterMovement_rollLaunch(Character *character, MovementCommand *
 {
 	(void)locomotion;
 	CharacterMovementData *data = &character->movement.data;
-	characterMovement_setHorizontalVelocity(character, data->roll_yaw, settings->roll_target_speed, settings->roll_launch_acceleration_rate, dt);
+	characterMovement_setHorizontalVelocity(character, data->roll_yaw, settings->roll_target_speed, settings->roll_launch_response_rate, dt);
 	data->roll_timer += dt;
 	if (data->roll_timer >= settings->roll_ground_time) cmd->roll_triggered = false;
 }
@@ -179,14 +179,14 @@ static void characterMovement_rollLaunch(Character *character, MovementCommand *
 static void characterMovement_rollSpin(Character *character, const CharacterMovementSettings *settings, float dt)
 {
 	CharacterMovementData *data = &character->movement.data;
-	characterMovement_setHorizontalVelocity(character, -character->body.rotation.z, data->horizontal_speed, settings->roll_spin_acceleration_rate, dt);
+	characterMovement_setHorizontalVelocity(character, -character->body.rotation.z, data->horizontal_speed, settings->roll_spin_response_rate, dt);
 	data->roll_timer += dt;
 }
 
 static void characterMovement_rollGrip(Character *character, MovementCommand *cmd, const CharacterMovementSettings *settings, float dt)
 {
 	CharacterMovementData *data = &character->movement.data;
-	characterMovement_setHorizontalVelocity(character, cmd->target_yaw, data->horizontal_speed, settings->roll_grip_acceleration_rate, dt);
+	characterMovement_setHorizontalVelocity(character, cmd->target_yaw, data->horizontal_speed, settings->roll_grip_response_rate, dt);
 	data->roll_timer += dt;
 }
 
@@ -276,7 +276,7 @@ static void characterMovement_setJump(Character *character, MovementCommand *cmd
 		cmd->jump_triggered = false;
 	}
 
-	characterMovement_setHorizontalVelocity(character, cmd->target_yaw, data->horizontal_speed, settings->jump_acceleration_rate, dt);
+	characterMovement_setHorizontalVelocity(character, cmd->target_yaw, data->horizontal_speed, settings->jump_response_rate, dt);
 
 	switch (characterMovement_jumpPhase(data, body, settings)) {
 		case CHARACTER_JUMP_PHASE_CHARGING: characterMovement_jumpCharging(character, cmd, dt); break;
@@ -293,7 +293,7 @@ static void characterMovement_setFalling(Character *character, MovementCommand *
 	const CharacterMovementSettings *settings = character->movement.settings;
 
 	data->is_grounded = 0;
-	characterMovement_setHorizontalVelocity(character, cmd->target_yaw, data->horizontal_speed, settings->jump_acceleration_rate, dt);
+	characterMovement_setHorizontalVelocity(character, cmd->target_yaw, data->horizontal_speed, settings->jump_response_rate, dt);
 	body->acceleration.z = CHARACTER_GRAVITY;
 	if (body->velocity.z < CHARACTER_FALL_MAX_SPEED)
 		body->velocity.z = CHARACTER_FALL_MAX_SPEED;

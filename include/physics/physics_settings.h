@@ -13,4 +13,8 @@
 #define PHYSICS_SOLVER_ITERATIONS 4
 #define PHYSICS_TIMESTEP          (1.0f / 60.0f)
 
+/* Cap on the steps a single frame may run. Without it a long frame queues up
+   more steps than the next frame can afford, which only makes it longer. */
+#define PHYSICS_MAX_SUBSTEPS      4
+
 #endif

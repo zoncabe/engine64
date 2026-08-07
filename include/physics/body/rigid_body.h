@@ -103,6 +103,7 @@ void rigidBodyDef_init(RigidBodyDef *d);
 
 void rigidBody_init(RigidBody *b, const RigidBodyDef *def, struct PhysicsWorld *world);
 
+PhysicsShape *rigidBody_addShape  (RigidBody *b, const PhysicsShapeDef *def, Vector3 scale);
 PhysicsShape *rigidBody_addBox    (RigidBody *b, const BoxDef     *def);
 PhysicsShape *rigidBody_addSphere (RigidBody *b, const SphereDef  *def);
 PhysicsShape *rigidBody_addCapsule(RigidBody *b, const CapsuleDef *def);

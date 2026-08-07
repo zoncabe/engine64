@@ -19,7 +19,6 @@ typedef enum {
 
 	PAUSE_BG,
 	PAUSE_CONTINUE,
-	PAUSE_OPTIONS,
 	PAUSE_QUIT,
 	PAUSE_HINT_MOVE,
 	PAUSE_HINT_SELECT,
@@ -37,12 +36,12 @@ static ScreenAnimationTrack pause_cursor_track[];
 
 static const ScreenAnimation pause_transition_animation = {
 	.track       = pause_transition_track,
-	.track_count = 14,
+	.track_count = 13,
 };
 
 static const ScreenAnimation pause_cursor_animation = {
 	.track       = pause_cursor_track,
-	.track_count = 3,
+	.track_count = 2,
 };
 
 Screen pause_screen = {
@@ -51,8 +50,7 @@ Screen pause_screen = {
 			.element = {
 				[PAUSE_BG]          = { .type = DRAW_RECTANGLE, .position = {   0.0f,   0.0f }, .scale = { 320.0f, 240.0f }, .rectangle = { SHAPE_FILL_GRADIENT } },
 				[PAUSE_CONTINUE]    = { .type = DRAW_TEXT,      .position = { 320.0f,  50.0f },                              .text      = { HEADLINER_20, MENU_STYLE_NORMAL, "Continue", &h20_parms } },
-				[PAUSE_OPTIONS]     = { .type = DRAW_TEXT,      .position = { 320.0f,  80.0f },                              .text      = { HEADLINER_20, MENU_STYLE_NORMAL, "Options",  &h20_parms } },
-				[PAUSE_QUIT]        = { .type = DRAW_TEXT,      .position = { 320.0f, 110.0f },                              .text      = { HEADLINER_20, MENU_STYLE_NORMAL, "Quit",     &h20_parms } },
+				[PAUSE_QUIT]        = { .type = DRAW_TEXT,      .position = { 320.0f,  80.0f },                              .text      = { HEADLINER_20, MENU_STYLE_NORMAL, "Quit",     &h20_parms } },
 				[PAUSE_HINT_MOVE]   = { .type = DRAW_TEXT,      .position = { 347.0f, 196.0f },                              .text      = { HEADLINER_14, 0,                 "Move",     &h14_parms } },
 				[PAUSE_HINT_SELECT] = { .type = DRAW_TEXT,      .position = { 338.0f, 211.0f },                              .text      = { HEADLINER_14, 0,                 "Select",   &h14_parms } },
 				[PAUSE_HINT_BACK]   = { .type = DRAW_TEXT,      .position = { 338.0f, 226.0f },                              .text      = { HEADLINER_14, 0,                 "Back",     &h14_parms } },
@@ -61,16 +59,15 @@ Screen pause_screen = {
 				[PAUSE_BTN_A]       = { .type = DRAW_SPRITE,    .position = { 320.0f, 201.0f }, .scale = { 0.60f, 0.60f },   .sprite    = { SPRITE_BTN_A  } },
 				[PAUSE_BTN_B]       = { .type = DRAW_SPRITE,    .position = { 320.0f, 216.0f }, .scale = { 0.60f, 0.60f },   .sprite    = { SPRITE_BTN_B  } },
 			},
-			.element_count = 11,
+			.element_count = 10,
 		},
 	},
 	.section_count = 1,
 	.animation     = &pause_transition_animation,
 };
 
-static const float pause_style_continue[] = { MENU_STYLE_SELECTED, MENU_STYLE_NORMAL,   MENU_STYLE_NORMAL   };
-static const float pause_style_options[]  = { MENU_STYLE_NORMAL,   MENU_STYLE_SELECTED, MENU_STYLE_NORMAL   };
-static const float pause_style_quit[]     = { MENU_STYLE_NORMAL,   MENU_STYLE_NORMAL,   MENU_STYLE_SELECTED };
+static const float pause_style_continue[] = { MENU_STYLE_SELECTED, MENU_STYLE_NORMAL   };
+static const float pause_style_quit[]     = { MENU_STYLE_NORMAL,   MENU_STYLE_SELECTED };
 
 static ScreenAnimationTrack pause_transition_track[] = {
 
@@ -80,7 +77,6 @@ static ScreenAnimationTrack pause_transition_track[] = {
 	{ .target_u8 = &pause_screen.section[0].element[PAUSE_BG].rectangle.gradient[3].a, .from = 0.0f, .to =  76.5f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
 
 	{ .target = &pause_screen.section[0].element[PAUSE_CONTINUE].position.x,    .from = 320.0f, .to = 238.0f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
-	{ .target = &pause_screen.section[0].element[PAUSE_OPTIONS].position.x,     .from = 320.0f, .to = 244.0f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
 	{ .target = &pause_screen.section[0].element[PAUSE_QUIT].position.x,        .from = 320.0f, .to = 263.0f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
 
 	{ .target = &pause_screen.section[0].element[PAUSE_HINT_MOVE].position.x,   .from = 347.0f, .to = 262.0f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
@@ -96,7 +92,6 @@ static ScreenAnimationTrack pause_transition_track[] = {
 static ScreenAnimationTrack pause_cursor_track[] = {
 
 	{ .target_u8 = &pause_screen.section[0].element[PAUSE_CONTINUE].text.style, .source_int = NULL, .values_by_index = pause_style_continue },
-	{ .target_u8 = &pause_screen.section[0].element[PAUSE_OPTIONS].text.style,  .source_int = NULL, .values_by_index = pause_style_options  },
 	{ .target_u8 = &pause_screen.section[0].element[PAUSE_QUIT].text.style,     .source_int = NULL, .values_by_index = pause_style_quit     },
 };
 
@@ -108,7 +103,6 @@ void pause_ui_init(void)
 	const int8_t *index = menuStack_getIndexPtr();
 	pause_cursor_track[0].source_int = index;
 	pause_cursor_track[1].source_int = index;
-	pause_cursor_track[2].source_int = index;
 }
 
 void pause_update(void)

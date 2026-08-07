@@ -18,6 +18,7 @@ src =   $(wildcard *.c) \
 		$(wildcard src/physics/memory/*.c) \
 		$(wildcard src/physics/shapes/*.c) \
 		$(wildcard src/physics/body/*.c) \
+		$(wildcard src/physics/cloth/*.c) \
 		$(wildcard src/physics/broadphase/*.c) \
 		$(wildcard src/physics/collision/*.c) \
 		$(wildcard src/physics/world/*.c) \
@@ -30,6 +31,7 @@ src =   $(wildcard *.c) \
 		$(wildcard src/player/*.c) \
 		$(wildcard src/ui/*.c) \
 		$(wildcard src/graphics/*.c) \
+		$(wildcard src/shaders/*.c) \
 		$(wildcard src/resources/*.c) \
 		$(wildcard src/light/*.c) \
 		$(wildcard src/render/*.c) \
@@ -47,7 +49,9 @@ assets_conv = $(addprefix filesystem/textures/,$(notdir $(assets_png:%.png=%.spr
 			  $(addprefix filesystem/audio/,$(notdir $(assets_wav:%.wav=%.wav64)))
 
 # Models with a collision mesh (declared one per line)
-assets_collision = filesystem/collision/room.collision
+assets_collision = filesystem/collision/room.collision \
+                   filesystem/collision/brew_flag.collision \
+                   filesystem/collision/bandera_uruguay.collision
 
 
 all: $(PROJECT_NAME).z64
@@ -84,6 +88,7 @@ filesystem/fonts/Headliner10.font64: MKFONT_FLAGS += --size 10
 filesystem/fonts/Headliner14.font64: MKFONT_FLAGS += --size 14
 filesystem/fonts/Headliner20.font64: MKFONT_FLAGS += --size 20
 filesystem/fonts/Headliner40.font64: MKFONT_FLAGS += --size 43
+filesystem/fonts/Headliner60.font64: MKFONT_FLAGS += --size 60
 
 filesystem/audio/%.wav64: assets/audio/%.wav
 	@mkdir -p $(dir $@)

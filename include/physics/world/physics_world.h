@@ -13,6 +13,7 @@
 #include "physics/memory/physics_paged_allocator.h"
 #include "physics/collision/contact_manager.h"
 #include "physics/body/rigid_body.h"
+#include "physics/cloth/cloth.h"
 #include "physics/shapes/physics_shape.h"
 #include "physics/geometry/aabb.h"
 #include "physics/geometry/raycast.h"
@@ -38,11 +39,16 @@ typedef struct PhysicsWorld {
 	int32_t               body_count;
 	RigidBody            *body_list;
 
+	int32_t               cloth_count;
+	Cloth                *cloth_list;
+
 	PhysicsStack          stack;
 	PhysicsHeap           heap;
 
 	Vector3               gravity;
+	Vector3               wind;      /* pushes cloths only; write it per frame */
 	float                 dt;
+	float                 accumulator;
 	int32_t               iterations;
 
 	int                   new_shape;
@@ -56,11 +62,23 @@ typedef struct PhysicsWorld {
 void physicsWorld_init    (PhysicsWorld *s, float dt, Vector3 gravity, int32_t iterations);
 void physicsWorld_shutdown(PhysicsWorld *s);
 
+/* Advances the world by the frame's elapsed time, running as many fixed steps
+   of dt as fit into it. Call this one, not physics_step, from the game loop:
+   stepping once per frame ties the simulation's speed to the framerate. */
+void physics_update(PhysicsWorld *s, float delta);
+
 void physics_step(PhysicsWorld *s);
 
 RigidBody *physicsWorld_createBody    (PhysicsWorld *s, const RigidBodyDef *def);
 void       physicsWorld_removeBody    (PhysicsWorld *s, RigidBody *body);
 void       physicsWorld_removeAllBodies(PhysicsWorld *s);
+
+/* Cloths are stepped by physics_step along with the bodies. The def names the
+   welded collision mesh that seeds the particles; it is loaded here, read, and
+   dropped, so the caller never handles it. */
+Cloth *physicsWorld_createCloth    (PhysicsWorld *s, const ClothDef *def);
+void   physicsWorld_removeCloth    (PhysicsWorld *s, Cloth *cloth);
+void   physicsWorld_removeAllCloths(PhysicsWorld *s);
 
 void physicsWorld_setAllowSleep    (PhysicsWorld *s, int allow_sleep);
 void physicsWorld_setIterations    (PhysicsWorld *s, int32_t iterations);
@@ -68,6 +86,9 @@ void physicsWorld_setEnableFriction(PhysicsWorld *s, int enabled);
 
 Vector3 physicsWorld_getGravity(const PhysicsWorld *s);
 void    physicsWorld_setGravity(PhysicsWorld *s, Vector3 gravity);
+
+/* Only cloths feel it. Meant to be rewritten every frame, gusts included. */
+void    physicsWorld_setWind(PhysicsWorld *s, Vector3 wind);
 
 void physicsWorld_setContactListener(PhysicsWorld *s, ContactListener *listener);
 

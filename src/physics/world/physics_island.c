@@ -114,6 +114,11 @@ void physicsIsland_solve(PhysicsIsland *island)
 
 		if (body->flags & BODY_FLAG_STATIC) continue;
 
+		/* A kinematic body is placed by whoever owns it, not by the solver: it
+		   carries a velocity so contacts know how hard it pushes, but
+		   integrating that velocity here would advance it a second time. */
+		if (body->flags & BODY_FLAG_KINEMATIC) continue;
+
 		body->linear_velocity  = v->v;
 		body->angular_velocity = v->w;
 
@@ -132,6 +137,10 @@ void physicsIsland_solve(PhysicsIsland *island)
 			RigidBody *body = island->bodies[i];
 			if (body->flags & BODY_FLAG_STATIC) continue;
 
+			/* Kinematics move on someone else's schedule, so their stillness
+			   says nothing about whether the island can rest. */
+			if (body->flags & BODY_FLAG_KINEMATIC) continue;
+
 			float sqr_lin = vector3_dot(&body->linear_velocity, &body->linear_velocity);
 			float sqr_ang = vector3_dot(&body->angular_velocity, &body->angular_velocity);
 
@@ -146,6 +155,10 @@ void physicsIsland_solve(PhysicsIsland *island)
 
 		if (min_sleep > PHYSICS_SLEEP_TIME) {
 			for (int32_t i = 0; i < island->body_count; ++i) {
+				/* Asleep it would stop seeding islands, and the bodies resting
+				   against it would never learn that it started moving again. */
+				if (island->bodies[i]->flags & BODY_FLAG_KINEMATIC) continue;
+
 				rigidBody_setToSleep(island->bodies[i]);
 			}
 		}

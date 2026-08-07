@@ -36,6 +36,52 @@ void characterCollider_setVertical(CharacterCollider *collider, const Vector3 *p
 }
 
 
+/* Registers the kinematic body in the world. Infinite mass and no gravity: the
+   solver reads it to push rigid bodies and never writes back. It must not
+   sleep, or the boxes resting on it would miss the moment it starts moving. */
+void characterPhysics_createBody(Character *character, PhysicsWorld *world)
+{
+	RigidBodyDef def;
+	rigidBodyDef_init(&def);
+
+	def.body_type   = BODY_KINEMATIC;
+	def.position    = character->collider.world.position;
+	def.axis        = (Vector3){ 0.0f, 0.0f, 1.0f };
+	def.angle       = 0.0f;
+	def.allow_sleep = 0;
+
+	RigidBody *rigid = physicsWorld_createBody(world, &def);
+	if (rigid == NULL) return;
+
+	rigid->owner = character->entity;
+
+	CapsuleDef shape = {
+		.radius      = character->collider.shape.radius,
+		.half_height = character->collider.shape.half_height,
+		.friction    = 0.5f,
+		.restitution = 0.0f,
+		.density     = 0.0f,
+	};
+	transform_init(&shape.tx);
+
+	rigidBody_addCapsule(rigid, &shape);
+	character->body.rigid = rigid;
+}
+
+
+/* Hands the frame's outcome to the world. Velocity matters as much as the
+   position: it is what tells a contact how hard the character is pushing. */
+void characterPhysics_syncBody(Character *character)
+{
+	RigidBody *rigid = character->body.rigid;
+	if (rigid == NULL) return;
+
+	rigidBody_setTransformPosition(rigid, character->collider.world.position);
+	rigidBody_setLinearVelocity(rigid, character->body.velocity);
+	rigidBody_setToAwake(rigid);
+}
+
+
 void characterContact_clear(CharacterContact *contact)
 {
 	contact->point                 = (Vector3){0.0f, 0.0f, 0.0f};
@@ -238,35 +284,42 @@ static int characterPhysics_deepestContact(const CharacterCollider *collider,
 	return found;
 }
 
+/* Walks the world's static bodies instead of a copied list: their shapes are
+   stored relative to their body, so each one is composed into world space here
+   before it is tested. */
 static int characterPhysics_deepestContactAll(const CharacterCollider *collider,
-                                              const PhysicsShape *shapes, int shape_count,
+                                              const PhysicsWorld *world,
                                               ContactManifold *out)
 {
 	int found = 0;
 
-	for (int i = 0; i < shape_count; i++) {
-		const PhysicsShape *shape = &shapes[i];
-		ContactManifold m = {0};
+	for (const RigidBody *body = world->body_list; body; body = body->next) {
+		if (!(body->flags & BODY_FLAG_STATIC)) continue;
 
-		switch (shape->type) {
-			case SHAPE_MESH:
-				if (!characterPhysics_deepestContact(collider, shape->mesh, &shape->local.position, &m)) continue;
-				break;
-			case SHAPE_BOX:
-				capsuleToStaticBox(&m, &collider->shape, &collider->world, &shape->box, &shape->local);
-				break;
-			case SHAPE_SPHERE:
-				capsuleToStaticSphere(&m, &collider->shape, &collider->world, &shape->sphere, &shape->local);
-				break;
-			case SHAPE_CAPSULE:
-				capsuleToStaticCapsule(&m, &collider->shape, &collider->world, &shape->capsule, &shape->local);
-				break;
-		}
-		if (!m.contact_count) continue;
+		for (const PhysicsShape *shape = body->shapes; shape; shape = shape->next) {
+			Transform tx = transform_product(&body->tx, &shape->local);
+			ContactManifold m = {0};
 
-		if (!found || m.contacts[0].penetration < out->contacts[0].penetration) {
-			*out  = m;
-			found = 1;
+			switch (shape->type) {
+				case SHAPE_MESH:
+					if (!characterPhysics_deepestContact(collider, shape->mesh, &tx.position, &m)) continue;
+					break;
+				case SHAPE_BOX:
+					capsuleToStaticBox(&m, &collider->shape, &collider->world, &shape->box, &tx);
+					break;
+				case SHAPE_SPHERE:
+					capsuleToStaticSphere(&m, &collider->shape, &collider->world, &shape->sphere, &tx);
+					break;
+				case SHAPE_CAPSULE:
+					capsuleToStaticCapsule(&m, &collider->shape, &collider->world, &shape->capsule, &tx);
+					break;
+			}
+			if (!m.contact_count) continue;
+
+			if (!found || m.contacts[0].penetration < out->contacts[0].penetration) {
+				*out  = m;
+				found = 1;
+			}
 		}
 	}
 
@@ -307,16 +360,19 @@ static void floorProbe_consider(FloorProbe *probe, const Vector3 *center, float 
 	}
 }
 
-static void characterPhysics_probeFloor(const PhysicsShape *shapes, int shape_count, const Vector3 *center, float radius, FloorProbe *probe)
+static void characterPhysics_probeFloor(const PhysicsWorld *world, const Vector3 *center, float radius, FloorProbe *probe)
 {
 	*probe = (FloorProbe){0};
 
-	for (int i = 0; i < shape_count; i++) {
-		const PhysicsShape *shape = &shapes[i];
+	for (const RigidBody *body = world->body_list; body; body = body->next) {
+	if (!(body->flags & BODY_FLAG_STATIC)) continue;
+
+	for (const PhysicsShape *shape = body->shapes; shape; shape = shape->next) {
+		Transform tx = transform_product(&body->tx, &shape->local);
 
 		switch (shape->type) {
 			case SHAPE_MESH: {
-				Vector3 local_center = vector3_difference(center, &shape->local.position);
+				Vector3 local_center = vector3_difference(center, &tx.position);
 
 				AABB aabb = {
 					{ local_center.x - radius, local_center.y - radius, local_center.z - radius },
@@ -335,17 +391,17 @@ static void characterPhysics_probeFloor(const PhysicsShape *shapes, int shape_co
 				break;
 			}
 			case SHAPE_BOX: {
-				Vector3 local_center = transform_mulVectorTransposed(&shape->local, center);
+				Vector3 local_center = transform_mulVectorTransposed(&tx, center);
 
 				Vector3 e = shape->box.e;
 				AABB box_local = { { -e.x, -e.y, -e.z }, { e.x, e.y, e.z } };
 				Vector3 closest_local = aabb_closestToPoint(&box_local, &local_center);
-				Vector3 closest = transform_mulVector(&shape->local, &closest_local);
+				Vector3 closest = transform_mulVector(&tx, &closest_local);
 				floorProbe_consider(probe, center, radius, &closest);
 				break;
 			}
 			case SHAPE_SPHERE: {
-				const Vector3 *pos = &shape->local.position;
+				const Vector3 *pos = &tx.position;
 				Vector3 d = vector3_difference(center, pos);
 				Vector3 dir = vector3_normalized(&d);
 				Vector3 closest = *pos;
@@ -355,7 +411,7 @@ static void characterPhysics_probeFloor(const PhysicsShape *shapes, int shape_co
 			}
 			case SHAPE_CAPSULE: {
 				Vector3 a, b;
-				capsule_getSegment(&shape->capsule, &shape->local, &a, &b);
+				capsule_getSegment(&shape->capsule, &tx, &a, &b);
 				Vector3 on_seg = segment_closestToPoint(&a, &b, center);
 				Vector3 d = vector3_difference(center, &on_seg);
 				Vector3 dir = vector3_normalized(&d);
@@ -366,9 +422,10 @@ static void characterPhysics_probeFloor(const PhysicsShape *shapes, int shape_co
 			}
 		}
 	}
+	}
 }
 
-static void characterPhysics_findFloor(const Character *character, const PhysicsShape *shapes, int shape_count, FloorProbe *probe)
+static void characterPhysics_findFloor(const Character *character, const PhysicsWorld *world, FloorProbe *probe)
 {
 	float radius = character->collider.shape.radius;
 
@@ -376,7 +433,7 @@ static void characterPhysics_findFloor(const Character *character, const Physics
 	Vector3 center = character->body.position;
 	center.z += radius - CHARACTER_FLOOR_SNAP_LENGTH;
 
-	characterPhysics_probeFloor(shapes, shape_count, &center, radius, probe);
+	characterPhysics_probeFloor(world, &center, radius, probe);
 }
 
 /* Godot's _snap_on_floor conditions: only when the character was on the
@@ -395,7 +452,7 @@ static void characterPhysics_snapToFloor(Character *character, const FloorProbe 
 	characterCollision_setGroundResponse(character);
 }
 
-void characterPhysics_collide(Character *character, const PhysicsShape *shapes, int shape_count)
+void characterPhysics_collide(Character *character, const PhysicsWorld *world)
 {
 	CharacterMovementData *data = &character->movement.data;
 
@@ -407,7 +464,7 @@ void characterPhysics_collide(Character *character, const PhysicsShape *shapes, 
 
 	for (int slide = 0; slide < CHARACTER_MAX_SLIDES; slide++) {
 		ContactManifold m;
-		if (!characterPhysics_deepestContactAll(&character->collider, shapes, shape_count, &m)) break;
+		if (!characterPhysics_deepestContactAll(&character->collider, world, &m)) break;
 
 		CharacterContact contact;
 		characterContact_clear(&contact);
@@ -416,7 +473,7 @@ void characterPhysics_collide(Character *character, const PhysicsShape *shapes, 
 	}
 
 	FloorProbe floor;
-	characterPhysics_findFloor(character, shapes, shape_count, &floor);
+	characterPhysics_findFloor(character, world, &floor);
 
 	characterPhysics_snapToFloor(character, &floor, was_on_floor, velocity_facing_up);
 

@@ -12,6 +12,7 @@
 #include "physics/collision/contact_solver.h"
 #include "physics/collision/contact_manager.h"
 #include "physics/collision/collision.h"
+#include "physics/collision/collision_mesh.h"
 #include "physics/broadphase/broad_phase.h"
 
 
@@ -69,8 +70,12 @@ void physicsWorld_init(PhysicsWorld *s, float dt, Vector3 gravity, int32_t itera
 
 	s->body_count       = 0;
 	s->body_list        = NULL;
+	s->cloth_count      = 0;
+	s->cloth_list       = NULL;
+	s->wind             = vector3_zero();
 	s->gravity          = gravity;
 	s->dt               = dt;
+	s->accumulator      = 0.0f;
 	s->iterations       = iterations;
 	s->new_shape        = 0;
 	s->allow_sleep      = 1;
@@ -93,8 +98,66 @@ void physicsWorld_removeAllBodies(PhysicsWorld *s)
 }
 
 
+/* --- cloth --- */
+
+Cloth *physicsWorld_createCloth(PhysicsWorld *s, const ClothDef *def)
+{
+	Cloth *cloth = physicsHeap_allocate(&s->heap, sizeof(Cloth));
+	if (cloth == NULL) return NULL;
+
+	/* The mesh is scaffolding: it seeds the particles and the constraints, and
+	   nothing keeps a reference to it afterwards. */
+	CollisionMesh *mesh = collisionMesh_load(def->mesh_path);
+	bool built = cloth_create(cloth, mesh, def);
+	collisionMesh_delete(mesh);
+
+	if (!built) {
+		physicsHeap_free(&s->heap, cloth);
+		return NULL;
+	}
+
+	cloth->gravity = s->gravity;
+	cloth->wind    = s->wind;
+
+	cloth->next  = s->cloth_list;
+	s->cloth_list = cloth;
+	s->cloth_count++;
+
+	return cloth;
+}
+
+
+void physicsWorld_removeCloth(PhysicsWorld *s, Cloth *cloth)
+{
+	for (Cloth **link = &s->cloth_list; *link; link = &(*link)->next) {
+		if (*link != cloth) continue;
+
+		*link = cloth->next;
+		cloth_delete(cloth);
+		physicsHeap_free(&s->heap, cloth);
+		s->cloth_count--;
+		return;
+	}
+}
+
+
+void physicsWorld_removeAllCloths(PhysicsWorld *s)
+{
+	Cloth *cloth = s->cloth_list;
+	while (cloth) {
+		Cloth *next = cloth->next;
+		cloth_delete(cloth);
+		physicsHeap_free(&s->heap, cloth);
+		cloth = next;
+	}
+	s->cloth_list  = NULL;
+	s->cloth_count = 0;
+}
+
+
 void physicsWorld_shutdown(PhysicsWorld *s)
 {
+	physicsWorld_removeAllCloths(s);
 	physicsWorld_removeAllBodies(s);
 	physicsPagedAllocator_shutdown(&s->shape_allocator);
 	contactManager_shutdown(&s->contact_manager);
@@ -104,6 +167,21 @@ void physicsWorld_shutdown(PhysicsWorld *s)
 
 
 /* --- step --- */
+
+void physics_update(PhysicsWorld *s, float delta)
+{
+	s->accumulator += delta;
+
+	/* Drop whatever a frame can't afford instead of carrying the debt over. */
+	float ceiling = s->dt * PHYSICS_MAX_SUBSTEPS;
+	if (s->accumulator > ceiling) s->accumulator = ceiling;
+
+	while (s->accumulator >= s->dt) {
+		physics_step(s);
+		s->accumulator -= s->dt;
+	}
+}
+
 
 void physics_step(PhysicsWorld *s)
 {
@@ -203,9 +281,13 @@ void physics_step(PhysicsWorld *s)
 	physicsStack_free(&s->stack, island.velocities);
 	physicsStack_free(&s->stack, island.bodies);
 
-	/* Sync broadphase AABBs. */
+	/* Sync broadphase AABBs. A sleeping body did not move, so its proxy is
+	   already where it belongs: re-inserting it into the tree every substep is
+	   what makes a settled scene keep costing, and settled is the normal case. */
 	for (RigidBody *body = s->body_list; body; body = body->next) {
 		if (body->flags & BODY_FLAG_STATIC) continue;
+		if (!(body->flags & BODY_FLAG_AWAKE)) continue;
+
 		rigidBody_synchronizeProxies(body);
 	}
 
@@ -215,6 +297,15 @@ void physics_step(PhysicsWorld *s)
 		body->force  = vector3_zero();
 		body->torque = vector3_zero();
 	}
+
+	/* Cloths run on the same fixed step, but outside the island solver: they
+	   are self-contained and never take part in contacts. What the world does
+	   to them is written here; the cloth resolves the wind per triangle. */
+	for (Cloth *cloth = s->cloth_list; cloth; cloth = cloth->next) {
+		cloth->gravity = s->gravity;
+		cloth->wind    = s->wind;
+		cloth_step(cloth, s->dt);
+	}
 }
 
 
@@ -223,6 +314,12 @@ void physics_step(PhysicsWorld *s)
 RigidBody *physicsWorld_createBody(PhysicsWorld *s, const RigidBodyDef *def)
 {
 	RigidBody *body = (RigidBody *)physicsHeap_allocate(&s->heap, (int32_t)sizeof(RigidBody));
+
+	/* The heap is a fixed 256 KB and hands back NULL when it is full or too
+	   fragmented to fit. Writing the body through that NULL corrupts low
+	   memory and then the world walks a list holding it, which surfaces far
+	   from here as garbage floats in the solver. */
+	assert(body);
 	rigidBody_init(body, def, s);
 
 	body->prev = NULL;
@@ -275,6 +372,7 @@ void physicsWorld_setEnableFriction(PhysicsWorld *s, int enabled)
 
 Vector3 physicsWorld_getGravity(const PhysicsWorld *s)       { return s->gravity; }
 void    physicsWorld_setGravity(PhysicsWorld *s, Vector3 g)  { s->gravity = g; }
+void    physicsWorld_setWind   (PhysicsWorld *s, Vector3 w)  { s->wind = w; }
 
 
 void physicsWorld_setContactListener(PhysicsWorld *s, ContactListener *listener)

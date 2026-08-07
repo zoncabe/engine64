@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <string.h>
 
 #include <t3d/t3d.h>
@@ -62,8 +63,16 @@ static void render_setSceneContext(RenderContext *ctx, const Scene *s, uint8_t f
 		T3DMat4FP  *matrix = mesh->matrix_buffer ? &mesh->matrix_buffer[fb_index] : NULL;
 		T3DSkeleton *skel  = mesh->skeleton;
 
+		/* Whatever drives this mesh has already moved: fold the new positions
+		   into this frame's vertex buffer, then point the segment its recorded
+		   display list reads from at that same copy. */
+		mesh_updateDeform(mesh, fb_index);
+		mesh_bindDeformFrame(mesh, fb_index);
+
 		for (int part = 0; part < mesh->dl_count; part++) {
 			if (!(mesh->visible & (1u << part))) continue;
+
+			assert(ctx->object_count < RENDER_MAX_T3D_OBJECT);
 			ctx->object[ctx->object_count++] = (T3DElement){ mesh->dl[part], matrix, skel };
 		}
 	}
@@ -129,17 +138,48 @@ void render(RenderContext *ctx, int *fb_index)
 
 	if (ctx->object_count > 0) {
 		light_set(light_get());
+
+		/* A mesh contributes one element per visible part, and every part of
+		   the same mesh shares its skeleton and its matrix: a character with
+		   three weapons is four elements with identical state. Binding and
+		   pushing once per run of equal state, and popping only when it
+		   changes, cuts that setup without altering a single draw. */
+		const T3DSkeleton *bound  = NULL;
+		const T3DMat4FP   *pushed = NULL;
+
 		for (int i = 0; i < ctx->object_count; i++) {
 			T3DElement *obj = &ctx->object[i];
-			if (obj->skeleton) t3d_skeleton_use(obj->skeleton);
-			if (obj->matrix)   t3d_matrix_push(obj->matrix);
+
+			if (obj->skeleton && obj->skeleton != bound) {
+				t3d_skeleton_use(obj->skeleton);
+				bound = obj->skeleton;
+			}
+
+			if (obj->matrix != pushed) {
+				if (pushed) t3d_matrix_pop(1);
+				if (obj->matrix) t3d_matrix_push(obj->matrix);
+				pushed = obj->matrix;
+			}
+
 			rspq_block_run(obj->dl);
-			if (obj->matrix)   t3d_matrix_pop(1);
 		}
+
+		if (pushed) t3d_matrix_pop(1);
 	}
 
 	for (int s = 0; s < ctx->section_count; s++) {
 		RenderSection *section = &ctx->section[s];
+
+		/* Nothing on screen, nothing on the wire: a fully hidden section
+		   must not emit a single command, scissor setup included. */
+		bool any_visible = false;
+		for (int i = 0; i < section->element_count; i++) {
+			if (!ctx->element[section->element_start + i].is_hidden) {
+				any_visible = true;
+				break;
+			}
+		}
+		if (!any_visible) continue;
 
 		if (section->has_scissor) {
 			rdpq_set_scissor(

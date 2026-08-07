@@ -15,7 +15,11 @@
 void contactManager_init(ContactManager *m, struct PhysicsStack *stack)
 {
 	m->stack = stack;
-	physicsPagedAllocator_init(&m->allocator, (int32_t)sizeof(ContactConstraint), 256);
+	/* A ContactConstraint carries a whole manifold, so it is 624 bytes: the
+	   qu3e page of 256 asks for 156 KB in one malloc, which fragments the heap
+	   badly on a console with 4 MB. 32 keeps a page at 20 KB and the allocator
+	   simply adds another when a busy scene needs it. */
+	physicsPagedAllocator_init(&m->allocator, (int32_t)sizeof(ContactConstraint), 32);
 	broadPhase_init(&m->broadphase, m);
 	m->contact_list     = NULL;
 	m->contact_count    = 0;
@@ -27,7 +31,8 @@ void contactManager_shutdown(ContactManager *m)
 {
 	broadPhase_shutdown(&m->broadphase);
 	physicsPagedAllocator_shutdown(&m->allocator);
-	m->contact_list = NULL;
+	m->contact_list  = NULL;
+	m->contact_count = 0;
 }
 
 
@@ -58,6 +63,14 @@ void contactManager_addContact(ContactManager *m, PhysicsShape *A, PhysicsShape 
 	contact->friction     = contact_mixFriction(A, B);
 	contact->restitution  = contact_mixRestitution(A, B);
 	contact->manifold.contact_count = 0;
+
+	/* The allocator hands out raw malloc memory, and testCollisions runs
+	   computeBasis on this normal whether or not the pair touched. Left as it
+	   came, a fresh page from a previous scene makes it garbage — which is why
+	   the first run survives and the second one does not. */
+	contact->manifold.normal            = (Vector3){ 0.0f, 0.0f, 1.0f };
+	contact->manifold.tangent_vectors[0] = (Vector3){ 1.0f, 0.0f, 0.0f };
+	contact->manifold.tangent_vectors[1] = (Vector3){ 0.0f, 1.0f, 0.0f };
 
 	for (int32_t i = 0; i < 8; ++i) contact->manifold.contacts[i].warm_started = 0;
 

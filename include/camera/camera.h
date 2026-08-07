@@ -39,6 +39,7 @@ typedef struct Camera {
 void camera_init(Camera *camera);
 void camera_reset(Camera *camera);
 void camera_update(Camera *camera, Vector3 *center, float dt);
+float camera_getAngleAround(const Camera *camera, const Vector3 *point);
 
 
 #endif
