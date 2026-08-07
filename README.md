@@ -12,7 +12,8 @@ Cloth simulation implemented using the [Advanced Character Physics](https://www.
 Collide and slide based character collision, resolved against boxes, spheres, capsules and triangle meshes. Floor detection and snapping.
 
 **Character movement**<br/>
-Gait based movement system: each gait defines its target speed, acceleration and rotation response. Movement accelerates towards a target velocity, with per asset settings for jump force, air control and roll timings.
+Gait based movement system: target speed, acceleration and rotation response per gait, with exponential velocity convergence. Per asset settings for charged jump, air control and roll phases.
+
 
 **Character animation**<br/>
 Blend tree based animation system: poses are sampled from clips and combined by weighted bone blending. Supports clip playback, selection, sequencing, 1D and 2D blend spaces and layering.
