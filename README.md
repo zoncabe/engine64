@@ -7,22 +7,26 @@ It works as a framework: you build your game calling the engine functions direct
 ### Features
 
 **Physics engine**
-Rigid bodies with island solving and sleeping. Sequential impulse contact solver with warm starting, friction and restitution. Box, sphere, capsule and triangle mesh colliders with a broadphase in front, plus cloth simulation running on the same fixed step.
+A port of [qu3e](https://github.com/RandyGaul/qu3e) by Randy Gaul, expanded to use all basic primitives plus triangle meshes. Rigid bodies with island solving and sleeping, sequential impulse contact solver with warm starting, friction and restitution.<br/>
+Cloth simulation implemented using the [Advanced Character Physics](https://www.cs.cmu.edu/afs/cs/academic/class/15462-s13/www/lec_slides/Jakobsen.pdf) papers, a Verlet method developed by Thomas Jakobsen at IO Interactive for the Hitman games.
 
 **Character physics**
-Characters don't go through the rigid body solver, they have their own collision path: capsule against the level mesh and primitive colliders, with floor detection for grounding. Each character carries a kinematic body so the solver props still react when pushed.
+Collide and slide based character collision, resolved against boxes, spheres, capsules and triangle meshes. Floor detection and snapping.
+
+**Character movement**
+Gait based movement system: each gait defines its target speed, acceleration and rotation response. Movement accelerates towards a target velocity, with per asset settings for jump force, air control and roll timings.
 
 **Character animation**
-Skeletal state machine on top of Tiny3D skeletons. Locomotion is a parametric grid of gaits and turning blended by weights, with aiming and strafing layered on top, and basic weapon handling.
+Blend tree based animation system: poses are sampled from clips and combined by weighted bone blending. Supports clip playback, selection, sequencing, 1D and 2D blend spaces and layering.
 
 **Screen system**
-2D screens (menus, HUD, cutscenes) are declared as structs of draw elements: rectangles, sprites and text, grouped in sections with optional scissor. A generic track based animation engine mutates those elements over time: lerps with easing, boolean visibility windows and lookup tracks driven by game state. The engine knows nothing about any particular screen.
+2D screen system with a track based animation engine. Handles rectangles, sprites and text grouped in scissor sections, with easing curves, timed visibility windows and state driven lookups.
 
-**Scenes and game states**
-A scene definition lists entities, their models and their collider shapes. The game state machine loads scenes and resources (sprites, fonts) per state, with enter and exit transitions handled by the screen system.
+**Scenes**
+Scene definitions hold the level content: entities with model, transform and collider shapes, characters, and the physics world.
 
-**Camera and control**
-Spherical third person camera with offset, with the groundwork in place for scripted cameras. Joypad bindings mapped to game actions.
+**Camera**
+Camera system with a spherical third person camera implemented, and the structure in place to add new camera types.
 
 ### Building
 
