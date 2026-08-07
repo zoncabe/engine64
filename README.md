@@ -28,15 +28,13 @@ Camera system with a spherical third person camera implemented, and the structur
 
 ### Building
 
-1. Install the Libdragon toolchain following their [installation guide](https://github.com/DragonMinded/libdragon/wiki/Installing-libdragon). The `N64_INST` environment variable must point to the toolchain install.
-2. Build and install [Tiny3D](https://github.com/HailToDodongo/tiny3d/blob/main/README.md) against that toolchain, with `T3D_INST` pointing to its location.
+1. Install the Libdragon toolchain following their [installation guide](https://github.com/DragonMinded/libdragon/wiki/Installing-libdragon).
+2. Build and install [Tiny3D](https://github.com/HailToDodongo/tiny3d/blob/main/README.md).
 3. From the project root run:
 
 ```
 make
 ```
-
-The build converts the assets (models, textures, fonts, collision meshes) and produces `game.z64`, ready to run on an emulator or flashcart. `make clean` removes the build directory and the ROM.
 
 download the latest build on the [itch.io](https://zoncabe.itch.io/engine64) page<br/>
 
