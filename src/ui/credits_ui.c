@@ -87,6 +87,12 @@ typedef enum {
 
 } CreditsOverlayElement;
 
+typedef enum {
+
+	CREDITS_COVER,
+
+} CreditsCoverElement;
+
 
 /* Posicion vertical de cada linea dentro del contenido (offset 0 = primera
    linea en la parte alta de la ventana, debajo del titulo fijo). */
@@ -123,7 +129,7 @@ Screen credits_screen = {
 	.section = {
 		[0] = {
 			.element = {
-				[CREDITS_BG]          = { .type = DRAW_RECTANGLE, .position = {   0.0f,   0.0f }, .scale = { 320.0f, 240.0f }, .rectangle = { SHAPE_FILL_GRADIENT, .gradient = { RGBA32(201, 121, 25, 255), RGBA32(223, 175, 117, 255), RGBA32(223, 175, 117, 255), RGBA32(201, 121, 25, 255) } } },
+				[CREDITS_BG]          = { .type = DRAW_RECTANGLE, .position = {   0.0f,   0.0f }, .scale = { 320.0f, 240.0f }, .rectangle = { SHAPE_FILL_GRADIENT, .gradient = { RGBA32(25, 121, 201, 255), RGBA32(117, 175, 223, 255), RGBA32(117, 175, 223, 255), RGBA32(25, 121, 201, 255) } } },
 				[CREDITS_TITLE]       = { .type = DRAW_TEXT,      .position = {  43.0f,  45.0f },                              .text      = { HEADLINER_40, MENU_STYLE_NORMAL, "Credits", &h40_parms } },
 			},
 			.element_count = 2,
@@ -166,8 +172,8 @@ Screen credits_screen = {
 		   overlay copia los colores de sus dos extremos. */
 		[2] = {
 			.element = {
-				[CREDITS_FADE_TOP]    = { .type = DRAW_RECTANGLE, .position = { 0.0f,  50.0f }, .scale = { 320.0f, 14.0f }, .rectangle = { SHAPE_FILL_GRADIENT, .gradient = { RGBA32(201, 121, 25, 255), RGBA32(223, 175, 117, 255), RGBA32(223, 175, 117, 0), RGBA32(201, 121, 25, 0) } } },
-				[CREDITS_FADE_BOTTOM] = { .type = DRAW_RECTANGLE, .position = { 0.0f, 198.0f }, .scale = { 320.0f, 14.0f }, .rectangle = { SHAPE_FILL_GRADIENT, .gradient = { RGBA32(201, 121, 25, 0), RGBA32(223, 175, 117, 0), RGBA32(223, 175, 117, 255), RGBA32(201, 121, 25, 255) } } },
+				[CREDITS_FADE_TOP]    = { .type = DRAW_RECTANGLE, .position = { 0.0f,  50.0f }, .scale = { 320.0f, 14.0f }, .rectangle = { SHAPE_FILL_GRADIENT, .gradient = { RGBA32(25, 121, 201, 255), RGBA32(117, 175, 223, 255), RGBA32(117, 175, 223, 0), RGBA32(25, 121, 201, 0) } } },
+				[CREDITS_FADE_BOTTOM] = { .type = DRAW_RECTANGLE, .position = { 0.0f, 198.0f }, .scale = { 320.0f, 14.0f }, .rectangle = { SHAPE_FILL_GRADIENT, .gradient = { RGBA32(25, 121, 201, 0), RGBA32(117, 175, 223, 0), RGBA32(117, 175, 223, 255), RGBA32(25, 121, 201, 255) } } },
 			},
 			.element_count = 2,
 		},
@@ -182,57 +188,29 @@ Screen credits_screen = {
 			},
 			.element_count = 5,
 		},
+		[4] = {
+			.element = {
+				[CREDITS_COVER] = { .type = DRAW_RECTANGLE, .position = { 0.0f, 0.0f }, .scale = { 320.0f, 240.0f }, .rectangle = { SHAPE_FILL_GRADIENT, .gradient = { RGBA32(0, 0, 0, 255), RGBA32(0, 0, 0, 255), RGBA32(0, 0, 0, 255), RGBA32(0, 0, 0, 255) } }, .is_hidden = true },
+			},
+			.element_count = 1,
+		},
 	},
-	.section_count = 4,
+	.section_count = 5,
 };
 
 
+/* La entrada entera es el cover negro (con su ruido de dither) bajando el
+   alfa: BG, textos y sprites emergen juntos, sin movimiento. En reversa el
+   mismo cover funde a negro para salir. Terminada la ventana, el rect no
+   manda ningun comando al RDP. */
 static const ScreenAnimationTrack credits_transition_track[] = {
 
-	{ .target_u8 = &credits_screen.section[0].element[CREDITS_BG].rectangle.gradient[0].r, .from =  12.0f, .to = 201.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[0].element[CREDITS_BG].rectangle.gradient[0].g, .from =  14.0f, .to = 121.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[0].element[CREDITS_BG].rectangle.gradient[0].b, .from =  28.0f, .to =  25.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
+	{ .target_u8 = &credits_screen.section[4].element[CREDITS_COVER].rectangle.gradient[0].a, .from = 255.0f, .to = 0.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_IN },
+	{ .target_u8 = &credits_screen.section[4].element[CREDITS_COVER].rectangle.gradient[1].a, .from = 255.0f, .to = 0.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_IN },
+	{ .target_u8 = &credits_screen.section[4].element[CREDITS_COVER].rectangle.gradient[2].a, .from = 255.0f, .to = 0.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_IN },
+	{ .target_u8 = &credits_screen.section[4].element[CREDITS_COVER].rectangle.gradient[3].a, .from = 255.0f, .to = 0.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_IN },
 
-	{ .target_u8 = &credits_screen.section[0].element[CREDITS_BG].rectangle.gradient[1].r, .from =  40.0f, .to = 223.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[0].element[CREDITS_BG].rectangle.gradient[1].g, .from =  30.0f, .to = 175.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[0].element[CREDITS_BG].rectangle.gradient[1].b, .from =  70.0f, .to = 117.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-
-	{ .target_u8 = &credits_screen.section[0].element[CREDITS_BG].rectangle.gradient[2].r, .from =  40.0f, .to = 223.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[0].element[CREDITS_BG].rectangle.gradient[2].g, .from =  30.0f, .to = 175.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[0].element[CREDITS_BG].rectangle.gradient[2].b, .from =  70.0f, .to = 117.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-
-	{ .target_u8 = &credits_screen.section[0].element[CREDITS_BG].rectangle.gradient[3].r, .from =  12.0f, .to = 201.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[0].element[CREDITS_BG].rectangle.gradient[3].g, .from =  14.0f, .to = 121.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[0].element[CREDITS_BG].rectangle.gradient[3].b, .from =  28.0f, .to =  25.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-
-	/* Los overlays animan sus colores en sincronia con el fondo (mismos
-	   from/to por columna), asi durante la transicion son indistinguibles
-	   del BG y nunca aparecen de un pop. Las alphas quedan fijas. */
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_TOP].rectangle.gradient[0].r,    .from = 12.0f, .to = 201.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_TOP].rectangle.gradient[0].g,    .from = 14.0f, .to = 121.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_TOP].rectangle.gradient[0].b,    .from = 28.0f, .to =  25.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_TOP].rectangle.gradient[1].r,    .from = 40.0f, .to = 223.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_TOP].rectangle.gradient[1].g,    .from = 30.0f, .to = 175.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_TOP].rectangle.gradient[1].b,    .from = 70.0f, .to = 117.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_TOP].rectangle.gradient[2].r,    .from = 40.0f, .to = 223.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_TOP].rectangle.gradient[2].g,    .from = 30.0f, .to = 175.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_TOP].rectangle.gradient[2].b,    .from = 70.0f, .to = 117.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_TOP].rectangle.gradient[3].r,    .from = 12.0f, .to = 201.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_TOP].rectangle.gradient[3].g,    .from = 14.0f, .to = 121.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_TOP].rectangle.gradient[3].b,    .from = 28.0f, .to =  25.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_BOTTOM].rectangle.gradient[0].r, .from = 12.0f, .to = 201.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_BOTTOM].rectangle.gradient[0].g, .from = 14.0f, .to = 121.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_BOTTOM].rectangle.gradient[0].b, .from = 28.0f, .to =  25.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_BOTTOM].rectangle.gradient[1].r, .from = 40.0f, .to = 223.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_BOTTOM].rectangle.gradient[1].g, .from = 30.0f, .to = 175.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_BOTTOM].rectangle.gradient[1].b, .from = 70.0f, .to = 117.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_BOTTOM].rectangle.gradient[2].r, .from = 40.0f, .to = 223.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_BOTTOM].rectangle.gradient[2].g, .from = 30.0f, .to = 175.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_BOTTOM].rectangle.gradient[2].b, .from = 70.0f, .to = 117.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_BOTTOM].rectangle.gradient[3].r, .from = 12.0f, .to = 201.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_BOTTOM].rectangle.gradient[3].g, .from = 14.0f, .to = 121.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
-	{ .target_u8 = &credits_screen.section[2].element[CREDITS_FADE_BOTTOM].rectangle.gradient[3].b, .from = 28.0f, .to =  25.0f, .delay = 0.00f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
+	{ .target_bool = &credits_screen.section[4].element[CREDITS_COVER].is_hidden, .from_bool = true, .to_bool = false, .duration = 0.25f },
 };
 
 static const ScreenAnimation credits_transition_animation = {

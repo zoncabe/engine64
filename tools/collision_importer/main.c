@@ -237,6 +237,13 @@ static void convert(const char *gltfPath, CollisionMesh *out, float baseScale, c
 				cgltf_accessor_read_float(pos_acc, l, raw, 3);
 				Vec3 vert = transformPoint(nodeMat, (Vec3){raw[0], raw[1], raw[2]});
 
+				/* The t3dm importer writes this same point rounded to int16
+				   (roundf, tiny3d's Vec3::round), and the mesh deform binding
+				   matches the two by quantized position. Snap to that grid
+				   before scaling so both sides always land on the same value,
+				   even for coordinates sitting exactly on .5. */
+				vert = (Vec3){ roundf(vert.x), roundf(vert.y), roundf(vert.z) };
+
 				remap[l] = weldVertex(out, &hash, (Vec3){
 					vert.x * baseScale,
 					vert.y * baseScale,

@@ -168,17 +168,31 @@ void physicsWorld_shutdown(PhysicsWorld *s)
 
 /* --- step --- */
 
+/* One step per rendered frame, on the frame's own clock. The clamp is what
+   keeps a hiccup from becoming one huge step: past it the simulation runs in
+   slow motion for that frame instead of blowing up the solver. */
 void physics_update(PhysicsWorld *s, float delta)
 {
+	if (delta <= 0.0f) return;   /* first frame; 1/dt lives in the solver bias */
+
+	s->dt = (delta > PHYSICS_MAX_TIMESTEP) ? PHYSICS_MAX_TIMESTEP : delta;
+	physics_step(s);
+
+	/* Cloths keep the fixed step: a Verlet cloth's look is tuned to its step
+	   size, so it steps on its own clock instead of the frame's dt. Its cost
+	   per second is constant, so it cannot feed back into the frame time. */
 	s->accumulator += delta;
 
-	/* Drop whatever a frame can't afford instead of carrying the debt over. */
-	float ceiling = s->dt * PHYSICS_MAX_SUBSTEPS;
+	float ceiling = PHYSICS_TIMESTEP * PHYSICS_CLOTH_MAX_SUBSTEPS;
 	if (s->accumulator > ceiling) s->accumulator = ceiling;
 
-	while (s->accumulator >= s->dt) {
-		physics_step(s);
-		s->accumulator -= s->dt;
+	while (s->accumulator >= PHYSICS_TIMESTEP) {
+		for (Cloth *cloth = s->cloth_list; cloth; cloth = cloth->next) {
+			cloth->gravity = s->gravity;
+			cloth->wind    = s->wind;
+			cloth_step(cloth, PHYSICS_TIMESTEP);
+		}
+		s->accumulator -= PHYSICS_TIMESTEP;
 	}
 }
 
@@ -298,14 +312,6 @@ void physics_step(PhysicsWorld *s)
 		body->torque = vector3_zero();
 	}
 
-	/* Cloths run on the same fixed step, but outside the island solver: they
-	   are self-contained and never take part in contacts. What the world does
-	   to them is written here; the cloth resolves the wind per triangle. */
-	for (Cloth *cloth = s->cloth_list; cloth; cloth = cloth->next) {
-		cloth->gravity = s->gravity;
-		cloth->wind    = s->wind;
-		cloth_step(cloth, s->dt);
-	}
 }
 
 

@@ -26,8 +26,8 @@ static const CharacterAnimationClipDef male_muscled_clips[] = {
 	[MM_ANIM_WALK_BACK]         = { "walking-backwards",                  MM_SLOT_STRAFE_WALK,   true  },
 	[MM_ANIM_WALK_BACK_L]       = { "walking-backwards-left",             MM_SLOT_WALK,          true  },
 	[MM_ANIM_WALK_BACK_R]       = { "walking-backwards-right",            MM_SLOT_WALK,          true  },
-	[MM_ANIM_WALK_STRAFE_L]     = { "walking-strafe-left",                MM_SLOT_STRAFE_WALK,   true  },
-	[MM_ANIM_WALK_STRAFE_R]     = { "walking-strafe-right",               MM_SLOT_STRAFE_WALK,   true  },
+	[MM_ANIM_WALK_STRAFE_L]     = { "walking-left",                       MM_SLOT_STRAFE_WALK,   true  },
+	[MM_ANIM_WALK_STRAFE_R]     = { "walking-right",                      MM_SLOT_STRAFE_WALK,   true  },
 
 	[MM_ANIM_RUN]               = { "running",                            MM_SLOT_RUN,           true  },
 	[MM_ANIM_TURN_RUN_L]        = { "running-turn-left",                  MM_SLOT_TURN_RUN,      true  },
@@ -40,10 +40,24 @@ static const CharacterAnimationClipDef male_muscled_clips[] = {
 	[MM_ANIM_RUN_BACK]          = { "running-backwards",                  MM_SLOT_STRAFE_RUN,    true  },
 	[MM_ANIM_RUN_BACK_L]        = { "running-backwards-left",             MM_SLOT_RUN,           true  },
 	[MM_ANIM_RUN_BACK_R]        = { "running-backwards-right",            MM_SLOT_RUN,           true  },
-	[MM_ANIM_RUN_STRAFE_L]      = { "running-strafe-left",                MM_SLOT_STRAFE_RUN,    true  },
-	[MM_ANIM_RUN_STRAFE_R]      = { "running-strafe-right",               MM_SLOT_STRAFE_RUN,    true  },
+	[MM_ANIM_RUN_STRAFE_L]      = { "running-left",                       MM_SLOT_STRAFE_RUN,    true  },
+	[MM_ANIM_RUN_STRAFE_R]      = { "running-right",                      MM_SLOT_STRAFE_RUN,    true  },
 
 	[MM_ANIM_SPRINT]            = { "sprinting",                          MM_SLOT_SPRINT,        true  },
+
+	[MM_ANIM_STRAFE_LOCKED_WALK_FWD]  = { "strafing-walk-forward-aiming",   MM_SLOT_STRAFE_LOCKED_WALK,      true },
+	[MM_ANIM_STRAFE_LOCKED_WALK_BACK] = { "strafing-walk-backwards-aiming", MM_SLOT_STRAFE_LOCKED_WALK,      true },
+	[MM_ANIM_STRAFE_LOCKED_WALK_L]    = { "strafing-walk-left-aiming",      MM_SLOT_STRAFE_LOCKED_WALK_SIDE, true },
+	[MM_ANIM_STRAFE_LOCKED_WALK_R]    = { "strafing-walk-right-aiming",     MM_SLOT_STRAFE_LOCKED_WALK_SIDE, true },
+	[MM_ANIM_STRAFE_LOCKED_RUN_FWD]   = { "strafing-run-forward-aiming",    MM_SLOT_STRAFE_LOCKED_RUN,       true },
+	[MM_ANIM_STRAFE_LOCKED_RUN_BACK]  = { "strafing-run-backwards-aiming",  MM_SLOT_STRAFE_LOCKED_RUN,       true },
+	[MM_ANIM_STRAFE_LOCKED_RUN_L]     = { "strafing-run-left-aiming",       MM_SLOT_STRAFE_LOCKED_RUN_SIDE,  true },
+	[MM_ANIM_STRAFE_LOCKED_RUN_R]     = { "strafing-run-right-aiming",      MM_SLOT_STRAFE_LOCKED_RUN_SIDE,  true },
+
+	[MM_ANIM_BOW_WALK_AIMING_FWD]     = { "bow-walking-forward-aiming",     MM_SLOT_BOW_WALK_AIMING,         true },
+	[MM_ANIM_BOW_WALK_AIMING_BACK]    = { "bow-walking-backwards-aiming",   MM_SLOT_BOW_WALK_AIMING,         true },
+	[MM_ANIM_BOW_WALK_AIMING_L]       = { "bow-walking-left-aiming",        MM_SLOT_BOW_WALK_AIMING_SIDE,    true },
+	[MM_ANIM_BOW_WALK_AIMING_R]       = { "bow-walking-right-aiming",       MM_SLOT_BOW_WALK_AIMING_SIDE,    true },
 
 	[MM_ANIM_JUMP_L]            = { "jump-left",                          MM_SLOT_JUMP_L,        false },
 	[MM_ANIM_JUMP_R]            = { "jump-right",                         MM_SLOT_JUMP_R,        false },
@@ -89,6 +103,15 @@ static const CharacterAnimationNode male_muscled_nodes[] = {
 	  ANIMATION_CLIPS(MM_ANIM_WALK_BACK, MM_ANIM_WALK_BACK_L, MM_ANIM_WALK_STRAFE_L, MM_ANIM_WALK, MM_ANIM_WALK_STRAFE_R, MM_ANIM_WALK_BACK_R, MM_ANIM_WALK_BACK,
 	                  MM_ANIM_RUN_BACK,  MM_ANIM_RUN_BACK_L,  MM_ANIM_RUN_STRAFE_L,  MM_ANIM_RUN,  MM_ANIM_RUN_STRAFE_R,  MM_ANIM_RUN_BACK_R,  MM_ANIM_RUN_BACK),
 	  7, 2, 0, ANIMATION_PARAM_STRAFE_DIR, ANIMATION_PARAM_STRAFE_GAIT, ANIMATION_PARAM_STRAFE },
+
+	[MM_NODE_STRAFE_LOCKED] = { ANIMATION_NODE_BLEND_2D,
+	  ANIMATION_CLIPS(MM_ANIM_STRAFE_LOCKED_WALK_BACK, MM_ANIM_STRAFE_LOCKED_WALK_L, MM_ANIM_STRAFE_LOCKED_WALK_FWD, MM_ANIM_STRAFE_LOCKED_WALK_R, MM_ANIM_STRAFE_LOCKED_WALK_BACK,
+	                  MM_ANIM_STRAFE_LOCKED_RUN_BACK,  MM_ANIM_STRAFE_LOCKED_RUN_L,  MM_ANIM_STRAFE_LOCKED_RUN_FWD,  MM_ANIM_STRAFE_LOCKED_RUN_R,  MM_ANIM_STRAFE_LOCKED_RUN_BACK),
+	  5, 2, 0, ANIMATION_PARAM_STRAFE_LOCKED_DIR, ANIMATION_PARAM_STRAFE_LOCKED_GAIT, ANIMATION_PARAM_STRAFE_LOCKED },
+
+	[MM_NODE_BOW_WALK_AIMING] = { ANIMATION_NODE_BLEND_2D,
+	  ANIMATION_CLIPS(MM_ANIM_BOW_WALK_AIMING_BACK, MM_ANIM_BOW_WALK_AIMING_L, MM_ANIM_BOW_WALK_AIMING_FWD, MM_ANIM_BOW_WALK_AIMING_R, MM_ANIM_BOW_WALK_AIMING_BACK),
+	  5, 1, 0, ANIMATION_PARAM_BOW_WALK_AIMING_DIR, ANIMATION_PARAM_BOW_WALK_AIMING_DIR, ANIMATION_PARAM_BOW_WALK_AIMING },
 };
 
 _Static_assert(MM_ANIM_TURN_WALK_R == MM_ANIM_TURN_WALK_L + 1, "turn_walk L/R must be contiguous (character_animation reads L+1)");
@@ -116,14 +139,16 @@ const CharacterAnimationDef male_muscled_animation_def = {
 	.roll_animation       = MM_ANIM_ROLL_L,
 	.locomotion_node      = MM_NODE_LOCOMOTION,
 	.strafe_node          = MM_NODE_STRAFE,
+	.strafe_locked_node   = MM_NODE_STRAFE_LOCKED,
+	.bow_walk_aiming_node = MM_NODE_BOW_WALK_AIMING,
 
 };
 
 static const CharacterGaitSettings male_muscled_gaits[] = {
 
-	{ .target_speed = 1.55f, .response_rate =  8.0f, .rotation_response_rate = 12.0f },
+	{ .target_speed = 1.55f, .response_rate =  8.0f, .rotation_response_rate = 14.0f },
 	{ .target_speed = 3.2f,  .response_rate =  9.0f, .rotation_response_rate = 15.0f },
-	{ .target_speed = 4.4f,  .response_rate = 10.0f, .rotation_response_rate = 14.0f },
+	{ .target_speed = 4.4f,  .response_rate = 10.0f, .rotation_response_rate = 16.0f },
 
 };
 
@@ -135,6 +160,10 @@ const CharacterMovementSettings male_muscled_movement_settings = {
 
 	.gait       = male_muscled_gaits,
 	.gait_count = sizeof(male_muscled_gaits) / sizeof(male_muscled_gaits[0]),
+
+	.stamina_drain_rate = 0.15f,
+	.stamina_regen_rate = 0.25f,
+	.tired_speed_scale  = 0.8f,
 
 	.roll_target_speed         = 4.6f,
 	.roll_launch_response_rate = 15.0f,
@@ -161,16 +190,14 @@ const CharacterColliderSettings male_muscled_collider_settings = {
 
 // --- Weapons ---
 
-const char *const male_muscled_weapon_meshes[] = { "ak47", "knife", "m1911" };
+const char *const male_muscled_weapon_meshes[] = { "ak47", "bow", "knife", "m1911" };
 
 const CharacterWeaponsDef male_muscled_weapons_def = {
 	.mesh       = male_muscled_weapon_meshes,
-	.mesh_count = 3,
-	/* Off for the demo capture. Restore these to carry the loadout again. */
+	.mesh_count = 4,
 	.weapon = {
-		//[WEAPON_SLOT_WAIST] = &weapon_m1911,
-		//[WEAPON_SLOT_BACK]  = &weapon_ak47,
-		//[WEAPON_SLOT_MELEE] = &weapon_knife,
+		[WEAPON_SLOT_BACK]  = &weapon_bow,
+		[WEAPON_SLOT_MELEE] = &weapon_knife,
 	},
 };
 
@@ -179,11 +206,24 @@ const WeaponDef weapon_ak47 = {
 	.bone          = "rifle",
 	.holster_bone  = "mixamorig:Spine2",
 	.hand_bone     = "mixamorig:RightHand",
-	.type          = WEAPON_TYPE_RIFLE,
+	.type          = WEAPON_TYPE_HITSCAN,
 	.magazine_size = 30,
 	.max_integrity = 100,
 	.holster_position = {{ -11.0f, 6.35f, -16.19f }},
 	.holster_rotation = {{ -0.6255f, -0.1841f, -0.7357f, 0.1833f }},
+	.holding_rotation = {{ 0.0f, 0.0f, 0.0f, 1.0f }},
+};
+
+const WeaponDef weapon_bow = {
+	.mesh          = "bow",
+	.bone          = "rifle",
+	.holster_bone  = "mixamorig:Spine2",
+	.hand_bone     = "mixamorig:LeftHand",
+	.type          = WEAPON_TYPE_BALLISTIC,
+	.magazine_size = 1,
+	.max_integrity = 100,
+	.holster_position = {{ 0.34f, -13.27f, -15.25f }},
+	.holster_rotation = {{ -0.5719f, 0.3900f, -0.6504f, -0.3127f }},
 	.holding_rotation = {{ 0.0f, 0.0f, 0.0f, 1.0f }},
 };
 
@@ -192,7 +232,7 @@ const WeaponDef weapon_m1911 = {
 	.bone          = "handgun",
 	.holster_bone  = "mixamorig:Hips",
 	.hand_bone     = "mixamorig:RightHand",
-	.type          = WEAPON_TYPE_HANDGUN,
+	.type          = WEAPON_TYPE_HITSCAN,
 	.magazine_size = 7,
 	.max_integrity = 100,
 	.holster_position = {{ -22.0f, -3.93f, 0.2f }},
@@ -203,13 +243,13 @@ const WeaponDef weapon_m1911 = {
 const WeaponDef weapon_knife = {
 	.mesh          = "knife",
 	.bone          = "melee-weapon",
-	.holster_bone  = "mixamorig:LeftUpLeg",
+	.holster_bone  = "mixamorig:RightUpLeg",
 	.hand_bone     = "mixamorig:RightHand",
 	.type          = WEAPON_TYPE_MELEE,
 	.magazine_size = 0,
 	.max_integrity = 100,
-	.holster_position = {{ -8.74f, -8.37f, 0.64f }},
-	.holster_rotation = {{ 0.013f, 0.9991f, -0.0389f, 0.0066f }},
+	.holster_position = {{ 8.74f, -8.38f, 0.59f }},
+	.holster_rotation = {{ 0.0130f, -0.9991f, 0.0390f, 0.0066f }},
 	.holding_rotation = {{ 0.0f, 0.0f, 0.0f, 1.0f }},
 };
 
@@ -218,7 +258,7 @@ const CharacterAnimationSettings male_muscled_animation_settings = {
 		.action_idle_max_blending_ratio = 0.85f,
 
 		.turn_max_angle  = 5.0f,
-		.turn_max_weight = 0.3f,
+		.turn_max_weight = 0.4f,
 
 		.jump_max_blending_ratio = 0.55f,
 
@@ -239,6 +279,9 @@ const CharacterAnimationSettings male_muscled_animation_settings = {
 
 		.strafe_turn_rate        = 8.0f,
 		.strafe_blend_rate       = 2.0f,
+
+		.strafe_locked_blend_rate   = 2.0f,
+		.bow_walk_aiming_blend_rate = 2.0f,
 
 };
 

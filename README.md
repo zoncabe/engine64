@@ -16,7 +16,7 @@ Gait based movement system: target speed, acceleration and rotation response per
 
 
 **Character animation**<br/>
-Blend tree based animation system: poses are sampled from clips and combined by weighted bone blending. Supports clip playback, selection, sequencing, 1D and 2D blend spaces and layering.
+Blend tree based animation system. Supports clip playback, selection, sequencing, 1D and 2D blend spaces and layering.
 
 **Screen system**<br/>
 2D screen system with a track based animation engine. Handles rectangles, sprites and text grouped in scissor sections, with easing curves, timed visibility windows and state driven lookups.

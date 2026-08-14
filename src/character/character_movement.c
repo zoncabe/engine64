@@ -156,7 +156,7 @@ static void characterMovement_updateBody(Character *character, float dt)
 static void characterMovement_setLocomotion(Character *character, MovementCommand *cmd, float dt)
 {
 	uint8_t state = character->movement.current;
-	characterMovement_setHorizontalVelocity(character, cmd->target_yaw, characterMovement_targetSpeed(character, state), characterMovement_accelerationRate(character, state), dt);
+	characterMovement_setHorizontalVelocity(character, cmd->target_yaw, characterMovement_targetSpeed(character, state) * cmd->speed_scale, characterMovement_accelerationRate(character, state), dt);
 }
 
 static uint8_t characterMovement_rollPhase(const CharacterMovementData *data, const MovementCommand *cmd, const CharacterMovementSettings *settings)
@@ -320,9 +320,16 @@ void character_updateMovement(Character *character, MovementCommand *cmd, float 
 	assert(characterMovement_handler[character->movement.current] != NULL);
 
 	character->movement.data.rotation_mode = CHARACTER_ROTATION_MODE_LERP;
-	character->movement.data.strafe     = cmd->strafe;
-	character->movement.data.strafe_yaw = cmd->strafe_yaw;
-	character->movement.data.gait       = cmd->gait;
+	character->movement.data.strafe        = cmd->strafe;
+	character->movement.data.strafe_locked = cmd->strafe_locked;
+	character->movement.data.strafe_yaw    = cmd->strafe_yaw;
+
+	/* A scaled-down command locks the top gait away: the character stays on
+	   the previous one until the scale is back at full. */
+	uint8_t gait = cmd->gait;
+	if (cmd->speed_scale < 1.0f && gait == character->movement.settings->gait_count - 1)
+		gait = character->movement.settings->gait_count - 2;
+	character->movement.data.gait = gait;
 	character->movement.next = MOVEMENT_STATE_NONE;
 
 	characterMovement_handler[character->movement.current](character, cmd, dt);

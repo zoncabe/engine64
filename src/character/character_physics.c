@@ -108,7 +108,8 @@ static void characterContact_setAngleOfIncidence(CharacterContact *contact, cons
 		contact->angle_of_incidence = 0.0f;
 		return;
 	}
-	contact->angle_of_incidence = -rad_to_deg((PI * 0.5f) - acosf(vector3_dot(velocity, &contact->normal) / magnitude));
+	float cos_angle = clampf(vector3_dot(velocity, &contact->normal) / magnitude, -1.0f, 1.0f);
+	contact->angle_of_incidence = -rad_to_deg((PI * 0.5f) - acosf(cos_angle));
 }
 
 static void characterContact_setDisplacement(CharacterContact *contact)

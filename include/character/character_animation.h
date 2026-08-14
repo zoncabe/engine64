@@ -26,6 +26,11 @@ typedef enum {
 	ANIMATION_PARAM_STRAFE,
 	ANIMATION_PARAM_STRAFE_GAIT,
 	ANIMATION_PARAM_STRAFE_DIR,
+	ANIMATION_PARAM_STRAFE_LOCKED,
+	ANIMATION_PARAM_STRAFE_LOCKED_GAIT,
+	ANIMATION_PARAM_STRAFE_LOCKED_DIR,
+	ANIMATION_PARAM_BOW_WALK_AIMING,
+	ANIMATION_PARAM_BOW_WALK_AIMING_DIR,
 	ANIMATION_PARAM_JUMP_L,
 	ANIMATION_PARAM_JUMP_R,
 	ANIMATION_PARAM_LAND_L,
@@ -95,6 +100,9 @@ typedef struct {
 	float strafe_turn_rate;
 	float strafe_blend_rate;
 
+	float strafe_locked_blend_rate;
+	float bow_walk_aiming_blend_rate;
+
 } CharacterAnimationSettings;
 
 
@@ -118,6 +126,8 @@ typedef struct {
 	uint8_t roll_animation;
 	uint8_t locomotion_node;
 	uint8_t strafe_node;
+	uint8_t strafe_locked_node;
+	uint8_t bow_walk_aiming_node;
 
 } CharacterAnimationDef;
 
@@ -163,6 +173,8 @@ typedef struct CharacterAnimation {
 	uint8_t      turn_avg_idx;
 	bool         strafe_turning;
 	float        strafe_blend;
+	float        strafe_locked_blend;
+	float        bow_walk_aiming_blend;
 
 } CharacterAnimation;
 

@@ -10,6 +10,7 @@
 #include "ui/gameplay_ui.h"
 #include "ui/credits_ui.h"
 #include "menu/menu.h"
+#include "particles/particles.h"
 #include "player/player.h"
 #include "control/player_control.h"
 #include "game/game.h"
@@ -77,6 +78,8 @@ static void gameState_updateGameplay(GameContext *ctx)
 	   body. Static ones keep the one scene_load wrote. */
 	for (int i = 0; i < scene->entity_count; i++)
 		entity_setMatrixFromBody(scene->entity[i], fb_index);
+
+	particles_update(ctx, fb_index);
 
 	viewport_updateCamera(&control[0].actions, &ctx->player[0].entity->transform.position);
 	gameplay_update();

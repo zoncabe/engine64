@@ -7,6 +7,7 @@
 #include "character/character_movement.h"
 #include "character/character_animation.h"
 #include "player/player.h"
+#include "physics/math/math_functions.h"
 #include "time/time.h"
 
 
@@ -17,7 +18,7 @@ Player *player_get(void) { return player; }
 void player_init(void)
 {
 	for (int i = 0; i < PLAYER_COUNT; i++)
-		player[i] = (Player){0};
+		player[i] = (Player){ .stats = { .stamina = 1.0f } };
 }
 
 void player_setCharacter(Player *player, Character *character)
@@ -29,10 +30,35 @@ void player_setCharacter(Player *player, Character *character)
 }
 
 
+/* Running at the top gait drains stamina, anything else recovers it. Hitting
+   zero flags the player tired, which caps locomotion speed through the
+   command until stamina is back at full. */
+static void player_updateStamina(Player *player, float dt)
+{
+	const CharacterMovement *movement = &player->character->movement;
+	const CharacterMovementSettings *settings = movement->settings;
+	PlayerStats *stats = &player->stats;
+
+	bool running = movement->current == MOVEMENT_STATE_WALKING
+	            && movement->data.gait == settings->gait_count - 1;
+
+	/* Transitions run first, on the value the previous frame rendered: the
+	   frame that lands on zero stays at zero on screen, and regen can only
+	   move it from the next update on. */
+	if (stats->stamina <= 0.0f) stats->tired = true;
+	if (stats->stamina >= 1.0f) stats->tired = false;
+
+	float rate = running && !stats->tired ? -settings->stamina_drain_rate : settings->stamina_regen_rate;
+	stats->stamina = clampf(stats->stamina + rate * dt, 0.0f, 1.0f);
+
+	player->cmd.speed_scale = stats->tired ? settings->tired_speed_scale : 1.0f;
+}
+
 void player_update(void)
 {
 	const float dt = time_get()->delta;
 	for (int i = 0; i < PLAYER_COUNT; i++) {
+		player_updateStamina(&player[i], dt);
 		character_updateMovement(player[i].character, &player[i].cmd, dt);
 		character_setAnimation(player[i].character);
 	}

@@ -61,6 +61,12 @@ typedef struct {
 	const CharacterGaitSettings *gait;
 	uint8_t gait_count;
 
+	/* Stamina is normalized 0..1; rates are per second. Tired caps the
+	   reachable speed at this fraction of the top gait. */
+	float stamina_drain_rate;
+	float stamina_regen_rate;
+	float tired_speed_scale;
+
 	float roll_target_speed;
 	float roll_launch_response_rate;
 	float roll_spin_response_rate;
@@ -87,6 +93,7 @@ typedef struct {
 	bool is_grounded;
 	uint8_t rotation_mode;
 	bool strafe;
+	bool strafe_locked;
 	float strafe_yaw;
 	uint8_t gait;
 } CharacterMovementData;
@@ -97,8 +104,10 @@ typedef struct {
 	bool jump_held;
 	bool jump_triggered;
 	bool strafe;
+	bool strafe_locked;
 	float strafe_yaw;
 	uint8_t gait;
+	float speed_scale;   /* 1.0 normal, tired_speed_scale while tired */
 } MovementCommand;
 
 typedef struct CharacterMovement {

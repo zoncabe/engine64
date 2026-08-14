@@ -71,28 +71,48 @@ static const float pause_style_quit[]     = { MENU_STYLE_NORMAL,   MENU_STYLE_SE
 
 static ScreenAnimationTrack pause_transition_track[] = {
 
-	{ .target_u8 = &pause_screen.section[0].element[PAUSE_BG].rectangle.gradient[0].a, .from = 0.0f, .to =  76.5f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
-	{ .target_u8 = &pause_screen.section[0].element[PAUSE_BG].rectangle.gradient[1].a, .from = 0.0f, .to = 255.0f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
-	{ .target_u8 = &pause_screen.section[0].element[PAUSE_BG].rectangle.gradient[2].a, .from = 0.0f, .to = 255.0f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
-	{ .target_u8 = &pause_screen.section[0].element[PAUSE_BG].rectangle.gradient[3].a, .from = 0.0f, .to =  76.5f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target_u8 = &pause_screen.section[0].element[PAUSE_BG].rectangle.gradient[0].a, .from = 0.0f, .to =  76.5f, .duration = 0.16f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target_u8 = &pause_screen.section[0].element[PAUSE_BG].rectangle.gradient[1].a, .from = 0.0f, .to = 255.0f, .duration = 0.16f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target_u8 = &pause_screen.section[0].element[PAUSE_BG].rectangle.gradient[2].a, .from = 0.0f, .to = 255.0f, .duration = 0.16f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target_u8 = &pause_screen.section[0].element[PAUSE_BG].rectangle.gradient[3].a, .from = 0.0f, .to =  76.5f, .duration = 0.16f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
 
-	{ .target = &pause_screen.section[0].element[PAUSE_CONTINUE].position.x,    .from = 320.0f, .to = 238.0f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
-	{ .target = &pause_screen.section[0].element[PAUSE_QUIT].position.x,        .from = 320.0f, .to = 263.0f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
-
-	{ .target = &pause_screen.section[0].element[PAUSE_HINT_MOVE].position.x,   .from = 347.0f, .to = 262.0f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
-	{ .target = &pause_screen.section[0].element[PAUSE_HINT_SELECT].position.x, .from = 338.0f, .to = 262.0f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
-	{ .target = &pause_screen.section[0].element[PAUSE_HINT_BACK].position.x,   .from = 338.0f, .to = 262.0f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
-
-	{ .target = &pause_screen.section[0].element[PAUSE_D_UP].position.x,        .from = 320.0f, .to = 235.0f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
-	{ .target = &pause_screen.section[0].element[PAUSE_D_DOWN].position.x,      .from = 330.0f, .to = 245.0f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
-	{ .target = &pause_screen.section[0].element[PAUSE_BTN_A].position.x,       .from = 320.0f, .to = 244.0f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
-	{ .target = &pause_screen.section[0].element[PAUSE_BTN_B].position.x,       .from = 320.0f, .to = 244.0f, .duration = 0.25f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target = &pause_screen.section[0].element[PAUSE_CONTINUE].position.x,    .from = 320.0f, .to = 238.0f, .duration = 0.12f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target = &pause_screen.section[0].element[PAUSE_QUIT].position.x,        .from = 320.0f, .to = 263.0f, .duration = 0.12f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target = &pause_screen.section[0].element[PAUSE_HINT_MOVE].position.x,   .from = 347.0f, .to = 262.0f, .duration = 0.12f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target = &pause_screen.section[0].element[PAUSE_HINT_SELECT].position.x, .from = 338.0f, .to = 262.0f, .duration = 0.12f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target = &pause_screen.section[0].element[PAUSE_HINT_BACK].position.x,   .from = 338.0f, .to = 262.0f, .duration = 0.12f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target = &pause_screen.section[0].element[PAUSE_D_UP].position.x,        .from = 320.0f, .to = 235.0f, .duration = 0.12f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target = &pause_screen.section[0].element[PAUSE_D_DOWN].position.x,      .from = 330.0f, .to = 245.0f, .duration = 0.12f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target = &pause_screen.section[0].element[PAUSE_BTN_A].position.x,       .from = 320.0f, .to = 244.0f, .duration = 0.12f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target = &pause_screen.section[0].element[PAUSE_BTN_B].position.x,       .from = 320.0f, .to = 244.0f, .duration = 0.12f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
 };
 
 static ScreenAnimationTrack pause_cursor_track[] = {
 
 	{ .target_u8 = &pause_screen.section[0].element[PAUSE_CONTINUE].text.style, .source_int = NULL, .values_by_index = pause_style_continue },
 	{ .target_u8 = &pause_screen.section[0].element[PAUSE_QUIT].text.style,     .source_int = NULL, .values_by_index = pause_style_quit     },
+};
+
+static const ScreenAnimationTrack pause_quit_track[] = {
+
+	{ .target_u8 = &pause_screen.section[0].element[PAUSE_BG].rectangle.gradient[0].a, .from =  76.5f, .to = 255.0f, .duration = 0.15f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target_u8 = &pause_screen.section[0].element[PAUSE_BG].rectangle.gradient[3].a, .from =  76.5f, .to = 255.0f, .duration = 0.15f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+
+	{ .target = &pause_screen.section[0].element[PAUSE_CONTINUE].position.x,    .from = 238.0f, .to = 320.0f, .duration = 0.15f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target = &pause_screen.section[0].element[PAUSE_QUIT].position.x,        .from = 263.0f, .to = 320.0f, .duration = 0.15f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+
+	{ .target = &pause_screen.section[0].element[PAUSE_HINT_MOVE].position.x,   .from = 262.0f, .to = 347.0f, .duration = 0.15f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target = &pause_screen.section[0].element[PAUSE_HINT_SELECT].position.x, .from = 262.0f, .to = 338.0f, .duration = 0.15f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target = &pause_screen.section[0].element[PAUSE_HINT_BACK].position.x,   .from = 262.0f, .to = 338.0f, .duration = 0.15f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target = &pause_screen.section[0].element[PAUSE_D_UP].position.x,        .from = 235.0f, .to = 320.0f, .duration = 0.15f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target = &pause_screen.section[0].element[PAUSE_D_DOWN].position.x,      .from = 245.0f, .to = 330.0f, .duration = 0.15f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target = &pause_screen.section[0].element[PAUSE_BTN_A].position.x,       .from = 244.0f, .to = 320.0f, .duration = 0.15f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target = &pause_screen.section[0].element[PAUSE_BTN_B].position.x,       .from = 244.0f, .to = 320.0f, .duration = 0.15f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+};
+
+static const ScreenAnimation pause_quit_animation = {
+	.track       = pause_quit_track,
+	.track_count = 11,
 };
 
 
@@ -122,6 +142,13 @@ void pause_startEnter(void)
 void pause_startExit(void (*on_finish)(void *ctx), void *ctx)
 {
 	screenAnimationPlayer_start(&pause_animation_player, &pause_transition_animation, SCREEN_ANIMATION_PLAY_ONCE, true);
+	pause_animation_player.on_finish     = on_finish;
+	pause_animation_player.on_finish_ctx = ctx;
+}
+
+void pause_startQuit(void (*on_finish)(void *ctx), void *ctx)
+{
+	screenAnimationPlayer_start(&pause_animation_player, &pause_quit_animation, SCREEN_ANIMATION_PLAY_ONCE, false);
 	pause_animation_player.on_finish     = on_finish;
 	pause_animation_player.on_finish_ctx = ctx;
 }

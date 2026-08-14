@@ -30,6 +30,7 @@ src =   $(wildcard *.c) \
 		$(wildcard src/scene/*.c) \
 		$(wildcard src/player/*.c) \
 		$(wildcard src/ui/*.c) \
+		$(wildcard src/particles/*.c) \
 		$(wildcard src/graphics/*.c) \
 		$(wildcard src/shaders/*.c) \
 		$(wildcard src/resources/*.c) \
@@ -50,7 +51,9 @@ assets_conv = $(addprefix filesystem/textures/,$(notdir $(assets_png:%.png=%.spr
 
 # Models with a collision mesh (declared one per line)
 assets_collision = filesystem/collision/room.collision \
-                   filesystem/collision/brew_flag.collision
+                   filesystem/collision/brew_flag.collision \
+                   filesystem/collision/bandera-uruguay.collision \
+                   filesystem/collision/brasil.collision
 
 
 all: $(PROJECT_NAME).z64

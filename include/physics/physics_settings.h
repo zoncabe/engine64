@@ -6,15 +6,25 @@
 
 #define PHYSICS_SLEEP_LINEAR      0.01f
 #define PHYSICS_SLEEP_ANGULAR     ((3.0f / 180.0f) * PI)
-#define PHYSICS_SLEEP_TIME        0.5f
+#define PHYSICS_SLEEP_TIME        0.4f
 #define PHYSICS_BAUMGARTE         0.2f
-#define PHYSICS_PENETRATION_SLOP  0.05f
+#define PHYSICS_PENETRATION_SLOP  0.01f
 
-#define PHYSICS_SOLVER_ITERATIONS 2
+#define PHYSICS_SOLVER_ITERATIONS 8
 #define PHYSICS_TIMESTEP          (1.0f / 60.0f)
 
-/* Cap on the steps a single frame may run. Without it a long frame queues up
-   more steps than the next frame can afford, which only makes it longer. */
-#define PHYSICS_MAX_SUBSTEPS      4
+/* Margin added to every AABB in the broadphase tree, metres per side. Sets
+   both the pair/wake distance (one margin per body, so twice this between
+   surfaces) and how far a body may drift before its leaf is reinserted. */
+#define PHYSICS_AABB_FATTENER     0.1f
+
+/* Longest step a frame may take. Past this the simulation slows down instead
+   of integrating a huge dt, which is what keeps a hiccup from exploding it. */
+#define PHYSICS_MAX_TIMESTEP      (1.0f / 20.0f)
+
+/* Cloths step on their own fixed clock of PHYSICS_TIMESTEP: a Verlet cloth's
+   look is tuned to its step size. Cap on cloth steps one frame may run;
+   below 60/cap FPS the cloth slows down instead of piling up debt. */
+#define PHYSICS_CLOTH_MAX_SUBSTEPS 3
 
 #endif

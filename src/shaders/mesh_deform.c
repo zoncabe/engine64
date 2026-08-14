@@ -99,6 +99,24 @@ static uint16_t meshDeform_find(const DeformBucket *bucket, uint32_t mask, const
 }
 
 
+/* The RSP's segment table is one, shared by every deform, and the render loop
+   binds every frame's buffer before running any display list: with a common
+   id the last binding would feed its vertices to all of them. Each binding
+   holds its own id for as long as it lives. */
+static uint8_t segment_used;
+
+static uint8_t meshDeform_acquireSegment(void)
+{
+	for (uint8_t id = MESH_DEFORM_SEGMENT; id <= 7; id++) {
+		if (!(segment_used & (1u << id))) {
+			segment_used |= (uint8_t)(1u << id);
+			return id;
+		}
+	}
+	return 0;
+}
+
+
 bool meshDeform_bind(MeshDeform *deform, T3DModel *model,
                      const Vector3 *source, const Vector3 *source_normal,
                      uint16_t source_count, float scale)
@@ -163,7 +181,8 @@ bool meshDeform_bind(MeshDeform *deform, T3DModel *model,
 	   partial uncached writes do not survive on hardware: the positions, three
 	   halves in a row, went through while the normals silently vanished. */
 	deform->vertex_bytes = sizeof(T3DVertPacked) * (((uint32_t)deform->slot_count + 1) / 2);
-	deform->segment      = MESH_DEFORM_SEGMENT;
+	deform->segment      = meshDeform_acquireSegment();
+	if (deform->segment == 0) return false;
 
 	for (int i = 0; i < MESH_DEFORM_BUFFERS; i++) {
 		deform->vertex_buffer[i] = memalign(16, deform->vertex_bytes);
@@ -226,6 +245,9 @@ void meshDeform_apply(const MeshDeform *deform, uint8_t fb_index)
 
 void meshDeform_delete(MeshDeform *deform)
 {
+	if (deform->segment >= MESH_DEFORM_SEGMENT)
+		segment_used &= (uint8_t)~(1u << deform->segment);
+
 	free(deform->slot_source);
 
 	for (int i = 0; i < MESH_DEFORM_BUFFERS; i++)

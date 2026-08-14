@@ -18,6 +18,12 @@ static void pause_onExitToGameplay(void *ctx)
 	if (pause_exit_game) game_setState(pause_exit_game, GAME_STATE_GAMEPLAY);
 }
 
+static void pause_onQuitToMainMenu(void *ctx)
+{
+	(void)ctx;
+	if (pause_exit_game) game_setState(pause_exit_game, GAME_STATE_MAIN_MENU);
+}
+
 static void mainMenu_onExitToGameplay(void *ctx)
 {
 	(void)ctx;
@@ -67,7 +73,7 @@ static void menuControl_handleCredits(Player *player, const ControllerActions *a
 
 	if (credits_isTransitioning()) return;
 
-	if (actions->cancel || actions->confirm) {
+	if (actions->cancel) {
 		mainMenu_exit_game = game;
 		credits_startExit(credits_onExitToMainMenu, NULL);
 		return;
@@ -115,7 +121,8 @@ static void menuControl_handlePause(Player *player, const ControllerActions *act
 		return;
 	}
 	if (actions->confirm && menuStack_getIndex() == 1) {
-		game_setState(game, GAME_STATE_MAIN_MENU);
+		pause_exit_game = game;
+		pause_startQuit(pause_onQuitToMainMenu, NULL);
 		menuStack_setIndex(0);
 	}
 	if (actions->menu_up)   menuStack_moveIndex(-1, 1);

@@ -48,7 +48,7 @@ typedef struct PhysicsWorld {
 	Vector3               gravity;
 	Vector3               wind;      /* pushes cloths only; write it per frame */
 	float                 dt;
-	float                 accumulator;
+	float                 accumulator;   /* cloth clock; rigid bodies step on the frame's dt */
 	int32_t               iterations;
 
 	int                   new_shape;

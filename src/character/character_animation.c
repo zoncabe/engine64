@@ -547,6 +547,137 @@ static void characterAnimation_setStrafeParams(const CharacterAnimationParamCtx 
 	animation->param[ANIMATION_PARAM_WALK] = weight * (1.0f - blend);
 }
 
+// eje: back 0 | left 1/4 | fwd 2/4 | right 3/4 | back 1
+static float characterAnimation_getStrafeLockedDirectionWeight(const CharacterAnimationParamCtx *ctx)
+{
+	const KinematicBody *body = &ctx->character->body;
+
+	if (body->velocity.x == 0.0f && body->velocity.y == 0.0f)
+		return ctx->animation->param[ANIMATION_PARAM_STRAFE_LOCKED_DIR];
+
+	float velocity_yaw = rad_to_deg(fm_atan2f(-body->velocity.x, -body->velocity.y));
+	float rel = angle_wrap_relative(velocity_yaw, body->rotation.z) - body->rotation.z;
+
+	return (rel + 180.0f) / 360.0f;
+}
+
+static void characterAnimation_snapStrafeLockedEntry(const CharacterAnimationParamCtx *ctx)
+{
+	const CharacterAnimationNode *node = &ctx->def->node[ctx->def->strafe_locked_node];
+
+	T3DAnim *src = &ctx->animation->clip[ctx->def->walk_animation];
+	float src_length = t3d_anim_get_length(src);
+	if (src_length <= 0.0f) return;
+	float phase = src->time / src_length;
+
+	for (int c = 0; c < node->cols * node->rows; c++) {
+		T3DAnim *dst = &ctx->animation->clip[node->animation[c]];
+		t3d_anim_set_time(dst, phase * t3d_anim_get_length(dst));
+	}
+}
+
+static void characterAnimation_snapStrafeLockedExit(const CharacterAnimationParamCtx *ctx)
+{
+	const CharacterAnimationNode *node = &ctx->def->node[ctx->def->strafe_locked_node];
+
+	// fuente: el clip de la fila walk mas cercano al weight actual
+	float out = ctx->animation->param[ANIMATION_PARAM_STRAFE_LOCKED_DIR];
+	uint8_t src_col = (uint8_t)(out * (node->cols - 1) + 0.5f);
+	if (src_col > node->cols - 1) src_col = node->cols - 1;
+
+	T3DAnim *src = &ctx->animation->clip[node->animation[src_col]];
+	float src_length = t3d_anim_get_length(src);
+	if (src_length <= 0.0f) return;
+	float phase = src->time / src_length;
+
+	const CharacterAnimationDef *def = ctx->def;
+	const uint8_t target[] = {
+		def->walk_animation, def->run_animation, def->sprint_animation,
+		def->turn_walk_animation, (uint8_t)(def->turn_walk_animation + 1),
+		def->turn_run_animation,  (uint8_t)(def->turn_run_animation + 1),
+	};
+
+	for (unsigned t = 0; t < sizeof(target); t++) {
+		T3DAnim *dst = &ctx->animation->clip[target[t]];
+		t3d_anim_set_time(dst, phase * t3d_anim_get_length(dst));
+	}
+}
+
+// fase del col dominante (fila walk) de un grid hacia todos los clips del otro
+static void characterAnimation_snapGridFromGrid(const CharacterAnimationParamCtx *ctx, uint8_t src_node_idx, float src_dir, uint8_t dst_node_idx)
+{
+	const CharacterAnimationNode *src_node = &ctx->def->node[src_node_idx];
+	const CharacterAnimationNode *dst_node = &ctx->def->node[dst_node_idx];
+
+	uint8_t src_col = (uint8_t)(src_dir * (src_node->cols - 1) + 0.5f);
+	if (src_col > src_node->cols - 1) src_col = src_node->cols - 1;
+
+	T3DAnim *src = &ctx->animation->clip[src_node->animation[src_col]];
+	float src_length = t3d_anim_get_length(src);
+	if (src_length <= 0.0f) return;
+	float phase = src->time / src_length;
+
+	for (int c = 0; c < dst_node->cols * dst_node->rows; c++) {
+		T3DAnim *dst = &ctx->animation->clip[dst_node->animation[c]];
+		t3d_anim_set_time(dst, phase * t3d_anim_get_length(dst));
+	}
+}
+
+static void characterAnimation_setStrafeLockedParams(const CharacterAnimationParamCtx *ctx)
+{
+	CharacterAnimation *animation = ctx->animation;
+	const CharacterMovementData *data = &ctx->character->movement.data;
+	const CharacterMovementSettings *movement = ctx->character->movement.settings;
+
+	bool locked = data->strafe_locked
+		&& characterMovement_isLocomotion(ctx->character->movement.current)
+		&& data->horizontal_speed > 0.0f;
+
+	float prev_blend = animation->strafe_locked_blend;
+	float factor = fm_expf(-ctx->settings->strafe_locked_blend_rate * ctx->delta);
+	float blend  = locked ? 1.0f - (1.0f - prev_blend) * factor : prev_blend * factor;
+	if (blend > 0.999f) blend = 1.0f;
+	if (blend < 0.001f) blend = 0.0f;
+
+	if (blend == 0.0f) {
+		if (prev_blend > 0.0f) characterAnimation_snapStrafeLockedExit(ctx);
+		animation->strafe_locked_blend = 0.0f;
+		animation->param[ANIMATION_PARAM_STRAFE_LOCKED] = 0.0f;
+		return;
+	}
+
+	if (prev_blend == 0.0f)
+		characterAnimation_snapStrafeLockedEntry(ctx);
+
+	const CharacterAnimationNode *node = &ctx->def->node[ctx->def->strafe_locked_node];
+	float walk_speed = animation->clip[ctx->def->walk_animation].speed;
+	float run_speed  = animation->clip[ctx->def->run_animation].speed;
+	for (uint8_t r = 0; r < node->rows; r++) {
+		float row_speed = (r == 0) ? walk_speed : run_speed;
+		for (uint8_t c = 0; c < node->cols; c++)
+			t3d_anim_set_speed(&animation->clip[node->animation[r * node->cols + c]], row_speed);
+	}
+
+	float dir = characterAnimation_getStrafeLockedDirectionWeight(ctx);
+
+	float gait = (data->horizontal_speed - movement->gait[0].target_speed)
+	           / (movement->gait[1].target_speed - movement->gait[0].target_speed);
+	if (gait < 0.0f) gait = 0.0f;
+	if (gait > 1.0f) gait = 1.0f;
+
+	characterAnimation_syncGridClips(ctx, node, dir, gait);
+
+	float weight = characterAnimation_getWalkWeight(data->horizontal_speed, movement);
+
+	animation->strafe_locked_blend = blend;
+	animation->param[ANIMATION_PARAM_STRAFE_LOCKED]      = weight * blend;
+	animation->param[ANIMATION_PARAM_STRAFE_LOCKED_DIR]  = dir;
+	animation->param[ANIMATION_PARAM_STRAFE_LOCKED_GAIT] = gait;
+
+	animation->param[ANIMATION_PARAM_WALK]   *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_STRAFE] *= (1.0f - blend);
+}
+
 static void characterAnimation_setActiveNodes(const CharacterAnimationParamCtx *ctx)
 {
 	const CharacterAnimationDef *def = ctx->def;
@@ -598,6 +729,7 @@ void characterAnimation_setParams(Character *character, const CharacterAnimation
 	characterAnimation_setJumpParams (&ctx);
 	characterAnimation_setRollParam (&ctx);
 	characterAnimation_setStrafeParams (&ctx);
+	characterAnimation_setStrafeLockedParams (&ctx);
 	characterAnimation_setActiveNodes (&ctx);
 }
 
@@ -626,6 +758,8 @@ void characterAnimation_initGraph(Character *character, const CharacterAnimation
 	animation->turn_avg_idx = 0;
 	animation->strafe_turning = false;
 	animation->strafe_blend = 0.0f;
+	animation->strafe_locked_blend = 0.0f;
+	animation->bow_walk_aiming_blend = 0.0f;
 
 	for (int i = 0; i < def->clip_count; i++)
 	{

@@ -1,7 +1,7 @@
 #ifndef GAME_STATES_H
 #define GAME_STATES_H
 
-#define GAME_INITIAL_STATE GAME_STATE_INTRO
+#define GAME_INITIAL_STATE GAME_STATE_MAIN_MENU
 
 typedef struct GameContext GameContext;
 typedef struct Game Game;

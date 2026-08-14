@@ -21,37 +21,6 @@ static T3DVec3 quat_rotateVec3(const T3DQuat *q, const T3DVec3 *v)
 	return (T3DVec3){{ out.x, out.y, out.z }};
 }
 
-/* Model-space pose of a bone, composed from the local TRS chain so it is
-   current-frame (bone->matrix would lag one skeleton update behind). */
-static void characterWeapon_boneModelPose(const T3DSkeleton *skeleton, int16_t bone, T3DVec3 *pos, T3DQuat *rot)
-{
-	uint16_t chain[16];
-	int depth = 0;
-
-	uint16_t idx = (uint16_t)bone;
-	while (idx != 0xFFFF && depth < 16) {
-		chain[depth++] = idx;
-		idx = skeleton->skeletonRef->bones[idx].parentIdx;
-	}
-
-	*pos = (T3DVec3){{ 0.0f, 0.0f, 0.0f }};
-	*rot = (T3DQuat){{ 0.0f, 0.0f, 0.0f, 1.0f }};
-
-	for (int i = depth - 1; i >= 0; i--) {
-		const T3DBone *b = &skeleton->bones[chain[i]];
-
-		T3DVec3 step = quat_rotateVec3(rot, &b->position);
-		pos->v[0] += step.v[0];
-		pos->v[1] += step.v[1];
-		pos->v[2] += step.v[2];
-
-		T3DQuat next;
-		t3d_quat_mul(&next, rot, (T3DQuat *)&b->rotation);
-		*rot = next;
-	}
-}
-
-
 void character_equipWeapon(Character *character, uint8_t slot_id, const WeaponDef *weapon)
 {
 	assert(slot_id < WEAPON_SLOT_COUNT);
@@ -112,7 +81,7 @@ void characterWeapon_setBones(Character *character)
 
 		T3DVec3 ref_pos;
 		T3DQuat ref_rot;
-		characterWeapon_boneModelPose(skeleton, reference, &ref_pos, &ref_rot);
+		character_getBonePose(skeleton, reference, &ref_pos, &ref_rot);
 
 		T3DVec3 step = quat_rotateVec3(&ref_rot, offset_pos);
 

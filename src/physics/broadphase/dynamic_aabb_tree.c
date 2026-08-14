@@ -10,6 +10,7 @@
 
 #include "physics/broadphase/dynamic_aabb_tree.h"
 #include "physics/memory/physics_memory.h"
+#include "physics/physics_settings.h"
 
 
 static inline int imax(int a, int b) { return a > b ? a : b; }
@@ -17,8 +18,7 @@ static inline int imax(int a, int b) { return a > b ? a : b; }
 
 static inline void fattenAABB(AABB *aabb)
 {
-	const float k_fattener = 0.5f;
-	Vector3 v = { k_fattener, k_fattener, k_fattener };
+	Vector3 v = { PHYSICS_AABB_FATTENER, PHYSICS_AABB_FATTENER, PHYSICS_AABB_FATTENER };
 	aabb->min = vector3_difference(&aabb->min, &v);
 	aabb->max = vector3_sum(&aabb->max, &v);
 }

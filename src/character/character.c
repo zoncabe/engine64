@@ -2,6 +2,7 @@
 #include <malloc.h>
 #include <string.h>
 #include <libdragon.h>
+#include <fgeom.h>
 #include <t3d/t3dmodel.h>
 
 #include "entity/entity.h"
@@ -36,6 +37,73 @@ Character *character_create(const CharacterDef *def, Entity *entity)
 		(const T3DMat4FP *)t3d_segment_placeholder(T3D_SEGMENT_SKELETON));
 
 	return character;
+}
+
+/* T3DQuat and T3DVec3 are libdragon's fm_quat_t / float[3] underneath. */
+static T3DVec3 quat_rotateVec3(const T3DQuat *q, const T3DVec3 *v)
+{
+	fm_vec3_t out;
+	fm_vec3_rotate(&out, (const fm_vec3_t *)v, (const fm_quat_t *)q);
+	return (T3DVec3){{ out.x, out.y, out.z }};
+}
+
+void character_getBoneModelSpacePose(const T3DSkeleton *skeleton, int16_t bone, T3DVec3 *position, T3DQuat *rotation)
+{
+	uint16_t chain[16];
+	int depth = 0;
+
+	uint16_t idx = (uint16_t)bone;
+	while (idx != 0xFFFF && depth < 16) {
+		chain[depth++] = idx;
+		idx = skeleton->skeletonRef->bones[idx].parentIdx;
+	}
+
+	*position = (T3DVec3){{ 0.0f, 0.0f, 0.0f }};
+	*rotation = (T3DQuat){{ 0.0f, 0.0f, 0.0f, 1.0f }};
+
+	for (int i = depth - 1; i >= 0; i--) {
+		const T3DBone *b = &skeleton->bones[chain[i]];
+
+		T3DVec3 step = quat_rotateVec3(rotation, &b->position);
+		position->v[0] += step.v[0];
+		position->v[1] += step.v[1];
+		position->v[2] += step.v[2];
+
+		T3DQuat next;
+		t3d_quat_mul(&next, rotation, (T3DQuat *)&b->rotation);
+		*rotation = next;
+	}
+}
+
+/* Model-space pose of a bone, composed from the local TRS chain so it is
+   current-frame (bone->matrix would lag one skeleton update behind). */
+void character_getBonePose(const T3DSkeleton *skeleton, int16_t bone, T3DVec3 *position, T3DQuat *rotation)
+{
+	uint16_t chain[16];
+	int depth = 0;
+
+	uint16_t idx = (uint16_t)bone;
+	while (idx != 0xFFFF && depth < 16) {
+		chain[depth++] = idx;
+		idx = skeleton->skeletonRef->bones[idx].parentIdx;
+	}
+
+	*position = (T3DVec3){{ 0.0f, 0.0f, 0.0f }};
+	*rotation = (T3DQuat){{ 0.0f, 0.0f, 0.0f, 1.0f }};
+
+	for (int i = depth - 1; i >= 0; i--) {
+		const T3DBone *b = &skeleton->bones[chain[i]];
+
+		fm_vec3_t step;
+		fm_vec3_rotate(&step, (const fm_vec3_t *)&b->position, (const fm_quat_t *)rotation);
+		position->v[0] += step.x;
+		position->v[1] += step.y;
+		position->v[2] += step.z;
+
+		T3DQuat next;
+		t3d_quat_mul(&next, rotation, (T3DQuat *)&b->rotation);
+		*rotation = next;
+	}
 }
 
 void character_delete(Character *character)

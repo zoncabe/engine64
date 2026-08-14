@@ -13,6 +13,7 @@
 #include "ui/main_menu_ui.h"
 #include "ui/pause_ui.h"
 #include "ui/gameplay_ui.h"
+#include "particles/particles.h"
 
 
 static Game game;
@@ -49,7 +50,11 @@ void game_init()
 	//time_setScale(2.0f);
 
 	viewport_init();
-	
+
+	particles_init();
+
+	player_init();
+
 	sound_init();
 
 	settings_init();

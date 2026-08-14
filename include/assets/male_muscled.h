@@ -17,6 +17,12 @@ typedef enum {
 	MM_SLOT_TURN_RUN,
 	MM_SLOT_STRAFE_WALK,
 	MM_SLOT_STRAFE_RUN,
+	MM_SLOT_STRAFE_LOCKED_WALK,
+	MM_SLOT_STRAFE_LOCKED_WALK_SIDE,
+	MM_SLOT_STRAFE_LOCKED_RUN,
+	MM_SLOT_STRAFE_LOCKED_RUN_SIDE,
+	MM_SLOT_BOW_WALK_AIMING,
+	MM_SLOT_BOW_WALK_AIMING_SIDE,
 
 	MM_SLOT_JUMP_L,
 	MM_SLOT_JUMP_R,
@@ -45,6 +51,8 @@ typedef enum {
 	MM_NODE_ROLL,
 	MM_NODE_ROLL_LAYER,
 	MM_NODE_STRAFE,
+	MM_NODE_STRAFE_LOCKED,
+	MM_NODE_BOW_WALK_AIMING,
 
 	MM_NODE_COUNT
 
@@ -91,6 +99,20 @@ typedef enum {
 
 	MM_ANIM_SPRINT,
 
+	MM_ANIM_STRAFE_LOCKED_WALK_FWD,
+	MM_ANIM_STRAFE_LOCKED_WALK_BACK,
+	MM_ANIM_STRAFE_LOCKED_WALK_L,
+	MM_ANIM_STRAFE_LOCKED_WALK_R,
+	MM_ANIM_STRAFE_LOCKED_RUN_FWD,
+	MM_ANIM_STRAFE_LOCKED_RUN_BACK,
+	MM_ANIM_STRAFE_LOCKED_RUN_L,
+	MM_ANIM_STRAFE_LOCKED_RUN_R,
+
+	MM_ANIM_BOW_WALK_AIMING_FWD,
+	MM_ANIM_BOW_WALK_AIMING_BACK,
+	MM_ANIM_BOW_WALK_AIMING_L,
+	MM_ANIM_BOW_WALK_AIMING_R,
+
 	MM_ANIM_JUMP_L,
 	MM_ANIM_JUMP_R,
 	MM_ANIM_FALL_L,
@@ -120,6 +142,7 @@ extern const CharacterWeaponsDef male_muscled_weapons_def;
 extern const CharacterDef male_muscled_character_def;
 
 extern const WeaponDef weapon_ak47;
+extern const WeaponDef weapon_bow;
 extern const WeaponDef weapon_m1911;
 extern const WeaponDef weapon_knife;
 extern const CharacterAnimationSettings male_muscled_animation_settings;

@@ -41,5 +41,9 @@ typedef struct Character {
 Character *character_create(const CharacterDef *def, Entity *entity);
 void character_delete(Character *character);
 
+/* Model-space pose of a bone, composed from the local TRS chain so it is
+   current-frame (bone->matrix would lag one skeleton update behind). */
+void character_getBonePose(const T3DSkeleton *skeleton, int16_t bone, T3DVec3 *position, T3DQuat *rotation);
+
 
 #endif

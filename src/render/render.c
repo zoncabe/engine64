@@ -10,6 +10,8 @@
 #include "graphics/font.h"
 #include "graphics/sprites.h"
 #include "graphics/shapes.h"
+#include "particles/particles.h"
+#include "ui/stamina_wheel.h"
 #include "render/render.h"
 #include "screen/screen.h"
 #include "time/time.h"
@@ -82,7 +84,7 @@ static void render_setDebugContext(RenderContext *ctx)
 {
 #if DEBUG
 	static char fps_buf[8];
-	snprintf(fps_buf, sizeof(fps_buf), "%d FPS", (int)time_get()->rate);
+	snprintf(fps_buf, sizeof(fps_buf), "%.3f", stamina_wheel_getProgress());
 	RenderSection *section = render_beginSection(ctx);
 	render_pushElement(ctx, (DrawElement){
 		.type     = DRAW_TEXT,
@@ -166,6 +168,8 @@ void render(RenderContext *ctx, int *fb_index)
 
 		if (pushed) t3d_matrix_pop(1);
 	}
+
+	particles_draw();
 
 	for (int s = 0; s < ctx->section_count; s++) {
 		RenderSection *section = &ctx->section[s];

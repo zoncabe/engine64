@@ -11,6 +11,7 @@ typedef struct {
 
 	float hp;
 	float stamina;
+	bool tired;
 
 } PlayerStats;
 

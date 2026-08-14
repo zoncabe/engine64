@@ -27,8 +27,9 @@
 /* One vertex buffer per framebuffer, same reason the matrices are buffered. */
 #define MESH_DEFORM_BUFFERS FB_COUNT
 
-/* t3d segment the deformed vertices are addressed through (valid ids are 1-7).
-   Segment 1 is the one the skinning placeholder uses, so this stays clear. */
+/* First t3d segment free for deformed vertices (valid ids are 1-7). Segment 1
+   is the one the skinning placeholder uses, so the pool starts at 2; each
+   binding takes the lowest free id and keeps it until deleted. */
 #define MESH_DEFORM_SEGMENT 2
 
 
