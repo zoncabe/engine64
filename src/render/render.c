@@ -84,7 +84,7 @@ static void render_setDebugContext(RenderContext *ctx)
 {
 #if DEBUG
 	static char fps_buf[8];
-	snprintf(fps_buf, sizeof(fps_buf), "%.3f", stamina_wheel_getProgress());
+	snprintf(fps_buf, sizeof(fps_buf), "%.1f", time_get()->rate);
 	RenderSection *section = render_beginSection(ctx);
 	render_pushElement(ctx, (DrawElement){
 		.type     = DRAW_TEXT,

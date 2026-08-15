@@ -59,7 +59,7 @@ void scene_load(const SceneDef *def)
 		if (entity_def->cloth) {
 			Cloth *cloth = physicsWorld_createCloth(&g_physics, entity_def->cloth);
 			/* The cloth runs in metres, the vertex buffer in render units. */
-			if (cloth) mesh_setDeform(entity->mesh, cloth->position, cloth->normal,
+			if (cloth) mesh_setDeform(entity->mesh, cloth->render_position, cloth->normal,
 			                         cloth->particle_count, RENDER_SCALE);
 		}
 

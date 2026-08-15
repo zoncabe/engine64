@@ -183,15 +183,17 @@ static void staminaWheel_setRenderState(void)
 	rdpq_set_mode_standard();
 	rdpq_mode_blender(RDPQ_BLENDER_MULTIPLY);
 
-	/* Verbatim from the N64brew GameJam 2024 setup screen (drawprogress):
-	   cycle 1 tints the ring (TEX1) with prim and takes alpha from the sweep
-	   (TEX0); cycle 2 hands the sweep to the alpha compare, which cuts the
-	   wheel at the current progress angle. Prim color comes from the
-	   particle color instead of rdpq_set_prim_color. */
+	/* The technique from the N64brew Discord (HailToDodongo/Tharo): in
+	   2-cycle mode the alpha compare reads the FIRST cycle's alpha (the
+	   sweep, TEX0) while the blender reads the second cycle's — so clip and
+	   opacity are decoupled by hardware. The env alpha multiplies only the
+	   blender side (ring coverage × fade): the wheel fades in and out
+	   without moving the cutoff, and the threshold stays unscaled. */
 	rdpq_mode_combiner(RDPQ_COMBINER2(
 		(TEX1,0,PRIM,0),  (0,0,0,TEX0),
-		(0,0,0,COMBINED), (0,0,0,TEX1)
+		(0,0,0,COMBINED), (TEX1,0,ENV,0)
 	));
+	rdpq_set_env_color(RGBA32(0, 0, 0, (uint8_t)(wheel_alpha * 255.0f)));
 	rdpq_mode_alphacompare((1.0f - wheel_progress) * 255.0f);
 
 	/* tpx maps UVs to an 8x8px base no matter the real size: scale_log

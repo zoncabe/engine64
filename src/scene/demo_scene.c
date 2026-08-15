@@ -1,9 +1,7 @@
 #include "scene/scene.h"
 #include "scene/demo_scene.h"
 #include "assets/male_muscled.h"
-
-
-
+#include "assets/miss_jiggles.h"
 
 static const PhysicsShapeDef room_shapes[] = {
 	{ .type = SHAPE_MESH, .mesh = {
@@ -65,7 +63,16 @@ const SceneDef demo_scene = {
 			.scale      = {1.0f, 1.0f, 1.0f},
 			.character  = &male_muscled_character_def,
 		},
+		
 		[1] = {
+			.model_path = miss_jiggles_model,
+			.position   = {1600.0f, -1600.0f, 200.0f},
+			.rotation   = {0.0f, 0.0f, 125.0f},
+			.scale      = {1.0f, 1.0f, 1.0f},
+			.character  = &miss_jiggles_character_def,
+		},
+
+		[2] = {
 			.model_path = "rom:/models/room.t3dm",
 			.position   = {0.0f, 0.0f, -2.0f},
 			.rotation   = {0.0f, 0.0f, 0.0f},
@@ -73,48 +80,47 @@ const SceneDef demo_scene = {
 			.collider   = &room_collider,
 		},
 
-		[2] = {
+		[3] = {
 			.model_path = "rom:/models/pole.t3dm",
 			.position   = {0.0f, 0.0f, -2.0f},
 			.rotation   = {0.0f, 0.0f, 0.0f},
 			.scale      = {1.0f, 1.0f, 2.0f},
 			.collider   = &pole_collider,
 		},
-		[3] = {
+		[4] = {
 			.model_path = "rom:/models/brew_flag.t3dm",
 			.position   = {5.0f, 0.0f, 688.0f},
 			.rotation   = {0.0f, 0.0f, 0.0f},
 			.scale      = {2.5f, 1.0f, 2.5f},
 			.cloth      = &flag_cloth,
 		},
-
-		[4] = {
+		[5] = {
 			.model_path = "rom:/models/pole.t3dm",
 			.position   = {0.0f, 1300.0f, 0.0f},
 			.rotation   = {0.0f, 0.0f, 0.0f},
 			.scale      = {1.0f, 1.0f, 1.4f},
 			.collider   = &pole_collider,
 		},
-		[5] = {
+		[6] = {
 			.model_path = "rom:/models/lamp.t3dm",
 			.position   = {0.0f, 1300.0f, 869.0f},
 			.rotation   = {0.0f, 0.0f, 0.0f},
 			.scale      = {2.0f, 2.0f, 2.0f},
 		},
 
-		[6] = {
+		[7] = {
 			.model_path = "rom:/models/pole.t3dm",
 			.position   = {0.0f, -1300.0f, 0.0f},
 			.rotation   = {0.0f, 0.0f, 0.0f},
 			.scale      = {1.0f, 1.0f, 1.4f},
 			.collider   = &pole_collider,
 		},
-		[7] = {
+		[8] = {
 			.model_path = "rom:/models/lamp.t3dm",
 			.position   = {0.0f, -1300.0f, 869.0f},
 			.rotation   = {0.0f, 0.0f, 0.0f},
 			.scale      = {2.0f, 2.0f, 2.0f},
 		},
 	},
-	.entity_count = 8,
+	.entity_count = 9,
 };

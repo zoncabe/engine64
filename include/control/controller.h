@@ -27,6 +27,8 @@ typedef struct {
 	ButtonID roll;
 	ButtonID sprint;
 	ButtonID camera_aim;
+	ButtonID switch_character_next;
+	ButtonID switch_character_prev;
 
 } ControllerBinding;
 
@@ -48,6 +50,8 @@ typedef struct ControllerActions {
 	bool  roll;
 	bool  sprint;
 	bool  camera_aim;
+	bool  switch_character_next;
+	bool  switch_character_prev;
 	float stick_x;
 	float stick_y;
 	float cstick_x;

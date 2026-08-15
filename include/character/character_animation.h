@@ -161,9 +161,11 @@ typedef struct {
 typedef struct CharacterAnimation {
 
 	const CharacterAnimationDef *def;
+	const T3DModel *model;
 	T3DSkeleton  main;
 	T3DSkeleton *buffer;
 	T3DAnim     *clip;
+	uint8_t     *clip_cooldown;   /* frames since the graph last touched each clip */
 	uint8_t     *node_state;
 	bool        *node_active;
 	float        param[ANIMATION_PARAM_COUNT];

@@ -35,6 +35,64 @@ void characterAnimation_blendLayers(const T3DSkeleton *main, const CharacterAnim
 
 static uint8_t characterAnimation_blendSegment(float weight, uint8_t count, float *t);
 static void characterAnimation_syncGridClips(const CharacterAnimationParamCtx *ctx, const CharacterAnimationNode *node, float cols_value, float rows_value);
+static T3DSkeleton *characterAnimation_clipBuffer(const CharacterAnimationDef *def, CharacterAnimation *animation, uint8_t clip);
+
+/* Streamed clips: every open T3DAnim keeps its .sdata file open, and libc caps
+   the files a program may hold open at once (64-lock pool). Clips open on
+   first use and close after a while untouched, so only the graph's working
+   set holds files. The delay keeps blend-boundary flicker from churning
+   open/close, and the hard cap bounds the open set no matter the input. */
+#define ANIMATION_CLIP_CLOSE_DELAY 60   /* frames untouched before closing */
+#define ANIMATION_CLIP_MAX_OPEN    24   /* per character */
+
+static void characterAnimation_closeClip(CharacterAnimation *animation, uint8_t index)
+{
+	t3d_anim_destroy(&animation->clip[index]);
+	memset(&animation->clip[index], 0, sizeof(animation->clip[index]));
+}
+
+static T3DAnim *characterAnimation_clip(CharacterAnimation *animation, uint8_t index)
+{
+	T3DAnim *clip = &animation->clip[index];
+	animation->clip_cooldown[index] = 0;
+	if (clip->animRef != NULL) return clip;
+
+	/* At the cap, evict the least recently touched clip. Clips touched this
+	   frame have cooldown 0 and are never evicted: live pointers stay valid. */
+	int open  = 0;
+	int evict = -1;
+	for (int i = 0; i < animation->def->clip_count; i++) {
+		if (animation->clip[i].animRef == NULL) continue;
+		open++;
+		if (evict < 0 || animation->clip_cooldown[i] > animation->clip_cooldown[evict]) evict = i;
+	}
+	if (open >= ANIMATION_CLIP_MAX_OPEN && evict >= 0 && animation->clip_cooldown[evict] > 0)
+		characterAnimation_closeClip(animation, (uint8_t)evict);
+
+	const CharacterAnimationClipDef *clip_def = &animation->def->clip[index];
+
+	*clip = t3d_anim_create(animation->model, clip_def->name);
+	t3d_anim_attach(clip, characterAnimation_clipBuffer(animation->def, animation, index));
+	t3d_anim_set_looping(clip, clip_def->is_looping);
+	t3d_anim_set_playing(clip, clip_def->is_looping);
+
+	return clip;
+}
+
+/* Once per frame: close what the graph stopped touching. */
+static void characterAnimation_closeIdleClips(CharacterAnimation *animation)
+{
+	for (int i = 0; i < animation->def->clip_count; i++) {
+		if (animation->clip[i].animRef == NULL) continue;
+
+		if (animation->clip_cooldown[i] < ANIMATION_CLIP_CLOSE_DELAY) {
+			animation->clip_cooldown[i]++;
+			continue;
+		}
+
+		characterAnimation_closeClip(animation, (uint8_t)i);
+	}
+}
 
 /* gait axis: gait i sits at i / (count - 1) */
 static float characterAnimation_getGaitParam(float speed, const CharacterMovementSettings *movement)
@@ -81,13 +139,13 @@ static void characterAnimation_setJumpFootingSpeed(const CharacterAnimationParam
 	float factor = ctx->settings->jump_footing_speed * (1.0f - jump);
 	if (factor < 0.0f) factor = 0.0f;
 
-	ctx->animation->clip[ctx->def->walk_animation].speed          *= factor;
-	ctx->animation->clip[ctx->def->run_animation].speed           *= factor;
-	ctx->animation->clip[ctx->def->sprint_animation].speed        *= factor;
-	ctx->animation->clip[ctx->def->turn_walk_animation].speed     *= factor;
-	ctx->animation->clip[ctx->def->turn_walk_animation + 1].speed *= factor;
-	ctx->animation->clip[ctx->def->turn_run_animation].speed      *= factor;
-	ctx->animation->clip[ctx->def->turn_run_animation + 1].speed  *= factor;
+	characterAnimation_clip(ctx->animation, ctx->def->walk_animation)->speed          *= factor;
+	characterAnimation_clip(ctx->animation, ctx->def->run_animation)->speed           *= factor;
+	characterAnimation_clip(ctx->animation, ctx->def->sprint_animation)->speed        *= factor;
+	characterAnimation_clip(ctx->animation, ctx->def->turn_walk_animation)->speed     *= factor;
+	characterAnimation_clip(ctx->animation, ctx->def->turn_walk_animation + 1)->speed *= factor;
+	characterAnimation_clip(ctx->animation, ctx->def->turn_run_animation)->speed      *= factor;
+	characterAnimation_clip(ctx->animation, ctx->def->turn_run_animation + 1)->speed  *= factor;
 }
 
 /* the grid runs at the cycle rate the current gait asks for: real speed over
@@ -102,8 +160,8 @@ static void characterAnimation_setLocomotionSpeed(const CharacterAnimationParamC
 	float t;
 	uint8_t row = characterAnimation_blendSegment(ctx->gait_param, node->rows, &t);
 
-	float low  = t3d_anim_get_length(&animation->clip[node->animation[row * node->cols + center]]);
-	float high = t3d_anim_get_length(&animation->clip[node->animation[(row + 1) * node->cols + center]]);
+	float low  = t3d_anim_get_length(characterAnimation_clip(animation, node->animation[row * node->cols + center]));
+	float high = t3d_anim_get_length(characterAnimation_clip(animation, node->animation[(row + 1) * node->cols + center]));
 	float length = low + t * (high - low);
 
 	float target = movement->gait[row].target_speed
@@ -114,7 +172,7 @@ static void characterAnimation_setLocomotionSpeed(const CharacterAnimationParamC
 	float scale = (ctx->character->movement.data.horizontal_speed / target) / length;
 
 	for (int i = 0; i < node->cols * node->rows; i++) {
-		T3DAnim *clip = &animation->clip[node->animation[i]];
+		T3DAnim *clip = characterAnimation_clip(animation, node->animation[i]);
 		t3d_anim_set_speed(clip, t3d_anim_get_length(clip) * scale);
 	}
 
@@ -127,7 +185,7 @@ static void characterAnimation_snapRollToLocomotion(const CharacterAnimationPara
 	float phase = left ? 0.0f : 0.5f;
 
 	for (int i = 0; i < node->cols * node->rows; i++) {
-		T3DAnim *clip = &ctx->animation->clip[node->animation[i]];
+		T3DAnim *clip = characterAnimation_clip(ctx->animation, node->animation[i]);
 		t3d_anim_set_time(clip, phase * t3d_anim_get_length(clip));
 	}
 }
@@ -192,11 +250,13 @@ static void characterAnimation_setRollParam(const CharacterAnimationParamCtx *ct
 
 	if (*as != MOVEMENT_STATE_ROLLING) {
 		uint8_t base = ctx->def->roll_animation;
+		T3DAnim *roll_l = characterAnimation_clip(ctx->animation, base);
+		T3DAnim *roll_r = characterAnimation_clip(ctx->animation, base + 1);
 
-		t3d_anim_set_playing(&ctx->animation->clip[base],     true);
-		t3d_anim_set_time   (&ctx->animation->clip[base],     0.0f);
-		t3d_anim_set_playing(&ctx->animation->clip[base + 1], true);
-		t3d_anim_set_time   (&ctx->animation->clip[base + 1], 0.0f);
+		t3d_anim_set_playing(roll_l, true);
+		t3d_anim_set_time   (roll_l, 0.0f);
+		t3d_anim_set_playing(roll_r, true);
+		t3d_anim_set_time   (roll_r, 0.0f);
 
 		float dir = (ctx->locomotion_phase < 0.5f) ? -1.0f : 1.0f;
 		ctx->animation->param[ANIMATION_PARAM_ROLL_RUN] = 0.0f;
@@ -210,7 +270,7 @@ static void characterAnimation_setRollParam(const CharacterAnimationParamCtx *ct
 
 	uint8_t base      = ctx->def->roll_animation;
 	uint8_t roll_idx  = left ? base : base + 1;
-	float   roll_time = ctx->animation->clip[roll_idx].time;
+	float   roll_time = characterAnimation_clip(ctx->animation, roll_idx)->time;
 	float   ratio     = ctx->animation->param[ANIMATION_PARAM_ROLL_RUN];
 
 	if (roll_time < r->run_to_rolling_anim_ground && ratio <= 1.0f)
@@ -232,9 +292,9 @@ static void characterAnimation_setRollParam(const CharacterAnimationParamCtx *ct
 static void characterAnimation_syncLandToJump(const CharacterAnimationParamCtx *ctx)
 {
 	const CharacterAnimationSettings *j = ctx->settings;
-	T3DAnim *jump_l   = &ctx->animation->clip[ctx->def->jump_animation];
-	T3DAnim *jump_r   = &ctx->animation->clip[ctx->def->jump_animation + 1];
-	float    land_t   = ctx->animation->clip[ctx->def->land_animation].time;
+	T3DAnim *jump_l   = characterAnimation_clip(ctx->animation, ctx->def->jump_animation);
+	T3DAnim *jump_r   = characterAnimation_clip(ctx->animation, ctx->def->jump_animation + 1);
+	float    land_t   = characterAnimation_clip(ctx->animation, ctx->def->land_animation)->time;
 	float    jump_t;
 
 	if (land_t < j->land_anim_crouch)
@@ -251,12 +311,12 @@ static void characterAnimation_syncLandToJump(const CharacterAnimationParamCtx *
 
 static void characterAnimation_snapToJump(const CharacterAnimationParamCtx *ctx)
 {
-	T3DAnim *jump_l   = &ctx->animation->clip[ctx->def->jump_animation];
-	T3DAnim *jump_r   = &ctx->animation->clip[ctx->def->jump_animation + 1];
-	T3DAnim *land_animation = &ctx->animation->clip[ctx->def->land_animation];
+	T3DAnim *jump_l   = characterAnimation_clip(ctx->animation, ctx->def->jump_animation);
+	T3DAnim *jump_r   = characterAnimation_clip(ctx->animation, ctx->def->jump_animation + 1);
+	T3DAnim *land_animation = characterAnimation_clip(ctx->animation, ctx->def->land_animation);
 
-	T3DAnim *fall_l = &ctx->animation->clip[ctx->def->fall_animation];
-	T3DAnim *fall_r = &ctx->animation->clip[ctx->def->fall_animation + 1];
+	T3DAnim *fall_l = characterAnimation_clip(ctx->animation, ctx->def->fall_animation);
+	T3DAnim *fall_r = characterAnimation_clip(ctx->animation, ctx->def->fall_animation + 1);
 
 	t3d_anim_set_playing(jump_l, true);
 	t3d_anim_set_playing(jump_r, true);
@@ -277,8 +337,8 @@ static void characterAnimation_snapToJump(const CharacterAnimationParamCtx *ctx)
 
 static void characterAnimation_snapToLand(const CharacterAnimationParamCtx *ctx)
 {
-	T3DAnim *land_l = &ctx->animation->clip[ctx->def->land_animation];
-	T3DAnim *land_r = &ctx->animation->clip[ctx->def->land_animation + 1];
+	T3DAnim *land_l = characterAnimation_clip(ctx->animation, ctx->def->land_animation);
+	T3DAnim *land_r = characterAnimation_clip(ctx->animation, ctx->def->land_animation + 1);
 	t3d_anim_set_time(land_l, 0.0f);
 	t3d_anim_set_time(land_r, 0.0f);
 	t3d_anim_set_playing(land_l, true);
@@ -291,7 +351,7 @@ static void characterAnimation_setJumpParams(const CharacterAnimationParamCtx *c
 {
 	const CharacterAnimationSettings *j   = ctx->settings;
 	float    delta     = ctx->delta;
-	T3DAnim *land_animation = &ctx->animation->clip[ctx->def->land_animation];
+	T3DAnim *land_animation = characterAnimation_clip(ctx->animation, ctx->def->land_animation);
 	uint8_t  cur       = ctx->character->movement.current;
 	uint8_t *as        = &ctx->animation->action_state;
 	float    footing   = ctx->locomotion_phase;
@@ -327,8 +387,8 @@ static void characterAnimation_setJumpParams(const CharacterAnimationParamCtx *c
 			land -= stand_rate;
 			if (land < 0.0f) {
 				land = 0.0f;
-				t3d_anim_set_playing(&ctx->animation->clip[ctx->def->land_animation],     false);
-				t3d_anim_set_playing(&ctx->animation->clip[ctx->def->land_animation + 1], false);
+				t3d_anim_set_playing(land_animation, false);
+				t3d_anim_set_playing(characterAnimation_clip(ctx->animation, ctx->def->land_animation + 1), false);
 			}
 		}
 
@@ -403,13 +463,13 @@ static void characterAnimation_snapStrafeEntry(const CharacterAnimationParamCtx 
 {
 	const CharacterAnimationNode *node = &ctx->def->node[ctx->def->strafe_node];
 
-	T3DAnim *src = &ctx->animation->clip[ctx->def->walk_animation];
+	T3DAnim *src = characterAnimation_clip(ctx->animation, ctx->def->walk_animation);
 	float src_length = t3d_anim_get_length(src);
 	if (src_length <= 0.0f) return;
 	float phase = src->time / src_length;
 
 	for (int c = 0; c < node->cols * node->rows; c++) {
-		T3DAnim *dst = &ctx->animation->clip[node->animation[c]];
+		T3DAnim *dst = characterAnimation_clip(ctx->animation, node->animation[c]);
 		if (dst == src) continue;
 		t3d_anim_set_time(dst, phase * t3d_anim_get_length(dst));
 	}
@@ -424,7 +484,7 @@ static void characterAnimation_snapStrafeExit(const CharacterAnimationParamCtx *
 	uint8_t src_col = (uint8_t)(out * (node->cols - 1) + 0.5f);
 	if (src_col > node->cols - 1) src_col = node->cols - 1;
 
-	T3DAnim *src = &ctx->animation->clip[node->animation[src_col]];
+	T3DAnim *src = characterAnimation_clip(ctx->animation, node->animation[src_col]);
 	float src_length = t3d_anim_get_length(src);
 	if (src_length <= 0.0f) return;
 	float phase = src->time / src_length;
@@ -437,7 +497,7 @@ static void characterAnimation_snapStrafeExit(const CharacterAnimationParamCtx *
 	};
 
 	for (unsigned t = 0; t < sizeof(target); t++) {
-		T3DAnim *dst = &ctx->animation->clip[target[t]];
+		T3DAnim *dst = characterAnimation_clip(ctx->animation, target[t]);
 		t3d_anim_set_time(dst, phase * t3d_anim_get_length(dst));
 	}
 }
@@ -473,8 +533,8 @@ static void characterAnimation_syncGridClips(const CharacterAnimationParamCtx *c
 	T3DAnim *ref = NULL;
 	for (uint8_t m = 0; m < curr_count && !ref; m++)
 		for (uint8_t p = 0; p < prev_count; p++)
-			if (curr[m] == prev[p]) { ref = &animation->clip[curr[m]]; break; }
-	if (!ref) ref = &animation->clip[prev[0]];
+			if (curr[m] == prev[p]) { ref = characterAnimation_clip(animation, curr[m]); break; }
+	if (!ref) ref = characterAnimation_clip(animation, prev[0]);
 
 	float ref_length = t3d_anim_get_length(ref);
 	if (ref_length <= 0.0f) return;
@@ -486,7 +546,7 @@ static void characterAnimation_syncGridClips(const CharacterAnimationParamCtx *c
 			if (curr[m] == prev[p]) carried = true;
 		if (carried) continue;
 
-		T3DAnim *dst = &animation->clip[curr[m]];
+		T3DAnim *dst = characterAnimation_clip(animation, curr[m]);
 		t3d_anim_set_time(dst, phase * t3d_anim_get_length(dst));
 	}
 }
@@ -520,12 +580,12 @@ static void characterAnimation_setStrafeParams(const CharacterAnimationParamCtx 
 		characterAnimation_snapStrafeEntry(ctx);
 
 	const CharacterAnimationNode *node = &ctx->def->node[ctx->def->strafe_node];
-	float walk_speed = animation->clip[ctx->def->walk_animation].speed;
-	float run_speed  = animation->clip[ctx->def->run_animation].speed;
+	float walk_speed = characterAnimation_clip(animation, ctx->def->walk_animation)->speed;
+	float run_speed  = characterAnimation_clip(animation, ctx->def->run_animation)->speed;
 	for (uint8_t r = 0; r < node->rows; r++) {
 		float row_speed = (r == 0) ? walk_speed : run_speed;
 		for (uint8_t c = 0; c < node->cols; c++)
-			t3d_anim_set_speed(&animation->clip[node->animation[r * node->cols + c]], row_speed);
+			t3d_anim_set_speed(characterAnimation_clip(animation, node->animation[r * node->cols + c]), row_speed);
 	}
 
 	float dir = characterAnimation_getStrafeDirectionWeight(ctx);
@@ -565,13 +625,13 @@ static void characterAnimation_snapStrafeLockedEntry(const CharacterAnimationPar
 {
 	const CharacterAnimationNode *node = &ctx->def->node[ctx->def->strafe_locked_node];
 
-	T3DAnim *src = &ctx->animation->clip[ctx->def->walk_animation];
+	T3DAnim *src = characterAnimation_clip(ctx->animation, ctx->def->walk_animation);
 	float src_length = t3d_anim_get_length(src);
 	if (src_length <= 0.0f) return;
 	float phase = src->time / src_length;
 
 	for (int c = 0; c < node->cols * node->rows; c++) {
-		T3DAnim *dst = &ctx->animation->clip[node->animation[c]];
+		T3DAnim *dst = characterAnimation_clip(ctx->animation, node->animation[c]);
 		t3d_anim_set_time(dst, phase * t3d_anim_get_length(dst));
 	}
 }
@@ -585,7 +645,7 @@ static void characterAnimation_snapStrafeLockedExit(const CharacterAnimationPara
 	uint8_t src_col = (uint8_t)(out * (node->cols - 1) + 0.5f);
 	if (src_col > node->cols - 1) src_col = node->cols - 1;
 
-	T3DAnim *src = &ctx->animation->clip[node->animation[src_col]];
+	T3DAnim *src = characterAnimation_clip(ctx->animation, node->animation[src_col]);
 	float src_length = t3d_anim_get_length(src);
 	if (src_length <= 0.0f) return;
 	float phase = src->time / src_length;
@@ -598,7 +658,7 @@ static void characterAnimation_snapStrafeLockedExit(const CharacterAnimationPara
 	};
 
 	for (unsigned t = 0; t < sizeof(target); t++) {
-		T3DAnim *dst = &ctx->animation->clip[target[t]];
+		T3DAnim *dst = characterAnimation_clip(ctx->animation, target[t]);
 		t3d_anim_set_time(dst, phase * t3d_anim_get_length(dst));
 	}
 }
@@ -612,13 +672,13 @@ static void characterAnimation_snapGridFromGrid(const CharacterAnimationParamCtx
 	uint8_t src_col = (uint8_t)(src_dir * (src_node->cols - 1) + 0.5f);
 	if (src_col > src_node->cols - 1) src_col = src_node->cols - 1;
 
-	T3DAnim *src = &ctx->animation->clip[src_node->animation[src_col]];
+	T3DAnim *src = characterAnimation_clip(ctx->animation, src_node->animation[src_col]);
 	float src_length = t3d_anim_get_length(src);
 	if (src_length <= 0.0f) return;
 	float phase = src->time / src_length;
 
 	for (int c = 0; c < dst_node->cols * dst_node->rows; c++) {
-		T3DAnim *dst = &ctx->animation->clip[dst_node->animation[c]];
+		T3DAnim *dst = characterAnimation_clip(ctx->animation, dst_node->animation[c]);
 		t3d_anim_set_time(dst, phase * t3d_anim_get_length(dst));
 	}
 }
@@ -650,12 +710,12 @@ static void characterAnimation_setStrafeLockedParams(const CharacterAnimationPar
 		characterAnimation_snapStrafeLockedEntry(ctx);
 
 	const CharacterAnimationNode *node = &ctx->def->node[ctx->def->strafe_locked_node];
-	float walk_speed = animation->clip[ctx->def->walk_animation].speed;
-	float run_speed  = animation->clip[ctx->def->run_animation].speed;
+	float walk_speed = characterAnimation_clip(animation, ctx->def->walk_animation)->speed;
+	float run_speed  = characterAnimation_clip(animation, ctx->def->run_animation)->speed;
 	for (uint8_t r = 0; r < node->rows; r++) {
 		float row_speed = (r == 0) ? walk_speed : run_speed;
 		for (uint8_t c = 0; c < node->cols; c++)
-			t3d_anim_set_speed(&animation->clip[node->animation[r * node->cols + c]], row_speed);
+			t3d_anim_set_speed(characterAnimation_clip(animation, node->animation[r * node->cols + c]), row_speed);
 	}
 
 	float dir = characterAnimation_getStrafeLockedDirectionWeight(ctx);
@@ -717,7 +777,7 @@ void characterAnimation_setParams(Character *character, const CharacterAnimation
 	uint8_t row = characterAnimation_blendSegment(ctx.gait_param, locomotion->rows, &row_t);
 	if (row_t > 0.5f) row++;
 
-	T3DAnim *base = &animation->clip[locomotion->animation[row * locomotion->cols + locomotion->cols / 2]];
+	T3DAnim *base = characterAnimation_clip(animation, locomotion->animation[row * locomotion->cols + locomotion->cols / 2]);
 
 	ctx.locomotion_phase = characterAnimation_getLocomotionPhase(base->time, t3d_anim_get_length(base));
 	ctx.turning          = characterAnimation_getTurningAvg(animation, ctx.settings, character->body.rotation.z, character->movement.data.previous_yaw);
@@ -761,20 +821,13 @@ void characterAnimation_initGraph(Character *character, const CharacterAnimation
 	animation->strafe_locked_blend = 0.0f;
 	animation->bow_walk_aiming_blend = 0.0f;
 
-	for (int i = 0; i < def->clip_count; i++)
-	{
-		const CharacterAnimationClipDef *clip_def = &def->clip[i];
-
-		animation->clip[i] = t3d_anim_create(model, clip_def->name);
-
-		T3DSkeleton *target = (clip_def->buffer == ANIMATION_SLOT_MAIN)
-			? &animation->main
-			: &animation->buffer[clip_def->buffer];
-
-		t3d_anim_attach(&animation->clip[i], target);
-		t3d_anim_set_looping(&animation->clip[i], clip_def->is_looping);
-		t3d_anim_set_playing(&animation->clip[i], clip_def->is_looping);
-	}
+	/* Clips open on demand through characterAnimation_clip: a zeroed slot
+	   (animRef NULL) is a closed clip. */
+	animation->model = model;
+	animation->clip_cooldown = malloc(def->clip_count);
+	assert(animation->clip_cooldown);
+	memset(animation->clip_cooldown, 0, def->clip_count);
+	memset(animation->clip, 0, def->clip_count * sizeof(T3DAnim));
 }
 
 static T3DSkeleton *characterAnimation_clipBuffer(const CharacterAnimationDef *def, CharacterAnimation *animation, uint8_t clip)
@@ -801,7 +854,7 @@ static void characterAnimation_updateClip(CharacterAnimation *animation, bool *u
 {
 	if (updated[clip]) return;
 	updated[clip] = true;
-	t3d_anim_update(&animation->clip[clip], delta);
+	t3d_anim_update(characterAnimation_clip(animation, clip), delta);
 }
 
 void characterAnimation_evaluateGraph(const CharacterAnimationDef *def, CharacterAnimation *animation, float delta)
@@ -835,7 +888,8 @@ void characterAnimation_evaluateGraph(const CharacterAnimationDef *def, Characte
 				if (animation->node_state[i] != active)
 				{
 					animation->node_state[i] = active;
-					t3d_anim_set_time(&animation->clip[inactive], animation->clip[active].time);
+					t3d_anim_set_time(characterAnimation_clip(animation, inactive),
+					                  characterAnimation_clip(animation, active)->time);
 				}
 
 				characterAnimation_updateClip(animation, updated, active, delta);
@@ -844,7 +898,7 @@ void characterAnimation_evaluateGraph(const CharacterAnimationDef *def, Characte
 
 			case ANIMATION_NODE_SEQUENCE:
 			{
-				T3DAnim *clip = &animation->clip[node->animation[0]];
+				T3DAnim *clip = characterAnimation_clip(animation, node->animation[0]);
 				if (clip->isPlaying)
 				{
 					float limit = t3d_anim_get_length(clip);
@@ -942,6 +996,7 @@ void character_setAnimation(Character *character)
 {
 	characterAnimation_setParams(character, character->animation.def);
 	characterAnimation_evaluateGraph(character->animation.def, &character->animation, time_get()->delta);
-	characterWeapon_setBones(character);
+	characterAnimation_closeIdleClips(&character->animation);
+	skeletonModifiers_apply(&character->skeleton_modifiers, &character->animation.main);
 	t3d_skeleton_update(&character->animation.main);
 }

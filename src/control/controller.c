@@ -54,6 +54,8 @@ static void controller_mapActions(Controller *controller)
 		.roll       = button_getPressed(&raw->pressed, bind->roll),
 		.sprint     = button_getPressed(&raw->held,    bind->sprint),
 		.camera_aim = button_getPressed(&raw->held,    bind->camera_aim),
+		.switch_character_next = button_getPressed(&raw->pressed, bind->switch_character_next),
+		.switch_character_prev = button_getPressed(&raw->pressed, bind->switch_character_prev),
 		.stick_x    = raw->input.stick_x,
 		.stick_y    = raw->input.stick_y,
 		.cstick_x   = raw->input.cstick_x,
@@ -75,6 +77,8 @@ static const ControllerBinding default_binding = {
 	.roll       = BTN_B,
 	.sprint     = BTN_R,
 	.camera_aim = BTN_Z,
+	.switch_character_next = BTN_D_RIGHT,
+	.switch_character_prev = BTN_D_LEFT,
 };
 
 void controller_start(void)

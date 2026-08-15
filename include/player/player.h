@@ -28,6 +28,7 @@ typedef struct Player {
 Player *player_get(void);
 void player_init(void);
 void player_setCharacter(Player *player, Character *character);
+void player_switchCharacter(Player *player, int8_t direction);
 void player_update(void);
 void player_setMatrix(uint8_t fb_index);
 

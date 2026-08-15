@@ -56,6 +56,7 @@ bool cloth_create(Cloth *cloth, const CollisionMesh *mesh, const ClothDef *def)
 	cloth->previous = malloc(sizeof(Vector3) * cloth->particle_count);
 	cloth->force    = malloc(sizeof(Vector3) * cloth->particle_count);
 	cloth->normal   = malloc(sizeof(Vector3) * cloth->particle_count);
+	cloth->render_position = malloc(sizeof(Vector3) * cloth->particle_count);
 	cloth->pinned   = calloc(cloth->particle_count, sizeof(uint8_t));
 
 	cloth->triangle_count = mesh->triangle_count;
@@ -64,9 +65,10 @@ bool cloth_create(Cloth *cloth, const CollisionMesh *mesh, const ClothDef *def)
 		memcpy(cloth->triangle, mesh->indices, sizeof(uint16_t) * 3 * cloth->triangle_count);
 
 	/* At rest both Verlet slots hold the same position, so velocity is zero. */
-	if (cloth->position && cloth->previous) {
+	if (cloth->position && cloth->previous && cloth->render_position) {
 		memcpy(cloth->position, mesh->vertices, sizeof(Vector3) * cloth->particle_count);
 		memcpy(cloth->previous, mesh->vertices, sizeof(Vector3) * cloth->particle_count);
+		memcpy(cloth->render_position, mesh->vertices, sizeof(Vector3) * cloth->particle_count);
 	}
 
 	uint32_t edge_max = (uint32_t)mesh->triangle_count * 3;
@@ -78,7 +80,7 @@ bool cloth_create(Cloth *cloth, const CollisionMesh *mesh, const ClothDef *def)
 	cloth->constraint = malloc(sizeof(ClothConstraint) * edge_max);
 
 	if (!cloth->position || !cloth->previous || !cloth->force || !cloth->pinned
-	    || !cloth->triangle || !table || !cloth->constraint) {
+	    || !cloth->render_position || !cloth->triangle || !table || !cloth->constraint) {
 		free(table);
 		cloth_delete(cloth);
 		return false;
@@ -355,12 +357,25 @@ void cloth_step(Cloth *cloth, float dt)
 }
 
 
+void cloth_blendRenderState(Cloth *cloth, float t)
+{
+	if (cloth->render_position == NULL) return;
+
+	for (uint16_t i = 0; i < cloth->particle_count; i++) {
+		cloth->render_position[i].x = cloth->previous[i].x + (cloth->position[i].x - cloth->previous[i].x) * t;
+		cloth->render_position[i].y = cloth->previous[i].y + (cloth->position[i].y - cloth->previous[i].y) * t;
+		cloth->render_position[i].z = cloth->previous[i].z + (cloth->position[i].z - cloth->previous[i].z) * t;
+	}
+}
+
+
 void cloth_delete(Cloth *cloth)
 {
 	free(cloth->position);
 	free(cloth->previous);
 	free(cloth->force);
 	free(cloth->normal);
+	free(cloth->render_position);
 	free(cloth->pinned);
 	free(cloth->triangle);
 	free(cloth->constraint);

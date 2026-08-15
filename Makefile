@@ -19,6 +19,7 @@ src =   $(wildcard *.c) \
 		$(wildcard src/physics/shapes/*.c) \
 		$(wildcard src/physics/body/*.c) \
 		$(wildcard src/physics/cloth/*.c) \
+		$(wildcard src/physics/spring/*.c) \
 		$(wildcard src/physics/broadphase/*.c) \
 		$(wildcard src/physics/collision/*.c) \
 		$(wildcard src/physics/world/*.c) \

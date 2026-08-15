@@ -10,9 +10,23 @@
 #include "character/character_animation.h"
 
 
+/* SkeletonModifierFn: the weapon posing; context is the Character. */
+static void character_weaponModifier(T3DSkeleton *skeleton, void *context)
+{
+	(void)skeleton;
+	characterWeapon_setBones(context);
+}
+
 Character *character_create(const CharacterDef *def, Entity *entity)
 {
-	Character *character = malloc(sizeof(Character));
+	/* The spring bone states ride in the same allocation; their only
+	   references are the modifier contexts, freed with the character. */
+	uint8_t spring_bones = 0;
+	if (def->spring_bones)
+		for (const SpringBonesDef *set = def->spring_bones; set->count; set++)
+			spring_bones += set->count;
+
+	Character *character = malloc(sizeof(Character) + spring_bones * sizeof(SpringBone));
 	assert(character);
 
 	*character = (Character){
@@ -30,6 +44,30 @@ Character *character_create(const CharacterDef *def, Entity *entity)
 
 	characterAnimation_initGraph(character, def->animation_def);
 	entity->mesh->skeleton = &character->animation.main;
+
+	skeletonModifiers_add(&character->skeleton_modifiers, character_weaponModifier, character);
+
+	if (spring_bones > 0) {
+		SpringBone *spring_bone = (SpringBone *)(character + 1);
+		uint8_t n = 0;
+
+		/* Chains rely on this order: the resolved joints run root to tip,
+		   so each modifier runs after the one it hangs from. */
+		for (const SpringBonesDef *set = def->spring_bones; set->count; set++) {
+			int16_t joint[16];
+			uint8_t count = springBones_resolveChain(&character->animation.main, set, joint, 16);
+			if (count > set->count) count = set->count;
+
+			for (uint8_t i = 0; i < count; i++) {
+				if (!springBone_init(&spring_bone[n], &character->animation.main, joint[i],
+				                     i, set, &entity->transform))
+					continue;
+
+				skeletonModifiers_add(&character->skeleton_modifiers, springBone_apply, &spring_bone[n]);
+				n++;
+			}
+		}
+	}
 
 	/* Part 0 = body, parts 1..N = one per weapon object, def order.
 	   Only the body starts visible; equipping turns weapon bits on. */
@@ -117,6 +155,7 @@ void character_delete(Character *character)
 	t3d_skeleton_destroy(&animation->main);
 
 	free(animation->clip);
+	free(animation->clip_cooldown);
 	free(animation->buffer);
 	free(animation->node_state);
 	free(animation->node_active);

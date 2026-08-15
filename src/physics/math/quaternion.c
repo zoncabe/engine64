@@ -98,3 +98,60 @@ Matrix3 quaternion_toMatrix3(const Quaternion *q)
 		.ez = { qxqz2 + qyqw2,        qyqz2 - qxqw2,        1.0f - qxqx2 - qyqy2 },
 	};
 }
+
+/* Shepperd's method: branch on the largest diagonal term to stay away from
+   the singular traces. Follows the column convention of toMatrix3 above. */
+Quaternion quaternion_fromMatrix3(const Matrix3 *m)
+{
+	float m00 = m->ex.x, m01 = m->ey.x, m02 = m->ez.x;
+	float m10 = m->ex.y, m11 = m->ey.y, m12 = m->ez.y;
+	float m20 = m->ex.z, m21 = m->ey.z, m22 = m->ez.z;
+	float trace = m00 + m11 + m22;
+	Quaternion q;
+
+	if (trace > 0.0f) {
+		float s = sqrtf(trace + 1.0f) * 2.0f;
+		q.w = 0.25f * s;
+		q.x = (m21 - m12) / s;
+		q.y = (m02 - m20) / s;
+		q.z = (m10 - m01) / s;
+	}
+	else if (m00 > m11 && m00 > m22) {
+		float s = sqrtf(1.0f + m00 - m11 - m22) * 2.0f;
+		q.w = (m21 - m12) / s;
+		q.x = 0.25f * s;
+		q.y = (m01 + m10) / s;
+		q.z = (m02 + m20) / s;
+	}
+	else if (m11 > m22) {
+		float s = sqrtf(1.0f + m11 - m00 - m22) * 2.0f;
+		q.w = (m02 - m20) / s;
+		q.x = (m01 + m10) / s;
+		q.y = 0.25f * s;
+		q.z = (m12 + m21) / s;
+	}
+	else {
+		float s = sqrtf(1.0f + m22 - m00 - m11) * 2.0f;
+		q.w = (m10 - m01) / s;
+		q.x = (m02 + m20) / s;
+		q.y = (m12 + m21) / s;
+		q.z = 0.25f * s;
+	}
+
+	return quaternion_normalized(&q);
+}
+
+/* Shortest-path component lerp, renormalized. */
+Quaternion quaternion_nlerp(const Quaternion *a, const Quaternion *b, float t)
+{
+	float dot  = a->x * b->x + a->y * b->y + a->z * b->z + a->w * b->w;
+	float sign = (dot < 0.0f) ? -1.0f : 1.0f;
+
+	Quaternion q = {
+		a->x + (b->x * sign - a->x) * t,
+		a->y + (b->y * sign - a->y) * t,
+		a->z + (b->z * sign - a->z) * t,
+		a->w + (b->w * sign - a->w) * t,
+	};
+	return quaternion_normalized(&q);
+}

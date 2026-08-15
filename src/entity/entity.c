@@ -144,14 +144,18 @@ RigidBody *entity_attachPhysics(Entity *entity, const EntityDef *def, PhysicsWor
 		body_def.lock_axis_z     = def->body->lock_axis_z;
 	}
 
-	/* Entity positions are in render-space; physics runs in metres. */
-	body_def.position = (Vector3){
-		def->position.x * RENDER_SCALE_INV,
-		def->position.y * RENDER_SCALE_INV,
-		def->position.z * RENDER_SCALE_INV,
-	};
-	body_def.axis  = (Vector3){ 0.0f, 0.0f, 1.0f };
-	body_def.angle = 0.0f;
+	/* Position in metres and rotation through the renderer's euler convention,
+	   both from the collider transform: a rotated entity collides the way it
+	   renders. */
+	Transform collider = entity_colliderTransform(def);
+	body_def.position = collider.position;
+
+	Quaternion rotation = quaternion_fromMatrix3(&collider.rotation);
+	quaternion_toAxisAngle(&rotation, &body_def.axis, &body_def.angle);
+
+	/* Identity degenerates to a zero axis; any axis stands for no rotation. */
+	if (vector3_squaredMagnitude(&body_def.axis) == 0.0f)
+		body_def.axis = (Vector3){ 0.0f, 0.0f, 1.0f };
 
 	RigidBody *body = physicsWorld_createBody(world, &body_def);
 	body->owner   = entity;

@@ -52,6 +52,7 @@ typedef struct Cloth {
 	   this the cloth ripples but keeps shading as the flat sheet it started
 	   as, because the model's own normals never move. */
 	Vector3  *normal;
+	Vector3  *render_position; /* previous/current step blend; the mesh reads these */
 	uint8_t  *pinned;          /* non-zero = held in place by the solver */
 	uint16_t  particle_count;
 
@@ -85,6 +86,10 @@ bool cloth_create(Cloth *cloth, const CollisionMesh *mesh, const ClothDef *def);
 void cloth_pinWhere(Cloth *cloth, bool (*predicate)(Vector3 position, void *user), void *user);
 
 void cloth_step(Cloth *cloth, float dt);
+
+/* Fills render_position with the previous/current step blend: t is how far
+   into the next step the frame sits, accumulator over timestep. */
+void cloth_blendRenderState(Cloth *cloth, float t);
 
 void cloth_delete(Cloth *cloth);
 

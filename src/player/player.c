@@ -8,6 +8,7 @@
 #include "character/character_animation.h"
 #include "player/player.h"
 #include "physics/math/math_functions.h"
+#include "scene/scene.h"
 #include "time/time.h"
 
 
@@ -27,6 +28,26 @@ void player_setCharacter(Player *player, Character *character)
 	player->entity = character ? character->entity : NULL;
 	if (player->entity && player->entity->mesh)
 		t3d_matrix_set(player->entity->mesh->matrix_buffer, true);
+}
+
+/* Cycles the player through the scene's characters, in either direction. */
+void player_switchCharacter(Player *player, int8_t direction)
+{
+	Scene *scene = scene_get();
+	if (scene->character_count < 2) return;
+
+	uint8_t current = 0;
+	for (uint8_t i = 0; i < scene->character_count; i++)
+		if (scene->character[i] == player->character) { current = i; break; }
+
+	uint8_t next = (uint8_t)((current + scene->character_count + direction) % scene->character_count);
+	Character *character = scene->character[next];
+
+	player_setCharacter(player, character);
+
+	/* Fresh command, facing where this body already faces: anything held over
+	   from the previous character would spin the new one on the spot. */
+	player->cmd = (MovementCommand){ .target_yaw = character->body.rotation.z };
 }
 
 
@@ -61,6 +82,23 @@ void player_update(void)
 		player_updateStamina(&player[i], dt);
 		character_updateMovement(player[i].character, &player[i].cmd, dt);
 		character_setAnimation(player[i].character);
+	}
+
+	/* Scene characters nobody drives run on an empty command, so they idle
+	   instead of freezing mid pose when the player switches away. */
+	static MovementCommand idle_cmd;
+	Scene *scene = scene_get();
+	for (int i = 0; i < scene->character_count; i++) {
+		Character *character = scene->character[i];
+
+		bool driven = false;
+		for (int p = 0; p < PLAYER_COUNT; p++)
+			if (player[p].character == character) driven = true;
+		if (driven) continue;
+
+		idle_cmd.target_yaw = character->body.rotation.z;
+		character_updateMovement(character, &idle_cmd, dt);
+		character_setAnimation(character);
 	}
 }
 

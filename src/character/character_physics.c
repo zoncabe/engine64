@@ -75,8 +75,10 @@ void characterPhysics_syncBody(Character *character)
 {
 	RigidBody *rigid = character->body.rigid;
 	if (rigid == NULL) return;
-
-	rigidBody_setTransformPosition(rigid, character->collider.world.position);
+	
+	rigidBody_setTransformPositionAxisAngle(rigid, character->collider.world.position,
+	                                        (Vector3){ 0.0f, 0.0f, 1.0f },
+	                                        deg_to_rad(character->body.rotation.z));
 	rigidBody_setLinearVelocity(rigid, character->body.velocity);
 	rigidBody_setToAwake(rigid);
 }

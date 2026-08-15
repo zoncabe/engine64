@@ -194,6 +194,12 @@ void physics_update(PhysicsWorld *s, float delta)
 		}
 		s->accumulator -= PHYSICS_TIMESTEP;
 	}
+
+	/* Shown state: previous and current step blended by the leftover
+	   fraction, same scheme as the dynamic bones. */
+	float t = s->accumulator / PHYSICS_TIMESTEP;
+	for (Cloth *cloth = s->cloth_list; cloth; cloth = cloth->next)
+		cloth_blendRenderState(cloth, t);
 }
 
 

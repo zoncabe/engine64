@@ -9,6 +9,9 @@
 
 void player_setCharacterControl(Player *player, const ControllerActions *actions, Viewport *viewport)
 {
+	if (actions->switch_character_next) player_switchCharacter(player,  1);
+	if (actions->switch_character_prev) player_switchCharacter(player, -1);
+
 	characterControl_update(
 		player->character,
 		&player->cmd,
