@@ -6,26 +6,33 @@ Framework type game engine. Written in C on top of the open source SDK [Libdrago
 
 **Physics engine**<br/>
 A port of [qu3e](https://github.com/RandyGaul/qu3e) by Randy Gaul, expanded to use all basic primitives plus triangle meshes. Rigid bodies with island solving and sleeping, sequential impulse contact solver with warm starting, friction and restitution.<br/>
-Cloth simulation implemented using the [Advanced Character Physics](https://www.cs.cmu.edu/afs/cs/academic/class/15462-s13/www/lec_slides/Jakobsen.pdf) papers, a Verlet method developed by Thomas Jakobsen at IO Interactive for the Hitman games.
+Cloth simulation after Jakobsen's [Advanced Character Physics](https://www.cs.cmu.edu/afs/cs/academic/class/15462-s13/www/lec_slides/Jakobsen.pdf): damped Verlet integration with iterative distance constraint relaxation, pinning and wind.
 
 **Character physics**<br/>
-Collide and slide based character collision, resolved against boxes, spheres, capsules and triangle meshes. Floor detection and snapping.
+Kinematic capsule resolved by collide and slide against boxes, spheres, capsules and triangle meshes, with floor detection and snapping. Registered in the physics world for two way interaction with rigid bodies.
 
 **Character movement**<br/>
 Gait based movement system: target speed, acceleration and rotation response per gait, with exponential velocity convergence. Per asset settings for charged jump, air control and roll phases.
 
-
 **Character animation**<br/>
-Blend tree based animation system. Supports clip playback, selection, sequencing, 1D and 2D blend spaces and layering.
+Blend tree based animation system: clip playback, selection, sequencing, 1D and 2D blend spaces, and weighted layering over skeleton buffers.
+
+**Spring bones**<br/>
+A port of [SpringBoneSimulator3D](https://github.com/godotengine/godot/blob/master/scene/3d/spring_bone_simulator_3d.cpp) from Godot Engine as a skeleton modifier: one Verlet tail per joint, chains resolved root to tip, simulated in character space with per set stiffness, drag and gravity. Sphere, capsule and plane colliders hung from bones, with per joint radii.<br/>
+World motion damping and teleport thresholds from [AnimNode_KawaiiPhysicsSimulation](https://github.com/pafuhana1213/KawaiiPhysics/blob/master/Plugins/KawaiiPhysics/Source/KawaiiPhysics/Private/AnimNode_KawaiiPhysicsSimulation.cpp), part of Kawaii Physics by pafuhana1213.
 
 **Screen system**<br/>
-2D screen system with a track based animation engine. Handles rectangles, sprites and text grouped in scissor sections, with easing curves, timed visibility windows and state driven lookups.
+2D screen system with a track based animation engine: rectangles, sprites and text grouped in scissor sections, with easing curves, timed visibility windows and state driven lookups.
 
 **Scenes**<br/>
-Scene definitions hold the level content: entities with model, transform and collider shapes, characters, and the physics world.
+Data driven scene definitions: lighting, camera setup, wind, entities and sound emitters. Loading resolves a definition into the physics world, character instances, cloth bindings and active emitters.
+
+**Sound**<br/>
+Positional sound system on top of the Libdragon mixer. Per sample volume, min and max distance with inverse falloff, priority based channel allocation and out of range culling. Constant power panning from listener position and camera orientation, damped at close range. Distance and panning applied on independent mixer paths with RSP driven ramps. Playback rate scaling to fit a sample to a requested duration.<br/>
+Character sounds driven by animation and movement state: footsteps at configurable points of the running locomotion clip, roll, jump and landing at their movement phases, volume scaled by speed.
 
 **Camera**<br/>
-Camera system with a spherical third person camera implemented, and the structure in place to add new camera types.
+Spring arm third person camera: exponential convergence on yaw and pitch with velocity clamping, per state arm length, shoulder offset and field of view, and view target blending on target changes. Camera types resolve through a handler table.
 
 ### Building
 
