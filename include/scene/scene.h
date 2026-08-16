@@ -4,13 +4,15 @@
 #include "entity/entity.h"
 #include "light/lighting.h"
 #include "camera/camera.h"
-#include "camera/spherical.h"
+#include "camera/spring_arm.h"
 #include "physics/shapes/physics_shape.h"
 #include "physics/body/rigid_body.h"
 #include "physics/collision/collision_mesh.h"
+#include "sound/sound.h"
 
 #define SCENE_MAX_CHARACTERS 6
 #define SCENE_MAX_SCENERY 12
+#define SCENE_MAX_SOUNDS 8
 
 #define SCENE_MAX_ENTITIES 32
 /* Counts primitives, not entities: one compound collider takes several. */
@@ -28,10 +30,19 @@ typedef struct {
 
 	CameraType type;
 	union {
-		CameraSphericalData spherical;
+		CameraSpringArmData spring_arm;
 	};
 
 } CameraDef;
+
+/* An ambience of the scene itself: it plays from a fixed point in the world
+   for as long as the scene is loaded. */
+typedef struct {
+
+	SoundID id;
+	Vector3 position;
+
+} SceneSoundDef;
 
 typedef struct {
 
@@ -40,6 +51,8 @@ typedef struct {
 	Vector3 wind;
 	EntityDef entity[SCENE_MAX_ENTITIES];
 	uint8_t entity_count;
+	SceneSoundDef sound[SCENE_MAX_SOUNDS];
+	uint8_t sound_count;
 
 } SceneDef;
 
@@ -50,6 +63,9 @@ typedef struct Scene {
 
 	Character *character[SCENE_MAX_CHARACTERS];
 	uint8_t character_count;
+
+	SoundEmitter sound[SCENE_MAX_SOUNDS];
+	uint8_t sound_count;
 
 } Scene;
 

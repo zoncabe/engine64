@@ -337,6 +337,49 @@ const CharacterAnimationSettings miss_jiggles_animation_settings = {
 };
 
 
+static const SoundID miss_jiggles_footsteps[] = {
+	SOUND_FOOTSTEP_WOOD_1, SOUND_FOOTSTEP_WOOD_2, SOUND_FOOTSTEP_WOOD_3,
+	SOUND_FOOTSTEP_WOOD_4, SOUND_FOOTSTEP_WOOD_5, SOUND_FOOTSTEP_WOOD_6,
+};
+
+static const SoundID miss_jiggles_rolls[] = {
+	SOUND_DODGE_ROLL_1, SOUND_DODGE_ROLL_2, SOUND_DODGE_ROLL_3, SOUND_DODGE_ROLL_4,
+};
+
+/* Both feet land at a quarter and three quarters of the locomotion clip. */
+static const float miss_jiggles_footings[] = { 0.25f, 0.75f };
+
+static const CharacterSoundDef miss_jiggles_sound_def = {
+
+	.footstep       = miss_jiggles_footsteps,
+	.footstep_count = 6,
+	.footing        = miss_jiggles_footings,
+	.footing_count  = 2,
+
+	.footstep_volume_min = 0.05f,
+	.footstep_volume_max = 0.4f,
+	.footstep_speed_max  = 4.0f,
+
+	.roll        = miss_jiggles_rolls,
+	.roll_count  = 4,
+	.roll_volume = 0.65f,
+	.roll_delay  = 0.07f,
+
+	/* No sample of its own yet: the step doubles as the push off the floor
+	   and as the touchdown. */
+	.jump        = miss_jiggles_footsteps,
+	.jump_count  = 6,
+	.jump_volume = 0.15f,
+
+	.land            = miss_jiggles_footsteps,
+	.land_count      = 6,
+	.land_volume_min = 0.35f,
+	.land_volume_max = 0.8f,
+	.land_speed_max  = 15.0f,
+
+};
+
+
 const CharacterDef miss_jiggles_character_def = {
 
 	.movement_settings  = &miss_jiggles_movement_settings,
@@ -344,5 +387,6 @@ const CharacterDef miss_jiggles_character_def = {
 	.collider_settings  = &miss_jiggles_collider_settings,
 	.weapons_def        = &miss_jiggles_weapons_def,
 	.spring_bones       = miss_jiggles_spring_bones,
+	.sound_def          = &miss_jiggles_sound_def,
 
 };

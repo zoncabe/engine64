@@ -169,6 +169,11 @@ typedef struct CharacterAnimation {
 	uint8_t     *node_state;
 	bool        *node_active;
 	float        param[ANIMATION_PARAM_COUNT];
+
+	/* Normalized time of the locomotion clip that is actually running. The
+	   graph reads it as a footing; kept here so it survives the frame. */
+	float        locomotion_cycle;
+
 	uint8_t      prev_speed_state;
 	uint8_t      action_state;
 	float        turn_avg[ANIMATION_TURN_AVG_COUNT];

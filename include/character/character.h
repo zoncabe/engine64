@@ -16,6 +16,7 @@
 #include "character/character_weapon.h"
 #include "character/character_skeleton.h"
 #include "character/character_spring_bone.h"
+#include "character/character_sound.h"
 
 typedef struct Entity Entity;
 
@@ -26,6 +27,7 @@ typedef struct CharacterDef {
 	const CharacterColliderSettings *collider_settings;
 	const CharacterWeaponsDef *weapons_def;
 	const SpringBonesDef *spring_bones;   /* optional: array of sets, one tuning each, count 0 terminates */
+	const CharacterSoundDef *sound_def;
 
 } CharacterDef;
 
@@ -37,6 +39,7 @@ typedef struct Character {
 	CharacterMovement   movement;
 	CharacterAnimation  animation;
 	CharacterWeapons    weapons;
+	CharacterSound      sound;
 	SkeletonModifiers   skeleton_modifiers;
 
 } Character;

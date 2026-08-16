@@ -779,6 +779,7 @@ void characterAnimation_setParams(Character *character, const CharacterAnimation
 
 	T3DAnim *base = characterAnimation_clip(animation, locomotion->animation[row * locomotion->cols + locomotion->cols / 2]);
 
+	animation->locomotion_cycle = base->time / t3d_anim_get_length(base);
 	ctx.locomotion_phase = characterAnimation_getLocomotionPhase(base->time, t3d_anim_get_length(base));
 	ctx.turning          = characterAnimation_getTurningAvg(animation, ctx.settings, character->body.rotation.z, character->movement.data.previous_yaw);
 

@@ -78,6 +78,12 @@ void game_runStep(void)
 
 	game_updateState(&ctx);
 
+	Vector3 ear = ctx.player[0].entity ? ctx.player[0].entity->transform.position
+	                                   : ctx.viewport->camera.position;
+	Vector3 right = camera_getRight(&ctx.viewport->camera);
+	sound_setListener(&ear, &right);
+	sound_update();
+
 	GameRenderDescriptor desc = game_getRenderDescriptor(&ctx);
 	render_setContext(&render_context, desc.scene, ctx.viewport->fb_index, desc.screen);
 	render(&render_context, &ctx.viewport->fb_index);

@@ -35,6 +35,9 @@ Character *character_create(const CharacterDef *def, Entity *entity)
 		.movement  = (CharacterMovement){ .settings = def->movement_settings, .data.is_grounded = true, .current = MOVEMENT_STATE_IDLE },
 		.animation = (CharacterAnimation){ .def = def->animation_def },
 		.weapons   = (CharacterWeapons){ .def = def->weapons_def, .drawn = CHARACTER_WEAPON_DRAWN_NONE },
+		/* No previous frame to compare against yet: a cycle of -1 crosses
+		   nothing, and the body starts standing on the floor. */
+		.sound     = (CharacterSound){ .def = def->sound_def, .previous_cycle = -1.0f, .previous_grounded = true },
 	};
 
 	characterCollider_init(&character->collider,

@@ -96,7 +96,7 @@ filesystem/fonts/Headliner60.font64: MKFONT_FLAGS += --size 60
 filesystem/audio/%.wav64: assets/audio/%.wav
 	@mkdir -p $(dir $@)
 	@echo "    [AUDIO] $@"
-	@$(N64_AUDIOCONV) --wav-compress 3 -o filesystem/audio $<
+	@$(N64_AUDIOCONV) --wav-compress 0 -o filesystem/audio $<
 
 $(BUILD_DIR)/$(PROJECT_NAME).dfs: $(assets_conv) $(assets_collision)
 $(BUILD_DIR)/$(PROJECT_NAME).elf: $(src:%.c=$(BUILD_DIR)/%.o)
@@ -113,6 +113,6 @@ build_lib:
 	make -C $(T3D_INST)
 	make all
 
--include $(wildcard $(BUILD_DIR)/*.d)
+-include $(src:%.c=$(BUILD_DIR)/%.d)
 
 .PHONY: all clean

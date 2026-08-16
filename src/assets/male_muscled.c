@@ -287,11 +287,55 @@ const CharacterAnimationSettings male_muscled_animation_settings = {
 
 
 
+static const SoundID male_muscled_footsteps[] = {
+	SOUND_FOOTSTEP_WOOD_1, SOUND_FOOTSTEP_WOOD_2, SOUND_FOOTSTEP_WOOD_3,
+	SOUND_FOOTSTEP_WOOD_4, SOUND_FOOTSTEP_WOOD_5, SOUND_FOOTSTEP_WOOD_6,
+};
+
+static const SoundID male_muscled_rolls[] = {
+	SOUND_DODGE_ROLL_1, SOUND_DODGE_ROLL_2, SOUND_DODGE_ROLL_3, SOUND_DODGE_ROLL_4,
+};
+
+/* Both feet land at a quarter and three quarters of the locomotion clip. */
+static const float male_muscled_footings[] = { 0.25f, 0.75f };
+
+static const CharacterSoundDef male_muscled_sound_def = {
+
+	.footstep       = male_muscled_footsteps,
+	.footstep_count = 6,
+	.footing        = male_muscled_footings,
+	.footing_count  = 2,
+
+	.footstep_volume_min = 0.1f,
+	.footstep_volume_max = 0.45f,
+	.footstep_speed_max  = 4.4f,
+
+	.roll        = male_muscled_rolls,
+	.roll_count  = 4,
+	.roll_volume = 0.7f,
+	.roll_delay  = 0.07f,
+
+	/* No sample of its own yet: the step doubles as the push off the floor
+	   and as the touchdown. */
+	.jump        = male_muscled_footsteps,
+	.jump_count  = 6,
+	.jump_volume = 0.2f,
+
+	.land            = male_muscled_footsteps,
+	.land_count      = 6,
+	.land_volume_min = 0.4f,
+	.land_volume_max = 0.85f,
+	.land_speed_max  = 15.0f,
+
+};
+
+
 const CharacterDef male_muscled_character_def = {
 
 	.movement_settings  = &male_muscled_movement_settings,
 	.animation_def      = &male_muscled_animation_def,
 	.collider_settings  = &male_muscled_collider_settings,
 	.weapons_def        = &male_muscled_weapons_def,
+	.sound_def          = &male_muscled_sound_def,
 
 };

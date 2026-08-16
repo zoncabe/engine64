@@ -44,14 +44,13 @@ const SceneDef demo_scene = {
 	.wind = { 220.0f, 50.0f, 50.0f },
 
 	.camera = {
-		.type = CAMERA_TYPE_SPHERICAL,
-		.spherical = {
-			.distance_from_center      = 200.0f,
-			.distance_center_to_target = 300.0f,
-			.angle_around_center       = -48.0f,
-			.offset_angle              = 30.0f,
-			.pitch                     = 8.0f,
-			.offset_height             = 130.0f,
+		.type = CAMERA_TYPE_SPRING_ARM,
+		.spring_arm = {
+			.arm_length      = 200.0f,
+			.shoulder_offset = 50.0f,
+			.yaw             = -48.0f,
+			.pitch           = 8.0f,
+			.pivot_height    = 130.0f,
 		},
 	},
 
@@ -123,4 +122,9 @@ const SceneDef demo_scene = {
 		},
 	},
 	.entity_count = 9,
+
+	.sound = {
+		[0] = { SOUND_FLAG_FLAPPING, {5.0f, 0.0f, 688.0f} },
+	},
+	.sound_count = 1,
 };

@@ -43,6 +43,14 @@ void player_switchCharacter(Player *player, int8_t direction)
 	uint8_t next = (uint8_t)((current + scene->character_count + direction) % scene->character_count);
 	Character *character = scene->character[next];
 
+	/* Glide the camera over from the body being left behind instead of cutting
+	   to the new one. */
+	camera_setViewTarget(
+		&viewport_get()->camera,
+		&player->entity->transform.position,
+		CAMERA_VIEW_TARGET_BLEND_TIME
+	);
+
 	player_setCharacter(player, character);
 
 	/* Fresh command, facing where this body already faces: anything held over
@@ -82,6 +90,7 @@ void player_update(void)
 		player_updateStamina(&player[i], dt);
 		character_updateMovement(player[i].character, &player[i].cmd, dt);
 		character_setAnimation(player[i].character);
+		characterSound_update(player[i].character);
 	}
 
 	/* Scene characters nobody drives run on an empty command, so they idle
@@ -99,6 +108,7 @@ void player_update(void)
 		idle_cmd.target_yaw = character->body.rotation.z;
 		character_updateMovement(character, &idle_cmd, dt);
 		character_setAnimation(character);
+		characterSound_update(character);
 	}
 }
 

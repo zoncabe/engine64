@@ -34,8 +34,8 @@ void scene_load(const SceneDef *def)
 	Camera *camera = &viewport_get()->camera;
 	camera_reset(camera);
 	switch (def->camera.type) {
-		case CAMERA_TYPE_SPHERICAL:
-			cameraSpherical_init(camera, &def->camera.spherical);
+		case CAMERA_TYPE_SPRING_ARM:
+			cameraSpringArm_init(camera, &def->camera.spring_arm);
 			break;
 		case CAMERA_TYPE_NONE:
 		case CAMERA_TYPE_COUNT:
@@ -83,6 +83,11 @@ void scene_load(const SceneDef *def)
 
 		scene.entity[scene.entity_count++] = entity;
 	}
+
+	for (int i = 0; i < def->sound_count; i++) {
+		const SceneSoundDef *sound_def = &def->sound[i];
+		scene.sound[scene.sound_count++] = sound_play(sound_def->id, &sound_def->position, 1.0f, 0.0f);
+	}
 }
 
 void scene_clear(void)
@@ -92,6 +97,8 @@ void scene_clear(void)
 
 void scene_unload(void)
 {
+	for (int i = 0; i < scene.sound_count; i++)
+		sound_stop(scene.sound[i]);
 	for (int i = 0; i < scene.character_count; i++)
 		character_delete(scene.character[i]);
 	for (int i = 0; i < scene.entity_count; i++)

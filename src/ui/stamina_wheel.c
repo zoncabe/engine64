@@ -117,7 +117,7 @@ static void staminaWheel_setInput(Particle *particle, const GameContext *ctx, ui
 	/* Fade in whenever stamina is short; fade out while aiming, or once the
 	   color has settled back on green so the lerp is seen before the wheel
 	   leaves. */
-	bool aiming  = ctx->viewport->camera.spherical.state == CAMERA_SPHERICAL_AIMING;
+	bool aiming  = ctx->viewport->camera.spring_arm.state == CAMERA_SPRING_ARM_AIMING;
 	bool settled = player->stats.stamina >= 1.0f && staminaWheel_colorIsGreen();
 	float fade_step = STAMINA_WHEEL_FADE_RATE * dt;
 	wheel_alpha += clampf((aiming || settled ? 0.0f : STAMINA_WHEEL_MAX_ALPHA) - wheel_alpha, -fade_step, fade_step);

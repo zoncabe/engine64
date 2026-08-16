@@ -1,14 +1,14 @@
 #include <math.h>
 
 #include "camera/camera.h"
-#include "camera/spherical.h"
+#include "camera/spring_arm.h"
 #include "control/camera_control.h"
 
 
-static void cameraControl_setSphericalInput(Camera *camera, const ControllerActions *actions)
+static void cameraControl_setSpringArmInput(Camera *camera, const ControllerActions *actions)
 {
-	CameraSphericalData *data = &camera->spherical.data;
-	const CameraSphericalSettings *settings = &camera->spherical.settings;
+	CameraSpringArmData *data = &camera->spring_arm.data;
+	const CameraSpringArmSettings *settings = &camera->spring_arm.settings;
 
 	if (fabsf(actions->cstick_x) >= CAMERA_STICK_DEADZONE
 	 || fabsf(actions->cstick_y) >= CAMERA_STICK_DEADZONE) {
@@ -19,12 +19,12 @@ static void cameraControl_setSphericalInput(Camera *camera, const ControllerActi
 		data->target_velocity.y = 0;
 	}
 
-	camera->spherical.state = actions->camera_aim ? CAMERA_SPHERICAL_AIMING : CAMERA_SPHERICAL_DEFAULT;
+	camera->spring_arm.state = actions->camera_aim ? CAMERA_SPRING_ARM_AIMING : CAMERA_SPRING_ARM_DEFAULT;
 }
 
 
 static void (*cameraControl_handler[CAMERA_TYPE_COUNT])(Camera *, const ControllerActions *) = {
-	[CAMERA_TYPE_SPHERICAL] = cameraControl_setSphericalInput,
+	[CAMERA_TYPE_SPRING_ARM] = cameraControl_setSpringArmInput,
 };
 
 
