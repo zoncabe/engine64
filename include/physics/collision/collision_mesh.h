@@ -1,5 +1,5 @@
 /*
-	collision_mesh.h — static triangle mesh collision data.
+	Static triangle mesh collision data.
 
 	Loads the binary written by tools/collision_importer and builds a
 	dynamicAABBTree with one leaf per triangle, in mesh-local space.

@@ -1,6 +1,6 @@
 /*
-	physics_memory.h — low-level malloc/free wrappers + PTR_ADD helper.
-	Shared by PhysicsStack / PhysicsHeap / PhysicsPagedAllocator.
+	Low-level malloc/free wrappers + PTR_ADD helper. Shared by PhysicsStack /
+	PhysicsHeap / PhysicsPagedAllocator.
 */
 #ifndef PHYSICS_MEMORY_H
 #define PHYSICS_MEMORY_H

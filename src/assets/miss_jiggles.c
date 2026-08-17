@@ -2,8 +2,6 @@
 #include "assets/miss_jiggles.h"
 
 
-// --- Clip definitions ---
-
 static const CharacterAnimationClipDef miss_jiggles_clips[] = {
 
 	[MJ_ANIM_IDLE_L]            = { "standing-idle-left",                 ANIMATION_SLOT_MAIN,   true  },
@@ -144,7 +142,7 @@ const CharacterAnimationDef miss_jiggles_animation_def = {
 
 };
 
-/* Slightly slower than male_muscled across the board. */
+/* Slightly slower than mr_muscles across the board. */
 static const CharacterGaitSettings miss_jiggles_gaits[] = {
 
 	{ .target_speed = 1.4f, .response_rate = 7.5f, .rotation_response_rate = 13.0f },
@@ -166,7 +164,7 @@ const CharacterMovementSettings miss_jiggles_movement_settings = {
 	.stamina_regen_rate = 0.25f,
 	.tired_speed_scale  = 0.8f,
 
-	/* Timers stay equal to male_muscled: they track the clip lengths, which
+	/* Timers stay equal to mr_muscles: they track the clip lengths, which
 	   are the same animations. */
 	.roll_target_speed         = 4.2f,
 	.roll_launch_response_rate = 14.0f,
@@ -303,7 +301,7 @@ const SpringBonesDef miss_jiggles_spring_bones[] = {
 	{0},
 };
 
-/* Same clips as male_muscled, so every duration-tied setting keeps its value. */
+/* Same clips as mr_muscles, so every duration-tied setting keeps its value. */
 const CharacterAnimationSettings miss_jiggles_animation_settings = {
 
 		.action_idle_max_blending_ratio = 0.85f,
@@ -343,7 +341,7 @@ static const SoundID miss_jiggles_footsteps[] = {
 };
 
 static const SoundID miss_jiggles_rolls[] = {
-	SOUND_DODGE_ROLL_1, SOUND_DODGE_ROLL_2, SOUND_DODGE_ROLL_3, SOUND_DODGE_ROLL_4,
+	SOUND_DODGE_ROLL_1, SOUND_DODGE_ROLL_2,
 };
 
 /* Both feet land at a quarter and three quarters of the locomotion clip. */
@@ -361,7 +359,7 @@ static const CharacterSoundDef miss_jiggles_sound_def = {
 	.footstep_speed_max  = 4.0f,
 
 	.roll        = miss_jiggles_rolls,
-	.roll_count  = 4,
+	.roll_count  = 2,
 	.roll_volume = 0.65f,
 	.roll_delay  = 0.07f,
 

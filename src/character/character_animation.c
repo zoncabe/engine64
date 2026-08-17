@@ -418,9 +418,9 @@ static float characterAnimation_getStrafeDirectionWeight(const CharacterAnimatio
 	float velocity_yaw = rad_to_deg(fm_atan2f(-body->velocity.x, -body->velocity.y));
 	float rel = angle_wrap_relative(velocity_yaw, body->rotation.z) - body->rotation.z;
 
-	// eje:    back 0 | back_l 1/6 | strafe_l 2/6 | fwd 3/6 | strafe_r 4/6 | back_r 5/6 | back 1
-	// anclas: fwd 0º, strafe ±90º, back_l/back_r ±90º del lado trasero, back ±180º
-	// los tramos 1/6-2/6 y 4/6-5/6 no se recorren por direccion: son el giro de cadera
+	/* axis:    back 0 | back_l 1/6 | strafe_l 2/6 | fwd 3/6 | strafe_r 4/6 | back_r 5/6 | back 1
+	   anchors: fwd 0º, strafe ±90º, back_l/back_r ±90º on the back side, back ±180º
+	   the 1/6-2/6 and 4/6-5/6 stretches are never reached by direction: they are the hip turn */
 	float raw;
 	if      (rel < -90.0f) raw = (rel + 180.0f) / 90.0f          * (1.0f / 6.0f);
 	else if (rel <   0.0f) raw = (2.0f + (rel + 90.0f) / 90.0f)  * (1.0f / 6.0f);
@@ -439,12 +439,12 @@ static float characterAnimation_getStrafeDirectionWeight(const CharacterAnimatio
 		ctx->animation->strafe_turning = true;
 	}
 
-	// ends 0 and 1 of the axis are the same clip: if the target is more than half
-	// the axis away, the real shortest path crosses the seam
+	/* ends 0 and 1 of the axis are the same clip: if the target is more than
+	   half the axis away, the shortest path crosses the seam */
 	if (raw - out > 0.5f) raw -= 1.0f;
 	if (out - raw > 0.5f) raw += 1.0f;
 
-	// exponential lerp toward the live weight, released once it lands
+	/* exponential lerp toward the live weight, released once it lands */
 	float factor = fm_expf(-s->strafe_turn_rate * ctx->delta);
 	out = out * factor + raw * (1.0f - factor);
 
@@ -479,7 +479,7 @@ static void characterAnimation_snapStrafeExit(const CharacterAnimationParamCtx *
 {
 	const CharacterAnimationNode *node = &ctx->def->node[ctx->def->strafe_node];
 
-	// fuente: el clip de la fila walk mas cercano al weight actual, que venia activo
+	/* source: the walk-row clip closest to the current weight, already active */
 	float out = ctx->animation->param[ANIMATION_PARAM_STRAFE_DIR];
 	uint8_t src_col = (uint8_t)(out * (node->cols - 1) + 0.5f);
 	if (src_col > node->cols - 1) src_col = node->cols - 1;
@@ -509,7 +509,7 @@ static void characterAnimation_syncGridClips(const CharacterAnimationParamCtx *c
 	float tx, ty;
 	uint8_t col, row;
 
-	// esquinas del frame anterior
+	/* corners of the previous frame */
 	uint8_t prev[4];
 	uint8_t prev_count = 0;
 	col = characterAnimation_blendSegment(animation->param[node->param_cols], node->cols, &tx);
@@ -519,7 +519,7 @@ static void characterAnimation_syncGridClips(const CharacterAnimationParamCtx *c
 	if (ty > 0.0f)              prev[prev_count++] = node->animation[(row + 1) * node->cols + col];
 	if (tx > 0.0f && ty > 0.0f) prev[prev_count++] = node->animation[(row + 1) * node->cols + col + 1];
 
-	// esquinas del frame nuevo
+	/* corners of the new frame */
 	uint8_t curr[4];
 	uint8_t curr_count = 0;
 	col = characterAnimation_blendSegment(cols_value, node->cols, &tx);
@@ -529,7 +529,7 @@ static void characterAnimation_syncGridClips(const CharacterAnimationParamCtx *c
 	if (ty > 0.0f)              curr[curr_count++] = node->animation[(row + 1) * node->cols + col];
 	if (tx > 0.0f && ty > 0.0f) curr[curr_count++] = node->animation[(row + 1) * node->cols + col + 1];
 
-	// referencia de fase: una esquina que siga participando; si no queda ninguna, la base anterior
+	/* phase reference: a corner still taking part, or the previous base if none is */
 	T3DAnim *ref = NULL;
 	for (uint8_t m = 0; m < curr_count && !ref; m++)
 		for (uint8_t p = 0; p < prev_count; p++)
@@ -607,7 +607,7 @@ static void characterAnimation_setStrafeParams(const CharacterAnimationParamCtx 
 	animation->param[ANIMATION_PARAM_WALK] = weight * (1.0f - blend);
 }
 
-// eje: back 0 | left 1/4 | fwd 2/4 | right 3/4 | back 1
+/* axis: back 0 | left 1/4 | fwd 2/4 | right 3/4 | back 1 */
 static float characterAnimation_getStrafeLockedDirectionWeight(const CharacterAnimationParamCtx *ctx)
 {
 	const KinematicBody *body = &ctx->character->body;
@@ -640,7 +640,7 @@ static void characterAnimation_snapStrafeLockedExit(const CharacterAnimationPara
 {
 	const CharacterAnimationNode *node = &ctx->def->node[ctx->def->strafe_locked_node];
 
-	// fuente: el clip de la fila walk mas cercano al weight actual
+	/* source: the walk-row clip closest to the current weight */
 	float out = ctx->animation->param[ANIMATION_PARAM_STRAFE_LOCKED_DIR];
 	uint8_t src_col = (uint8_t)(out * (node->cols - 1) + 0.5f);
 	if (src_col > node->cols - 1) src_col = node->cols - 1;
@@ -663,7 +663,7 @@ static void characterAnimation_snapStrafeLockedExit(const CharacterAnimationPara
 	}
 }
 
-// fase del col dominante (fila walk) de un grid hacia todos los clips del otro
+/* carries the phase of a grid's dominant column (walk row) to every clip of another */
 static void characterAnimation_snapGridFromGrid(const CharacterAnimationParamCtx *ctx, uint8_t src_node_idx, float src_dir, uint8_t dst_node_idx)
 {
 	const CharacterAnimationNode *src_node = &ctx->def->node[src_node_idx];
@@ -779,7 +779,6 @@ void characterAnimation_setParams(Character *character, const CharacterAnimation
 
 	T3DAnim *base = characterAnimation_clip(animation, locomotion->animation[row * locomotion->cols + locomotion->cols / 2]);
 
-	animation->locomotion_cycle = base->time / t3d_anim_get_length(base);
 	ctx.locomotion_phase = characterAnimation_getLocomotionPhase(base->time, t3d_anim_get_length(base));
 	ctx.turning          = characterAnimation_getTurningAvg(animation, ctx.settings, character->body.rotation.z, character->movement.data.previous_yaw);
 
@@ -866,6 +865,8 @@ void characterAnimation_evaluateGraph(const CharacterAnimationDef *def, Characte
 	bool updated[def->clip_count];
 	memset(updated, false, sizeof(updated));
 
+	float cycle_weight = 0.0f;
+
 	for (int i = 0; i < def->node_count; i++)
 	{
 		if (!animation->node_active[i]) continue;
@@ -934,7 +935,7 @@ void characterAnimation_evaluateGraph(const CharacterAnimationDef *def, Characte
 				uint8_t col = characterAnimation_blendSegment(param_val, node->cols, &tx);
 				uint8_t row = characterAnimation_blendSegment(animation->param[node->param_rows], node->rows, &ty);
 
-				// bilinear share of each corner, adds up to 1
+				/* bilinear share of each corner, adds up to 1 */
 				uint8_t corner[4];
 				float   share[4];
 				uint8_t count = 0;
@@ -957,8 +958,8 @@ void characterAnimation_evaluateGraph(const CharacterAnimationDef *def, Characte
 					share[count++] = tx * ty;
 				}
 
-				// every layer is diluted by the ones applied after it, so each one
-				// is divided by what those leave: the main keeps 1 - weight
+				/* every layer is diluted by the ones applied after it, so each
+				   one is divided by what those leave: the main keeps 1 - weight */
 				float layer[4];
 				float remain = 1.0f;
 				for (int m = count - 1; m >= 0; m--) {
@@ -971,6 +972,12 @@ void characterAnimation_evaluateGraph(const CharacterAnimationDef *def, Characte
 					characterAnimation_updateClip(animation, updated, corner[m], delta);
 					if (layer[m] > 0.0f)
 						characterAnimation_addLayer(&blend_buffer, characterAnimation_clipBuffer(def, animation, corner[m]), layer[m]);
+
+					if (weight * share[m] > cycle_weight) {
+						cycle_weight = weight * share[m];
+						T3DAnim *clip = characterAnimation_clip(animation, corner[m]);
+						animation->locomotion_cycle = clip->time / t3d_anim_get_length(clip);
+					}
 				}
 
 				break;

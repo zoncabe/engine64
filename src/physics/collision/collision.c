@@ -1,7 +1,28 @@
 /*
-	collision.c — narrowphase. Ports qu3e q3Collide.cpp (OBB-vs-OBB SAT +
-	Sutherland-Hodgman clip) 1-a-1 and adds a type-based dispatcher so
-	box / sphere / capsule pairs all land here.
+	Ported from qu3e q3Collide.cpp — altered source, not the original software.
+
+	Copyright (c) 2014 Randy Gaul http://www.randygaul.net
+
+	This software is provided 'as-is', without any express or implied
+	warranty. In no event will the authors be held liable for any damages
+	arising from the use of this software.
+
+	Permission is granted to anyone to use this software for any purpose,
+	including commercial applications, and to alter it and redistribute it
+	freely, subject to the following restrictions:
+	  1. The origin of this software must not be misrepresented; you must not
+	     claim that you wrote the original software. If you use this software
+	     in a product, an acknowledgment in the product documentation would be
+	     appreciated but is not required.
+	  2. Altered source versions must be plainly marked as such, and must not
+	     be misrepresented as being the original software.
+	  3. This notice may not be removed or altered from any source distribution.
+*/
+
+/*
+	Narrowphase. The OBB-vs-OBB SAT and Sutherland-Hodgman clip come from
+	qu3e; the type-based dispatcher and the sphere / capsule / triangle pairs
+	are added on top.
 */
 #include <float.h>
 #include <math.h>
@@ -12,7 +33,6 @@
 #include "physics/math/math_functions.h"    /* segment_closestToPoint */
 
 
-/* --- Axis tracking helpers. --- */
 static inline int trackFaceAxis(int32_t *axis, int32_t n, float s, float *s_max,
                                  Vector3 normal, Vector3 *axis_normal)
 {
@@ -47,7 +67,6 @@ typedef struct ClipVertex {
 } ClipVertex;
 
 
-/* --- Reference edge and basis for the reference face. --- */
 static void computeReferenceEdgesAndBasis(Vector3 e_r, Transform rtx, Vector3 n, int32_t axis,
                                            uint8_t *out, Matrix3 *basis, Vector3 *e)
 {
@@ -99,7 +118,7 @@ static void computeReferenceEdgesAndBasis(Vector3 e_r, Transform rtx, Vector3 n,
 }
 
 
-/* --- Incident face corners for the box opposing the reference face. --- */
+/* Corners of the incident face, on the box opposing the reference face. */
 static void computeIncidentFace(Transform itx, Vector3 e, Vector3 n, ClipVertex *out)
 {
 	Vector3 n_local = matrix3_transformVectorTransposed(&itx.rotation, &n);
@@ -182,7 +201,7 @@ static void computeIncidentFace(Transform itx, Vector3 e, Vector3 n, ClipVertex 
 }
 
 
-/* --- Sutherland-Hodgman one-plane clip. --- */
+/* Sutherland-Hodgman one-plane clip. */
 #define IN_FRONT(a) ((a) < 0.0f)
 #define BEHIND(a)   ((a) >= 0.0f)
 #define ON_PLANE(a) ((a) < 0.005f && (a) > -0.005f)
@@ -234,7 +253,7 @@ static int32_t orthographic(float sign, float e, int32_t axis, int32_t clip_edge
 }
 
 
-/* --- Clip the incident face against the reference face. --- */
+/* Clip the incident face against the reference face. */
 static int32_t clipFace(Vector3 r_pos, Vector3 e, uint8_t *clip_edges, Matrix3 basis,
                          ClipVertex *incident, ClipVertex *out_verts, float *out_depths)
 {
@@ -276,7 +295,7 @@ static int32_t clipFace(Vector3 r_pos, Vector3 e, uint8_t *clip_edges, Matrix3 b
 }
 
 
-/* --- Closest points between two line segments (edge-edge contact). --- */
+/* Closest points between two line segments (edge-edge contact). */
 static void edgesContact(Vector3 *ca, Vector3 *cb,
                           Vector3 pa, Vector3 qa, Vector3 pb, Vector3 qb)
 {
@@ -300,7 +319,7 @@ static void edgesContact(Vector3 *ca, Vector3 *cb,
 }
 
 
-/* --- Supporting edge of a box for the given direction n (world space). --- */
+/* Supporting edge of a box for the given direction n (world space). */
 static void supportEdge(Transform tx, Vector3 e, Vector3 n, Vector3 *a_out, Vector3 *b_out)
 {
 	Vector3 n_local = matrix3_transformVectorTransposed(&tx.rotation, &n);
@@ -337,7 +356,7 @@ static void supportEdge(Transform tx, Vector3 e, Vector3 n, Vector3 *a_out, Vect
 }
 
 
-/* --- boxToBox: OBB-vs-OBB SAT + face/edge clipping. 1-a-1 port from qu3e. --- */
+/* OBB-vs-OBB SAT plus face and edge clipping. */
 void boxToBox(ContactManifold *m, PhysicsShape *a, PhysicsShape *b)
 {
 	Transform atx = rigidBody_getTransform(a->body);
@@ -585,7 +604,6 @@ void boxToBox(ContactManifold *m, PhysicsShape *a, PhysicsShape *b)
    box-local space and leveraging the AABB primitives. */
 
 
-/* --- Sphere vs Sphere. --- */
 void sphereToSphere(ContactManifold *m, PhysicsShape *a, PhysicsShape *b)
 {
 	Transform atx = rigidBody_getTransform(a->body);
@@ -613,7 +631,7 @@ void sphereToSphere(ContactManifold *m, PhysicsShape *a, PhysicsShape *b)
 }
 
 
-/* --- Sphere vs Box. Sphere is A, Box is B. --- */
+/* Sphere is A, box is B. */
 void sphereToBox(ContactManifold *m, PhysicsShape *a, PhysicsShape *b)
 {
 	Transform stx = rigidBody_getTransform(a->body);
@@ -648,7 +666,7 @@ void sphereToBox(ContactManifold *m, PhysicsShape *a, PhysicsShape *b)
 }
 
 
-/* --- Capsule vs Box. Capsule is A, Box is B. --- */
+/* Capsule is A, box is B. */
 void capsuleToBox(ContactManifold *m, PhysicsShape *a, PhysicsShape *b)
 {
 	Transform atx = rigidBody_getTransform(a->body);
@@ -694,8 +712,8 @@ void capsuleToBox(ContactManifold *m, PhysicsShape *a, PhysicsShape *b)
 }
 
 
-/* --- Sphere vs Capsule. Sphere is A, capsule is B. Treat capsule as its
-   segment + radius; closest-point-on-segment reduces to sphere-vs-sphere. --- */
+/* Sphere is A, capsule is B. Treat the capsule as its segment plus radius:
+   closest-point-on-segment reduces the pair to sphere-vs-sphere. */
 void sphereToCapsule(ContactManifold *m, PhysicsShape *a, PhysicsShape *b)
 {
 	Transform stx = rigidBody_getTransform(a->body);
@@ -733,7 +751,7 @@ void sphereToCapsule(ContactManifold *m, PhysicsShape *a, PhysicsShape *b)
 }
 
 
-/* --- Capsule vs Capsule. Closest point between the two inner segments. --- */
+/* Closest point between the two inner segments. */
 void capsuleToCapsule(ContactManifold *m, PhysicsShape *a, PhysicsShape *b)
 {
 	Transform atx = rigidBody_getTransform(a->body);
@@ -779,8 +797,8 @@ void capsuleToCapsule(ContactManifold *m, PhysicsShape *a, PhysicsShape *b)
 }
 
 
-/* --- Capsule vs Box without RigidBody: static geometry placed by a
-   world transform. Same logic as capsuleToBox. Capsule is A, Box is B. --- */
+/* Without a RigidBody: static geometry placed by a world transform. Same
+   logic as capsuleToBox. Capsule is A, box is B. */
 void capsuleToStaticBox(ContactManifold *m, const Capsule *capsule, const Transform *capsule_world,
                         const Box *box, const Transform *box_world)
 {
@@ -822,7 +840,7 @@ void capsuleToStaticBox(ContactManifold *m, const Capsule *capsule, const Transf
 }
 
 
-/* --- Capsule vs Sphere without RigidBody. Capsule is A, sphere is B. --- */
+/* Without a RigidBody. Capsule is A, sphere is B. */
 void capsuleToStaticSphere(ContactManifold *m, const Capsule *capsule, const Transform *capsule_world,
                            const Sphere *sphere, const Transform *sphere_world)
 {
@@ -850,7 +868,7 @@ void capsuleToStaticSphere(ContactManifold *m, const Capsule *capsule, const Tra
 }
 
 
-/* --- Capsule vs Capsule without RigidBody. A is the moving capsule. --- */
+/* Without a RigidBody. A is the moving capsule. */
 void capsuleToStaticCapsule(ContactManifold *m, const Capsule *capsule, const Transform *capsule_world,
                             const Capsule *other, const Transform *other_world)
 {
@@ -881,9 +899,8 @@ void capsuleToStaticCapsule(ContactManifold *m, const Capsule *capsule, const Tr
 }
 
 
-/* --- Capsule vs Triangle. The capsule is A, the triangle is B.
-   Reference point on the segment via plane intersection, then one
-   closest-point refinement. --- */
+/* The capsule is A, the triangle is B. Reference point on the segment via
+   plane intersection, then one closest-point refinement. */
 void capsuleToTriangle(ContactManifold *m, const Capsule *capsule, const Transform *world,
                        const Triangle *triangle)
 {
@@ -931,7 +948,7 @@ void capsuleToTriangle(ContactManifold *m, const Capsule *capsule, const Transfo
 }
 
 
-/* --- Convex shape against a static triangle mesh. ---
+/* Convex shape against a static triangle mesh.
 
    A mesh is not a convex piece, so it cannot be fed to the SAT routines above.
    Instead the shape's AABB queries the mesh tree and every triangle it touches
@@ -1111,7 +1128,7 @@ static void shapeToMesh(ContactManifold *m, PhysicsShape *shape, PhysicsShape *m
 }
 
 
-/* --- collision: type-based dispatcher. --- */
+/* Type-based dispatcher. */
 void collision(ContactManifold *m, PhysicsShape *a, PhysicsShape *b)
 {
 	ShapeType ta = a->type;

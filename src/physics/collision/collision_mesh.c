@@ -1,6 +1,3 @@
-/*
-	collision_mesh.c — see collision_mesh.h.
-*/
 #include <stdlib.h>
 #include <stdint.h>
 #include <assert.h>

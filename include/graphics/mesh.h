@@ -14,16 +14,16 @@
 struct MeshDeform;
 
 typedef struct {
-	rspq_block_t **dl;            // one block per part
+	rspq_block_t **dl;            /* one block per part */
 	uint8_t        dl_count;
-	uint8_t        visible;       // bitmask: parts to render
-	T3DMat4FP     *matrix_buffer; // NULL = matrix baked in dl (static mesh)
+	uint8_t        visible;       /* bitmask: parts to render */
+	T3DMat4FP     *matrix_buffer; /* NULL = matrix baked in dl (static mesh) */
 	T3DModel      *model;
-	T3DSkeleton   *skeleton;      // NULL = static mesh (set by character_create)
+	T3DSkeleton   *skeleton;      /* NULL = static mesh (set by character_create) */
 
-	// Where the vertices come from when something else drives them. Opaque:
-	// the binding lives in its own module, the mesh only needs to know if it
-	// is there. NULL = vertices come straight from the model.
+	/* Where the vertices come from when something else drives them. The
+	   binding lives in its own module, so the mesh only needs to know it is
+	   there. NULL = vertices come straight from the model. */
 	struct MeshDeform *deform;
 } Mesh;
 

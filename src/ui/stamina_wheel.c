@@ -1,6 +1,6 @@
 /*
-	stamina_wheel.c — radial stamina gauge, a textured particle anchored to
-	the character hip bone so it follows the run cycle.
+	Radial stamina gauge, a textured particle anchored to the character hip
+	bone so it follows the run cycle.
 
 	The radial cutout comes from the N64brew GameJam 2024 setup screen:
 	TILE0 holds an angular sweep gradient and TILE1 the ring artwork; the

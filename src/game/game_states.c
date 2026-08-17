@@ -236,9 +236,9 @@ void game_setState(Game *game, GameState new_state)
 	bool preserves = gameState_preservesScene(prev, new_state);
 
 	if (preserves) {
-		// Pause is overlay on top of gameplay: keep gameplay resources loaded.
-		// Going INTO pause: load pause resources additively + run pause onEnter.
-		// Going OUT of pause: unload pause resources, leave gameplay onEnter alone (no re-fade).
+		/* Pause overlays gameplay, so its resources stay loaded. Entering
+		   adds the pause ones, leaving drops them without re-entering
+		   gameplay, which would fade in again. */
 		if (new_state == GAME_STATE_PAUSE) {
 			resources_load(resources_forState(GAME_STATE_PAUSE));
 			game->state = new_state;
@@ -251,7 +251,8 @@ void game_setState(Game *game, GameState new_state)
 	}
 
 	rspq_wait();
-	// If leaving pause toward a non-preserved state, also tear down the gameplay scene underneath.
+	/* Leaving pause for a state that does not preserve the scene also tears
+	   down the gameplay scene underneath. */
 	if (prev == GAME_STATE_PAUSE) {
 		resources_unload(resources_forState(GAME_STATE_PAUSE));
 		gameState_unload(GAME_STATE_GAMEPLAY);

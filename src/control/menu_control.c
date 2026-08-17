@@ -84,8 +84,8 @@ static void menuControl_handleCredits(Player *player, const ControllerActions *a
 	if (actions->menu_up_held)   velocity -= CREDITS_DPAD_SPEED;
 	if (actions->menu_down_held) velocity += CREDITS_DPAD_SPEED;
 
-	// Stick hacia arriba retrocede, hacia abajo avanza; el modulo maneja
-	// la velocidad. Rango crudo del stick N64: +-80 aprox.
+	/* Stick up scrolls back, down forward; its magnitude sets the speed.
+	   Raw N64 stick range is about +-80. */
 	float stick = actions->stick_y / 80.0f;
 	if (stick >  1.0f) stick =  1.0f;
 	if (stick < -1.0f) stick = -1.0f;

@@ -1,8 +1,7 @@
 /*
-	character_spring_bone.c — see character_spring_bone.h. Translation of
-	SpringBoneSimulator3D::_process_joints and the SkeletonModifier3D
-	helpers it calls (limit_length, get_from_to_rotation), one joint per
-	modifier call.
+	Translation of SpringBoneSimulator3D::_process_joints and the
+	SkeletonModifier3D helpers it calls (limit_length, get_from_to_rotation),
+	one joint per modifier call. See character_spring_bone.h.
 */
 #include <math.h>
 #include <fgeom.h>

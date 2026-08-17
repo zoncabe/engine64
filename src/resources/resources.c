@@ -5,17 +5,17 @@
 
 
 static const SpriteID intro_sprite[] = {
-	SPRITE_N64LOGO, SPRITE_LIBDRAGON, SPRITE_TINY3D,
+	SPRITE_LIBDRAGON, SPRITE_TINY3D,
 };
 
-static const uint8_t intro_font[] = { DROID_SANS, HEADLINER_60 };
+static const uint8_t intro_font[] = { DROID_SANS, XOLONIUM_60 };
 
 static const SpriteID mainmenu_sprite[] = {
 	SPRITE_GORILLA, SPRITE_BTN_A, SPRITE_BTN_B, SPRITE_D_UP, SPRITE_D_DOWN, SPRITE_D_LEFT, SPRITE_D_RIGHT,
 };
 
 static const uint8_t mainmenu_font[] = {
-	DROID_SANS, HEADLINER_14, HEADLINER_20, HEADLINER_40,
+	DROID_SANS, XOLONIUM_14, XOLONIUM_20, XOLONIUM_40,
 };
 
 static const SpriteID credits_sprite[] = {
@@ -23,7 +23,7 @@ static const SpriteID credits_sprite[] = {
 };
 
 static const uint8_t credits_font[] = {
-	DROID_SANS, HEADLINER_14, HEADLINER_40,
+	DROID_SANS, XOLONIUM_14, XOLONIUM_40,
 };
 
 static const uint8_t gameplay_font[] = { DROID_SANS };
@@ -33,7 +33,7 @@ static const SpriteID pause_sprite[] = {
 };
 
 static const uint8_t pause_font[] = {
-	HEADLINER_14, HEADLINER_20,
+	XOLONIUM_14, XOLONIUM_20,
 };
 
 static const ResourceSet state_resource[GAME_STATE_COUNT] = {

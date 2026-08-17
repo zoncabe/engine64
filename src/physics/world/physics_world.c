@@ -1,6 +1,26 @@
 /*
-	physics_world.c — world assembly, step, body/shape management.
-	Ported 1-a-1 from qu3e q3Scene.cpp.
+	Ported from qu3e q3Scene.cpp — altered source, not the original software.
+
+	Copyright (c) 2014 Randy Gaul http://www.randygaul.net
+
+	This software is provided 'as-is', without any express or implied
+	warranty. In no event will the authors be held liable for any damages
+	arising from the use of this software.
+
+	Permission is granted to anyone to use this software for any purpose,
+	including commercial applications, and to alter it and redistribute it
+	freely, subject to the following restrictions:
+	  1. The origin of this software must not be misrepresented; you must not
+	     claim that you wrote the original software. If you use this software
+	     in a product, an acknowledgment in the product documentation would be
+	     appreciated but is not required.
+	  2. Altered source versions must be plainly marked as such, and must not
+	     be misrepresented as being the original software.
+	  3. This notice may not be removed or altered from any source distribution.
+*/
+
+/*
+	World assembly, step, body and shape management.
 */
 #include <assert.h>
 #include <stddef.h>
@@ -16,7 +36,7 @@
 #include "physics/broadphase/broad_phase.h"
 
 
-/* --- Shims exposed to rigid_body.c and broad_phase.c. --- */
+/* Shims exposed to rigid_body.c and broad_phase.c. */
 
 void physicsWorld_allocShape(PhysicsWorld *s, PhysicsShape **out)
 {
@@ -59,8 +79,6 @@ void contactManager_removeContactsFromBody_fromWorld(PhysicsWorld *s, RigidBody 
 }
 
 
-/* --- lifecycle --- */
-
 void physicsWorld_init(PhysicsWorld *s, float dt, Vector3 gravity, int32_t iterations)
 {
 	physicsStack_init(&s->stack);
@@ -97,8 +115,6 @@ void physicsWorld_removeAllBodies(PhysicsWorld *s)
 	s->body_count = 0;
 }
 
-
-/* --- cloth --- */
 
 Cloth *physicsWorld_createCloth(PhysicsWorld *s, const ClothDef *def)
 {
@@ -165,8 +181,6 @@ void physicsWorld_shutdown(PhysicsWorld *s)
 	physicsStack_shutdown(&s->stack);
 }
 
-
-/* --- step --- */
 
 /* One step per rendered frame, on the frame's own clock. The clamp is what
    keeps a hiccup from becoming one huge step: past it the simulation runs in
@@ -321,8 +335,6 @@ void physics_step(PhysicsWorld *s)
 }
 
 
-/* --- body management --- */
-
 RigidBody *physicsWorld_createBody(PhysicsWorld *s, const RigidBodyDef *def)
 {
 	RigidBody *body = (RigidBody *)physicsHeap_allocate(&s->heap, (int32_t)sizeof(RigidBody));
@@ -359,8 +371,6 @@ void physicsWorld_removeBody(PhysicsWorld *s, RigidBody *body)
 }
 
 
-/* --- settings --- */
-
 void physicsWorld_setAllowSleep(PhysicsWorld *s, int allow_sleep)
 {
 	s->allow_sleep = allow_sleep;
@@ -393,8 +403,6 @@ void physicsWorld_setContactListener(PhysicsWorld *s, ContactListener *listener)
 	s->contact_manager.contact_listener = listener;
 }
 
-
-/* --- queries --- */
 
 typedef struct QueryAABB_ctx {
 	const BroadPhase         *broadphase;

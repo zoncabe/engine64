@@ -37,9 +37,9 @@ static float screenAnimation_duration(const ScreenAnimation *animation)
 	return max;
 }
 
-// In reverse, the last track to arrive on entry is the first to leave on
-// exit: a track's reverse-delay is (max_forward_delay - forward_delay), so
-// everything starts moving on frame 0 (no freeze) and the stagger flips.
+/* In reverse the last track to arrive is the first to leave: a track's
+   reverse delay is (max forward delay - its own), so everything moves from
+   frame 0 and the stagger flips. */
 static float screenAnimation_maxDelay(const ScreenAnimation *animation)
 {
 	float max = 0.0f;
@@ -106,9 +106,8 @@ static void screenAnimationPlayer_applyTrack(const ScreenAnimationTrack *track, 
 
 	if (!track->target && !track->target_u8) return;
 
-	// A pending track writes nothing: the player primes every target with its
-	// initial value on start, so sequences of tracks over the same target
-	// (chained fades) hold whatever the last expired track left behind.
+	/* A pending track writes nothing: start primes every target, so chained
+	   fades over one target hold whatever the last expired track left. */
 	float local = time - track->delay;
 	if (local < 0.0f) return;
 
@@ -140,9 +139,9 @@ static void screenAnimationPlayer_applyTrackReversed(const ScreenAnimationTrack 
 		return;
 	}
 	if (track->target_bool) {
-		// Mirror of the forward window: a step (duration 0) holds to_bool
-		// until reverse_delay; a window holds it during
-		// [reverse_delay, reverse_delay + duration).
+		/* Mirror of the forward window: a step (duration 0) holds to_bool
+		   until reverse_delay, a window during
+		   [reverse_delay, reverse_delay + duration). */
 		bool in_window;
 		if (track->duration <= 0.0f)
 			in_window = (time < reverse_delay);
@@ -153,10 +152,9 @@ static void screenAnimationPlayer_applyTrackReversed(const ScreenAnimationTrack 
 	}
 	if (!track->target && !track->target_u8) return;
 
-	// Until reverse_delay the track is pending and writes nothing (the prime
-	// left the end state); after that we lerp toward `from` over `duration`.
-	// reverse_delay=0 for the track with the largest forward delay —
-	// whichever arrived last leaves first.
+	/* Before reverse_delay the track is pending and writes nothing, the prime
+	   left the end state; after it, lerp toward `from` over `duration`.
+	   reverse_delay is 0 for the track with the largest forward delay. */
 	float local = time - reverse_delay;
 	if (local < 0.0f) return;
 
@@ -191,11 +189,11 @@ static void screenAnimationPlayer_applyFrame(ScreenAnimationPlayer *animation_pl
 	}
 }
 
-// Leaves every lerp target at its start value so pending tracks can stay
-// silent. Forward it iterates the array backwards (the chronologically first
-// track over a target wins); reversed, forwards (the last one wins, because
-// the reverse starts from the end state). Reactive tracks (text, lookup,
-// match) and bools write on every frame, so they need no priming.
+/* Leaves every lerp target at its start value so pending tracks can stay
+   silent. Forward it walks the array backwards, so the chronologically first
+   track over a target wins; reversed it walks forwards, since the reverse
+   starts from the end state. Reactive tracks (text, lookup) and bools write
+   every frame and need no priming. */
 static void screenAnimationPlayer_prime(ScreenAnimationPlayer *animation_player)
 {
 	const ScreenAnimation *animation = animation_player->animation;

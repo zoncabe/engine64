@@ -3,6 +3,7 @@
 #include <t3d/t3danim.h>
 
 #include "time/time.h"
+#include "sound/sound.h"
 #include "control/controller.h"
 #include "camera/camera.h"
 #include "control/camera_control.h"
@@ -27,6 +28,10 @@ void viewport_init()
 void viewport_clear()
 {
 	rdpq_attach(display_get(), display_get_zbuf());
+
+	/* display_get blocks until a framebuffer frees up, which is the longest
+	   the loop ever sits still without feeding the mixer. */
+	sound_poll();
 	t3d_frame_start();
 	t3d_viewport_attach(&viewport.t3d_viewport);
 

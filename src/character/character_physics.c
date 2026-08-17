@@ -1,7 +1,7 @@
 /*
-	character_physics.c — capsule collision response for the kinematic body.
-	Collide and slide against static geometry, ported from the original
-	actor_collision_response (libultra demo, commit aeb14e2).
+	Capsule collision response for the kinematic body. Collide and slide
+	against static geometry, ported from the original actor_collision_response
+	(libultra demo, commit aeb14e2).
 */
 #include <math.h>
 #include <stdint.h>
@@ -236,7 +236,7 @@ void characterCollision_setResponse(Character *character, CharacterContact *cont
 }
 
 
-/* --- Frame driver: collide and slide, then snap to the floor. --- */
+/* Frame driver: collide and slide, then snap to the floor. */
 
 typedef struct TriangleQuery {
 	const CollisionMesh *mesh;
@@ -287,17 +287,23 @@ static int characterPhysics_deepestContact(const CharacterCollider *collider,
 	return found;
 }
 
-/* Walks the world's static bodies instead of a copied list: their shapes are
-   stored relative to their body, so each one is composed into world space here
-   before it is tested. */
+/* Walks the world's bodies instead of a copied list: their shapes are stored
+   relative to their body, so each one is composed into world space here
+   before it is tested. Obstacles are the static geometry plus every other
+   kinematic body — the capsule another character keeps in the world. The
+   solver cannot resolve two kinematic bodies against each other, so the
+   controllers do it: each one walks out of the other. Dynamic bodies stay
+   out, they are pushed by the solver instead. */
 static int characterPhysics_deepestContactAll(const CharacterCollider *collider,
                                               const PhysicsWorld *world,
+                                              const RigidBody *self,
                                               ContactManifold *out)
 {
 	int found = 0;
 
 	for (const RigidBody *body = world->body_list; body; body = body->next) {
-		if (!(body->flags & BODY_FLAG_STATIC)) continue;
+		if (body == self) continue;
+		if (!(body->flags & (BODY_FLAG_STATIC | BODY_FLAG_KINEMATIC))) continue;
 
 		for (const PhysicsShape *shape = body->shapes; shape; shape = shape->next) {
 			Transform tx = transform_product(&body->tx, &shape->local);
@@ -329,10 +335,10 @@ static int characterPhysics_deepestContactAll(const CharacterCollider *collider,
 	return found;
 }
 
-/* --- Floor query: the capsule's bottom sphere swept down by the snap
+/* Floor query: the capsule's bottom sphere swept down by the snap
    length. Answers whether there is walkable floor under the character,
    how deep the probe sinks into it and with which normal. Contacts whose
-   normal is steeper than the walkable limit (walls) are ignored. --- */
+   normal is steeper than the walkable limit (walls) are ignored. */
 
 typedef struct FloorProbe {
 	int     found;
@@ -467,7 +473,7 @@ void characterPhysics_collide(Character *character, const PhysicsWorld *world)
 
 	for (int slide = 0; slide < CHARACTER_MAX_SLIDES; slide++) {
 		ContactManifold m;
-		if (!characterPhysics_deepestContactAll(&character->collider, world, &m)) break;
+		if (!characterPhysics_deepestContactAll(&character->collider, world, character->body.rigid, &m)) break;
 
 		CharacterContact contact;
 		characterContact_clear(&contact);

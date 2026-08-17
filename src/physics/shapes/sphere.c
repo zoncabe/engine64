@@ -1,6 +1,3 @@
-/*
-	sphere.c — sphere methods.
-*/
 #include <math.h>
 
 #include "physics/shapes/sphere.h"

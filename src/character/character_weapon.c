@@ -1,8 +1,7 @@
 /*
-	character_weapon.c — weapon slots, equip and bone posing.
-	Weapon meshes live inside the character model, skinned to dedicated
-	root-level bones; posing those bones parks the weapon on its holster
-	reference bone or on the hand.
+	Weapon slots, equip and bone posing. Weapon meshes live inside the
+	character model, skinned to dedicated root-level bones; posing those bones
+	parks the weapon on its holster reference bone or on the hand.
 */
 #include <assert.h>
 #include <string.h>

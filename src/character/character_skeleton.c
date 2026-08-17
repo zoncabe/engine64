@@ -1,6 +1,3 @@
-/*
-	character_skeleton.c — see character_skeleton.h.
-*/
 #include <assert.h>
 #include <fgeom.h>
 #include <fmath.h>

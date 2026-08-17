@@ -1,7 +1,27 @@
 /*
-	contact.h — contact point, manifold, edge, constraint.
-	Ported from qu3e q3Contact, renamed to engine conventions. Pairs work on
-	PhysicsShape (box / sphere / capsule via tagged union).
+	Ported from qu3e q3Contact.h — altered source, not the original software.
+
+	Copyright (c) 2014 Randy Gaul http://www.randygaul.net
+
+	This software is provided 'as-is', without any express or implied
+	warranty. In no event will the authors be held liable for any damages
+	arising from the use of this software.
+
+	Permission is granted to anyone to use this software for any purpose,
+	including commercial applications, and to alter it and redistribute it
+	freely, subject to the following restrictions:
+	  1. The origin of this software must not be misrepresented; you must not
+	     claim that you wrote the original software. If you use this software
+	     in a product, an acknowledgment in the product documentation would be
+	     appreciated but is not required.
+	  2. Altered source versions must be plainly marked as such, and must not
+	     be misrepresented as being the original software.
+	  3. This notice may not be removed or altered from any source distribution.
+*/
+
+/*
+	Contact point, manifold, edge, constraint. Pairs work on PhysicsShape (box
+	/ sphere / capsule via tagged union).
 */
 #ifndef PHYSICS_COLLISION_CONTACT_H
 #define PHYSICS_COLLISION_CONTACT_H
@@ -18,7 +38,7 @@ struct RigidBody;
 struct ContactConstraint;
 
 
-/* FeaturePair — 32-bit key identifying a contact point across frames. */
+/* 32-bit key identifying a contact point across frames. */
 typedef union FeaturePair {
 	struct {
 		uint8_t in_r;
@@ -30,7 +50,6 @@ typedef union FeaturePair {
 } FeaturePair;
 
 
-/* One contact point inside a manifold. */
 typedef struct ContactPoint {
 	Vector3     position;
 	float       penetration;
@@ -44,7 +63,7 @@ typedef struct ContactPoint {
 } ContactPoint;
 
 
-/* Contact manifold between two shapes — up to 8 contacts. */
+/* Up to 8 contact points between two shapes. */
 typedef struct ContactManifold {
 	PhysicsShape *A;
 	PhysicsShape *B;
@@ -104,8 +123,8 @@ typedef struct ContactConstraint {
 void contactConstraint_solveCollision(ContactConstraint *c);
 
 
-/* Mixers — restitution keeps the max (bounciest wins), friction takes
-   geometric mean (the slippery side dominates). */
+/* Restitution keeps the max, so the bounciest side wins; friction takes the
+   geometric mean, so the slippery side dominates. */
 static inline float contact_mixRestitution(const PhysicsShape *A, const PhysicsShape *B) {
 	return (A->restitution > B->restitution) ? A->restitution : B->restitution;
 }

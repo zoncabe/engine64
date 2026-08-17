@@ -1,6 +1,6 @@
 #include "scene/scene.h"
 #include "scene/demo_scene.h"
-#include "assets/male_muscled.h"
+#include "assets/mr_muscles.h"
 #include "assets/miss_jiggles.h"
 
 static const PhysicsShapeDef room_shapes[] = {
@@ -56,11 +56,11 @@ const SceneDef demo_scene = {
 
 	.entity = {
 		[0] = {
-			.model_path = male_muscled_model,
+			.model_path = mr_muscles_model,
 			.position   = {1750.0f, -1750.0f, 200.0f},
 			.rotation   = {0.0f, 0.0f, 125.0f},
 			.scale      = {1.0f, 1.0f, 1.0f},
-			.character  = &male_muscled_character_def,
+			.character  = &mr_muscles_character_def,
 		},
 		
 		[1] = {

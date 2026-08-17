@@ -12,7 +12,6 @@ static const char *sprite_paths[SPRITE_COUNT] = {
 	[SPRITE_D_DOWN]    = "rom:/textures/DDown.sprite",
 	[SPRITE_D_LEFT]    = "rom:/textures/DLeft.sprite",
 	[SPRITE_D_RIGHT]   = "rom:/textures/DRight.sprite",
-	[SPRITE_N64LOGO]   = "rom:/textures/n64logo.sprite",
 	[SPRITE_LIBDRAGON] = "rom:/textures/libdragon.sprite",
 	[SPRITE_TINY3D]    = "rom:/textures/tiny3d.sprite",
 	[SPRITE_ZONCABE]   = "rom:/textures/zoncabe.sprite",

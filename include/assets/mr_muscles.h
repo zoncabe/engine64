@@ -1,9 +1,9 @@
-#ifndef MALE_MUSCLED_H
-#define MALE_MUSCLED_H
+#ifndef MR_MUSCLES_H
+#define MR_MUSCLES_H
 
 #include "character/character.h"
 
-#define male_muscled_model "rom:/models/male_muscled.t3dm"
+#define mr_muscles_model "rom:/models/mr_muscles.t3dm"
 #define gorilla_model "rom:/models/gorilla.t3dm"
 
 
@@ -35,7 +35,7 @@ typedef enum {
 	
 	MM_SLOT_COUNT
 
-} MaleMuscledSlot;
+} MrMusclesSlot;
 
 typedef enum {
 
@@ -56,7 +56,7 @@ typedef enum {
 
 	MM_NODE_COUNT
 
-} MaleMuscledNode;
+} MrMusclesNode;
 
 typedef enum {
 
@@ -131,21 +131,21 @@ typedef enum {
 
 	MM_ANIM_COUNT
 	
-} MaleMuscledAnim;
+} MrMusclesAnim;
 
 
-extern const CharacterMovementSettings    male_muscled_movement_settings;
-extern const CharacterColliderSettings    male_muscled_collider_settings;
+extern const CharacterMovementSettings    mr_muscles_movement_settings;
+extern const CharacterColliderSettings    mr_muscles_collider_settings;
 
-extern const char *const male_muscled_weapon_meshes[];
-extern const CharacterWeaponsDef male_muscled_weapons_def;
-extern const CharacterDef male_muscled_character_def;
+extern const char *const mr_muscles_weapon_meshes[];
+extern const CharacterWeaponsDef mr_muscles_weapons_def;
+extern const CharacterDef mr_muscles_character_def;
 
 extern const WeaponDef weapon_ak47;
 extern const WeaponDef weapon_bow;
 extern const WeaponDef weapon_m1911;
 extern const WeaponDef weapon_knife;
-extern const CharacterAnimationSettings male_muscled_animation_settings;
-extern const CharacterAnimationDef           male_muscled_animation_def;
+extern const CharacterAnimationSettings mr_muscles_animation_settings;
+extern const CharacterAnimationDef           mr_muscles_animation_def;
 
 #endif

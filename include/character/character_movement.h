@@ -44,8 +44,8 @@ typedef enum {
 	MOVEMENT_STATE_NONE
 } MovementState;
 
-/* Fase de gait del estado WALKING. El dev define cuantas y sus valores;
-   el orden es de menor a mayor target_speed. */
+/* One gait phase of the WALKING state. How many and their values are up to
+   the caller; the order runs from lowest to highest target_speed. */
 typedef struct {
 	float target_speed;
 	float response_rate;

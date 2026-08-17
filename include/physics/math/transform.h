@@ -1,7 +1,7 @@
 /*
-	transform.h — physics transform: position + rotation matrix.
-	(from qu3e q3Transform). The render-side transform (pos+euler+scale)
-	lives in render/render.h as RenderTransform.
+	Physics transform: position + rotation matrix. (from qu3e q3Transform).
+	The render-side transform (pos+euler+scale) lives in render/render.h as
+	RenderTransform.
 */
 #ifndef TRANSFORM_H
 #define TRANSFORM_H

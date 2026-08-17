@@ -1,6 +1,3 @@
-/*
-	spring.c — see spring.h.
-*/
 #include <math.h>
 
 #include "physics/spring/spring.h"

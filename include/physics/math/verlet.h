@@ -1,8 +1,8 @@
 /*
-	verlet.h — Jakobsen's integration step and constraint projection
-	("Advanced Character Physics", GDC 2001). The primitives behind cloth,
-	springs and particle soft bodies. Header-only: each one is a handful of
-	multiply-adds and belongs inlined in its caller's loop.
+	Jakobsen's integration step and constraint projection ("Advanced Character
+	Physics", GDC 2001). The primitives behind cloth, springs and particle
+	soft bodies. Header-only: each one is a handful of multiply-adds and
+	belongs inlined in its caller's loop.
 */
 #ifndef VERLET_H
 #define VERLET_H

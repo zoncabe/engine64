@@ -1,10 +1,10 @@
 /*
-	character_spring_bone.h — port of Godot's SpringBoneSimulator3D
-	(scene/3d/spring_bone_simulator_3d.cpp) as a skeleton modifier: one
-	verlet tail per joint, stepped once per frame with the frame's delta,
-	simulated in character space (the "center") so only the animation and
-	gravity move it. A set listed root to tip simulates as a chain: each
-	joint reads the pose the previous one already wrote.
+	Port of Godot's SpringBoneSimulator3D
+	(scene/3d/spring_bone_simulator_3d.cpp) as a skeleton modifier: one verlet
+	tail per joint, stepped once per frame with the frame's delta, simulated
+	in character space (the "center") so only the animation and gravity move
+	it. A set listed root to tip simulates as a chain: each joint reads the
+	pose the previous one already wrote.
 */
 #ifndef CHARACTER_SPRING_BONE_H
 #define CHARACTER_SPRING_BONE_H

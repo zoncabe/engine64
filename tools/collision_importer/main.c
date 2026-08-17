@@ -1,9 +1,9 @@
-/**
-* collision_importer — extracts the collision mesh from a .gltf/.glb
-* and writes the collision binary (big-endian, native N64 format).
-*
-* Originally based on collisionBuilder.cpp from pyrite64 by Max Bebök
-* (HailToDodongo), https://github.com/HailToDodongo/pyrite64, MIT licensed.
+/*
+	Extracts the collision mesh from a .gltf/.glb and writes the collision
+	binary (big-endian, native N64 format).
+
+	Originally based on collisionBuilder.cpp from pyrite64 by Max Bebök
+	(HailToDodongo), https://github.com/HailToDodongo/pyrite64, MIT licensed.
 */
 #include <stdio.h>
 #include <stdint.h>
@@ -75,13 +75,13 @@ static void align4(FILE *f)
 	while (bytes_written % 4 != 0) write_u8(f, 0);
 }
 
-/* ---- vertex welding ----
-
-	glTF splits a vertex whenever any attribute differs across it: UV seams,
-	shading splits, material borders. Position is copied verbatim in every
-	split, so duplicates are bit-identical and an exact hash welds all of them
-	without the tolerance a distance test would need. Collision only reads
-	positions, so the splits carry no information worth keeping.
+/*
+	Vertex welding. glTF splits a vertex whenever any attribute differs across
+	it: UV seams, shading splits, material borders. Position is copied
+	verbatim in every split, so duplicates are bit-identical and an exact hash
+	welds all of them without the tolerance a distance test would need.
+	Collision only reads positions, so the splits carry no information worth
+	keeping.
 */
 
 typedef struct {
@@ -166,8 +166,6 @@ static uint16_t weldVertex(CollisionMesh *mesh, VertexHash *hash, Vec3 v)
 
 	return (uint16_t)mesh->vertex_count++;
 }
-
-/* ---- conversion ---- */
 
 static Vec3 transformPoint(const cgltf_float m[16], Vec3 v)
 {
@@ -321,8 +319,6 @@ static void convert(const char *gltfPath, CollisionMesh *out, float baseScale, c
 
 	cgltf_free(data);
 }
-
-/* ---- binary output ---- */
 
 static void writeFile(const CollisionMesh *mesh, const char *path)
 {

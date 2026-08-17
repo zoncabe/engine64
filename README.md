@@ -6,7 +6,7 @@ Framework type game engine. Written in C on top of the open source SDK [Libdrago
 
 **Physics engine**<br/>
 A port of [qu3e](https://github.com/RandyGaul/qu3e) by Randy Gaul, expanded to use all basic primitives plus triangle meshes. Rigid bodies with island solving and sleeping, sequential impulse contact solver with warm starting, friction and restitution.<br/>
-Cloth simulation after Jakobsen's [Advanced Character Physics](https://www.cs.cmu.edu/afs/cs/academic/class/15462-s13/www/lec_slides/Jakobsen.pdf): damped Verlet integration with iterative distance constraint relaxation, pinning and wind.
+Cloth simulation implemented using the [Advanced Character Physics](https://www.cs.cmu.edu/afs/cs/academic/class/15462-s13/www/lec_slides/Jakobsen.pdf) papers, a Verlet method developed by Thomas Jakobsen at IO Interactive for the Hitman games.
 
 **Character physics**<br/>
 Kinematic capsule resolved by collide and slide against boxes, spheres, capsules and triangle meshes, with floor detection and snapping. Registered in the physics world for two way interaction with rigid bodies.

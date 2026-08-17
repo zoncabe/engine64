@@ -1,7 +1,7 @@
 /*
-	spring.h — damped spring particle: one Verlet particle pulled toward a
-	moving anchor. The cheap jiggle: gives lag, bounce and settle, no
-	deformation. What the caller consumes is the clamped offset.
+	Damped spring particle: one Verlet particle pulled toward a moving anchor.
+	The cheap jiggle: gives lag, bounce and settle, no deformation. What the
+	caller consumes is the clamped offset.
 */
 #ifndef SPRING_H
 #define SPRING_H

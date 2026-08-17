@@ -12,7 +12,13 @@
 
 
 static const rdpq_textparms_t h14_parms = { .char_spacing = 0.95f };
-static const rdpq_textparms_t h20_parms = { .char_spacing = 0.7f  };
+
+/* The items align on their right edge: same X and same width for both,
+   whatever the font. */
+#define PAUSE_MENU_X     222.0f
+#define PAUSE_MENU_WIDTH 80
+
+static const rdpq_textparms_t h20_menu_parms = { .width = PAUSE_MENU_WIDTH, .align = ALIGN_RIGHT };
 
 
 typedef enum {
@@ -49,11 +55,11 @@ Screen pause_screen = {
 		[0] = {
 			.element = {
 				[PAUSE_BG]          = { .type = DRAW_RECTANGLE, .position = {   0.0f,   0.0f }, .scale = { 320.0f, 240.0f }, .rectangle = { SHAPE_FILL_GRADIENT } },
-				[PAUSE_CONTINUE]    = { .type = DRAW_TEXT,      .position = { 320.0f,  50.0f },                              .text      = { HEADLINER_20, MENU_STYLE_NORMAL, "Continue", &h20_parms } },
-				[PAUSE_QUIT]        = { .type = DRAW_TEXT,      .position = { 320.0f,  80.0f },                              .text      = { HEADLINER_20, MENU_STYLE_NORMAL, "Quit",     &h20_parms } },
-				[PAUSE_HINT_MOVE]   = { .type = DRAW_TEXT,      .position = { 347.0f, 196.0f },                              .text      = { HEADLINER_14, 0,                 "Move",     &h14_parms } },
-				[PAUSE_HINT_SELECT] = { .type = DRAW_TEXT,      .position = { 338.0f, 211.0f },                              .text      = { HEADLINER_14, 0,                 "Select",   &h14_parms } },
-				[PAUSE_HINT_BACK]   = { .type = DRAW_TEXT,      .position = { 338.0f, 226.0f },                              .text      = { HEADLINER_14, 0,                 "Back",     &h14_parms } },
+				[PAUSE_CONTINUE]    = { .type = DRAW_TEXT,      .position = { 320.0f,  50.0f },                              .text      = { XOLONIUM_20, MENU_STYLE_NORMAL, "Continue", &h20_menu_parms } },
+				[PAUSE_QUIT]        = { .type = DRAW_TEXT,      .position = { 320.0f,  80.0f },                              .text      = { XOLONIUM_20, MENU_STYLE_NORMAL, "Quit",     &h20_menu_parms } },
+				[PAUSE_HINT_MOVE]   = { .type = DRAW_TEXT,      .position = { 347.0f, 196.0f },                              .text      = { XOLONIUM_14, 0,                 "Move",     &h14_parms } },
+				[PAUSE_HINT_SELECT] = { .type = DRAW_TEXT,      .position = { 338.0f, 211.0f },                              .text      = { XOLONIUM_14, 0,                 "Select",   &h14_parms } },
+				[PAUSE_HINT_BACK]   = { .type = DRAW_TEXT,      .position = { 338.0f, 226.0f },                              .text      = { XOLONIUM_14, 0,                 "Back",     &h14_parms } },
 				[PAUSE_D_UP]        = { .type = DRAW_SPRITE,    .position = { 320.0f, 186.0f }, .scale = { 0.48f, 0.48f },   .sprite    = { SPRITE_D_UP   } },
 				[PAUSE_D_DOWN]      = { .type = DRAW_SPRITE,    .position = { 330.0f, 187.0f }, .scale = { 0.48f, 0.48f },   .sprite    = { SPRITE_D_DOWN } },
 				[PAUSE_BTN_A]       = { .type = DRAW_SPRITE,    .position = { 320.0f, 201.0f }, .scale = { 0.60f, 0.60f },   .sprite    = { SPRITE_BTN_A  } },
@@ -76,8 +82,8 @@ static ScreenAnimationTrack pause_transition_track[] = {
 	{ .target_u8 = &pause_screen.section[0].element[PAUSE_BG].rectangle.gradient[2].a, .from = 0.0f, .to = 255.0f, .duration = 0.16f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
 	{ .target_u8 = &pause_screen.section[0].element[PAUSE_BG].rectangle.gradient[3].a, .from = 0.0f, .to =  76.5f, .duration = 0.16f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
 
-	{ .target = &pause_screen.section[0].element[PAUSE_CONTINUE].position.x,    .from = 320.0f, .to = 238.0f, .duration = 0.12f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
-	{ .target = &pause_screen.section[0].element[PAUSE_QUIT].position.x,        .from = 320.0f, .to = 263.0f, .duration = 0.12f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target = &pause_screen.section[0].element[PAUSE_CONTINUE].position.x,    .from = 320.0f, .to = PAUSE_MENU_X, .duration = 0.12f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target = &pause_screen.section[0].element[PAUSE_QUIT].position.x,        .from = 320.0f, .to = PAUSE_MENU_X, .duration = 0.12f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
 	{ .target = &pause_screen.section[0].element[PAUSE_HINT_MOVE].position.x,   .from = 347.0f, .to = 262.0f, .duration = 0.12f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
 	{ .target = &pause_screen.section[0].element[PAUSE_HINT_SELECT].position.x, .from = 338.0f, .to = 262.0f, .duration = 0.12f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
 	{ .target = &pause_screen.section[0].element[PAUSE_HINT_BACK].position.x,   .from = 338.0f, .to = 262.0f, .duration = 0.12f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
@@ -98,8 +104,8 @@ static const ScreenAnimationTrack pause_quit_track[] = {
 	{ .target_u8 = &pause_screen.section[0].element[PAUSE_BG].rectangle.gradient[0].a, .from =  76.5f, .to = 255.0f, .duration = 0.15f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
 	{ .target_u8 = &pause_screen.section[0].element[PAUSE_BG].rectangle.gradient[3].a, .from =  76.5f, .to = 255.0f, .duration = 0.15f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
 
-	{ .target = &pause_screen.section[0].element[PAUSE_CONTINUE].position.x,    .from = 238.0f, .to = 320.0f, .duration = 0.15f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
-	{ .target = &pause_screen.section[0].element[PAUSE_QUIT].position.x,        .from = 263.0f, .to = 320.0f, .duration = 0.15f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target = &pause_screen.section[0].element[PAUSE_CONTINUE].position.x,    .from = PAUSE_MENU_X, .to = 320.0f, .duration = 0.15f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
+	{ .target = &pause_screen.section[0].element[PAUSE_QUIT].position.x,        .from = PAUSE_MENU_X, .to = 320.0f, .duration = 0.15f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
 
 	{ .target = &pause_screen.section[0].element[PAUSE_HINT_MOVE].position.x,   .from = 262.0f, .to = 347.0f, .duration = 0.15f, .easing = SCREEN_ANIMATION_EASING_LINEAR },
 	{ .target = &pause_screen.section[0].element[PAUSE_HINT_SELECT].position.x, .from = 262.0f, .to = 338.0f, .duration = 0.15f, .easing = SCREEN_ANIMATION_EASING_LINEAR },

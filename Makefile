@@ -86,12 +86,15 @@ filesystem/fonts/%.font64: assets/fonts/%.ttf
 	@echo "    [FONT] $@"
 	$(N64_MKFONT) $(MKFONT_FLAGS) -o filesystem/fonts "$<"
 
+# Xolonium es ancha: --display comprime los glifos al 75% sin tocar su altura.
+XOLONIUM_FLAGS = --display 320x240,2:1
+
 filesystem/fonts/DroidSans.font64:  MKFONT_FLAGS += --size 10
-filesystem/fonts/Headliner10.font64: MKFONT_FLAGS += --size 10
-filesystem/fonts/Headliner14.font64: MKFONT_FLAGS += --size 14
-filesystem/fonts/Headliner20.font64: MKFONT_FLAGS += --size 20
-filesystem/fonts/Headliner40.font64: MKFONT_FLAGS += --size 43
-filesystem/fonts/Headliner60.font64: MKFONT_FLAGS += --size 60
+filesystem/fonts/Xolonium10.font64: MKFONT_FLAGS += --size 10 $(XOLONIUM_FLAGS)
+filesystem/fonts/Xolonium14.font64: MKFONT_FLAGS += --size 14 $(XOLONIUM_FLAGS)
+filesystem/fonts/Xolonium20.font64: MKFONT_FLAGS += --size 20 $(XOLONIUM_FLAGS)
+filesystem/fonts/Xolonium40.font64: MKFONT_FLAGS += --size 43 $(XOLONIUM_FLAGS)
+filesystem/fonts/Xolonium60.font64: MKFONT_FLAGS += --size 60 $(XOLONIUM_FLAGS)
 
 filesystem/audio/%.wav64: assets/audio/%.wav
 	@mkdir -p $(dir $@)

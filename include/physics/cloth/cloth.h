@@ -1,5 +1,5 @@
 /*
-	cloth.h — Verlet cloth with distance constraints solved by relaxation.
+	Verlet cloth with distance constraints solved by relaxation.
 
 	Implements the method in "Advanced Character Physics" (Thomas Jakobsen,
 	IO Interactive, GDC 2001), the cloth and ragdoll solver of the fysix

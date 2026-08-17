@@ -1,7 +1,7 @@
 /*
-	physics_shape.c — narrowphase/body dispatchers. Each function builds the
-	world transform (body_tx · shape->local) and routes to the concrete shape
-	implementation based on shape->type.
+	Narrowphase/body dispatchers. Each function builds the world transform
+	(body_tx · shape->local) and routes to the concrete shape implementation
+	based on shape->type.
 */
 #include <stddef.h>
 

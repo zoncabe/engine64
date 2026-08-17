@@ -20,9 +20,9 @@ typedef struct CharacterAnimation CharacterAnimation;
 typedef enum {
 
 	ANIMATION_PARAM_IDLE_RIGHT,
-	ANIMATION_PARAM_WALK,   /* peso del grid de marcha sobre el idle */
-	ANIMATION_PARAM_WALK_GAIT,   /* posicion en el eje de gaits, [0,1] sobre la tabla de movement */
-	ANIMATION_PARAM_WALK_TURN,   /* eje de giro: 0 izquierda, 0.5 recto, 1 derecha */
+	ANIMATION_PARAM_WALK,   /* weight of the locomotion grid over the idle */
+	ANIMATION_PARAM_WALK_GAIT,   /* position on the gait axis, [0,1] over the movement table */
+	ANIMATION_PARAM_WALK_TURN,   /* turn axis: 0 left, 0.5 straight, 1 right */
 	ANIMATION_PARAM_STRAFE,
 	ANIMATION_PARAM_STRAFE_GAIT,
 	ANIMATION_PARAM_STRAFE_DIR,
@@ -69,7 +69,7 @@ typedef struct {
 	uint8_t buffer;
 	uint8_t param_cols;
 	uint8_t param_rows;
-	uint8_t param_weight;   /* BLEND_2D: peso con el que el grid compuesto entra al main */
+	uint8_t param_weight;   /* BLEND_2D: weight the composed grid enters the main with */
 
 } CharacterAnimationNode;
 
@@ -170,8 +170,8 @@ typedef struct CharacterAnimation {
 	bool        *node_active;
 	float        param[ANIMATION_PARAM_COUNT];
 
-	/* Normalized time of the locomotion clip that is actually running. The
-	   graph reads it as a footing; kept here so it survives the frame. */
+	/* Normalized time of the clip carrying the most weight this frame, left
+	   behind by the graph for whoever needs to fire on the gait cycle. */
 	float        locomotion_cycle;
 
 	uint8_t      prev_speed_state;

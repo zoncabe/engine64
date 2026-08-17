@@ -1,5 +1,5 @@
 /*
-	mesh_deform.h — drives a t3d vertex buffer from an external set of points.
+	Drives a t3d vertex buffer from an external set of points.
 
 	Binds every vertex slot of a model to the source point sitting at the same
 	rest position, then rewrites the buffer from those points on demand. The
@@ -34,12 +34,12 @@
 
 
 typedef struct MeshDeform {
-	uint16_t      *slot_source;   // source index per vertex slot, or MESH_DEFORM_UNBOUND
-	uint16_t       slot_count;    // vertex slots in the model
-	uint16_t       bound_count;   // slots that found a source point
-	float          scale;         // source units -> render units
+	uint16_t      *slot_source;   /* source index per vertex slot, or MESH_DEFORM_UNBOUND */
+	uint16_t       slot_count;    /* vertex slots in the model */
+	uint16_t       bound_count;   /* slots that found a source point */
+	float          scale;         /* source units -> render units */
 	T3DModel      *model;
-	const Vector3 *source;        // the points driving the mesh; kept, not owned
+	const Vector3 *source;        /* the points driving the mesh; kept, not owned */
 
 	/* The RSP runs behind the CPU, so writing one buffer every frame lets it
 	   read vertices half-overwritten. One copy per framebuffer, addressed

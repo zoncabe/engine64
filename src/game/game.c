@@ -47,7 +47,6 @@ void game_init()
 	controller_start();
 	
 	time_init();
-	//time_setScale(2.0f);
 
 	viewport_init();
 
@@ -87,6 +86,8 @@ void game_runStep(void)
 	GameRenderDescriptor desc = game_getRenderDescriptor(&ctx);
 	render_setContext(&render_context, desc.scene, ctx.viewport->fb_index, desc.screen);
 	render(&render_context, &ctx.viewport->fb_index);
+
+	sound_poll();
 }
 
 void game_close()

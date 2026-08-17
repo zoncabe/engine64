@@ -1,5 +1,5 @@
 /*
-	physics_shape.h — polymorphic shape attached to a RigidBody.
+	Polymorphic shape attached to a RigidBody.
 
 	A RigidBody keeps one linked list of PhysicsShape. Each shape carries its
 	local transform and admin fields (friction, restitution, etc.), and a

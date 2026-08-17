@@ -1,9 +1,9 @@
 /*
-	skeleton_modifier.h — post-animation skeleton edits. The animation writes
-	the base pose; the modifier list runs in order on top of it (weapons,
-	physics driven bones, aim, IK), each writing local bone TRS + hasChanged.
-	The contract: a modifier never touches bone matrices and never calls
-	t3d_skeleton_update — the skeleton's owner does that once, after the list.
+	Post-animation skeleton edits. The animation writes the base pose; the
+	modifier list runs in order on top of it (weapons, physics driven bones,
+	aim, IK), each writing local bone TRS + hasChanged. The contract: a
+	modifier never touches bone matrices and never calls t3d_skeleton_update —
+	the skeleton's owner does that once, after the list.
 */
 #ifndef SKELETON_MODIFIER_H
 #define SKELETON_MODIFIER_H

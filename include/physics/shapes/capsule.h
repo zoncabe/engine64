@@ -1,6 +1,6 @@
 /*
-	capsule.h — capsule geometry (local Z axis): cylinder + hemispheres.
-	Admin fields live in PhysicsShape.
+	Capsule geometry (local Z axis): cylinder + hemispheres. Admin fields live
+	in PhysicsShape.
 */
 #ifndef PHYSICS_SHAPE_CAPSULE_H
 #define PHYSICS_SHAPE_CAPSULE_H

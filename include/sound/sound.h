@@ -61,6 +61,11 @@ void sound_setListener(const Vector3 *position, const Vector3 *right);
    or not a scene is loaded. */
 void sound_update(void);
 
+/* Feeds the mixer without touching the emitters. A single call per frame runs
+   dry whenever a frame stretches, so this goes around the expensive parts of
+   the loop as well. */
+void sound_poll(void);
+
 /* Starts the sound at a point in the world. Looping sounds hold their emitter
    until sound_stop; one-shots release it when the sample ends.
 

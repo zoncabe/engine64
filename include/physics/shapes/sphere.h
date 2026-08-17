@@ -1,5 +1,5 @@
 /*
-	sphere.h — sphere geometry (radius). Admin fields live in PhysicsShape.
+	Sphere geometry (radius). Admin fields live in PhysicsShape.
 */
 #ifndef PHYSICS_SHAPE_SPHERE_H
 #define PHYSICS_SHAPE_SPHERE_H

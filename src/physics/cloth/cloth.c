@@ -5,11 +5,11 @@
 #include "physics/cloth/cloth.h"
 
 
-/* ---- edge extraction ----
-
-	One constraint per unique mesh edge. On a triangulated grid that yields the
-	structural edges plus the diagonal of every quad, and the diagonal is what
-	resists shearing, so it comes for free with the triangulation.
+/*
+	Edge extraction: one constraint per unique mesh edge. On a triangulated
+	grid that yields the structural edges plus the diagonal of every quad, and
+	the diagonal is what resists shearing, so it comes free with the
+	triangulation.
 */
 
 #define EDGE_EMPTY 0xFFFFFFFFu
@@ -140,9 +140,9 @@ void cloth_pinWhere(Cloth *cloth, bool (*predicate)(Vector3 position, void *user
 }
 
 
-/* ---- integration ----
-
-	Jakobsen's step, with the previous position standing in for velocity:
+/*
+	Integration: Jakobsen's step, with the previous position standing in for
+	velocity:
 
 		x += x - oldx + a * dt * dt;
 		oldx = temp;
@@ -150,9 +150,8 @@ void cloth_pinWhere(Cloth *cloth, bool (*predicate)(Vector3 position, void *user
 	Damping scales the implied velocity term instead of adding a force, which
 	keeps the step to one multiply-add per axis.
 */
-/* ---- wind ----
-
-	Wind acts on the surface, not on the points. For each triangle, the raw
+/*
+	Wind acts on the surface, not on the points. For each triangle the raw
 	cross product gives a normal whose length is twice the area, and the unit
 	normal says how squarely the face meets the wind:
 
@@ -277,9 +276,9 @@ static void cloth_integrate(Cloth *cloth, float dt)
 }
 
 
-/* ---- constraint relaxation ----
-
-	The exact projection needs the current distance, and therefore a root:
+/*
+	Constraint relaxation. The exact projection needs the current distance, and
+	therefore a root:
 
 		deltalength = sqrt(delta * delta);
 		diff        = (deltalength - restlength) / deltalength;

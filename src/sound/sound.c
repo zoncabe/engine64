@@ -16,7 +16,7 @@
 /* The mixer sums its channels into one accumulator, so voices playing at once
    add up. This is the headroom that keeps a handful of them from running past
    the end of the range. */
-#define SOUND_MASTER_VOLUME 0.7f
+#define SOUND_MASTER_VOLUME 0.5f
 
 #define SOUND_EPSILON 1e-4f
 
@@ -47,6 +47,12 @@ typedef struct {
 static wav64_t *sound_wave[SOUND_COUNT];
 static SoundEmitterState sound_emitter[SOUND_MAX_EMITTERS];
 static SoundListener sound_listener;
+
+/* Emitter each channel belongs to. A one-shot frees its channel the moment the
+   sample ends, one frame before its emitter notices, so without this the next
+   sound to start can take that channel while the old emitter still writes
+   volume to it. */
+static SoundEmitter sound_channel_owner[SOUND_MIXER_CHANNELS];
 
 
 void sound_setListener(const Vector3 *position, const Vector3 *right)
@@ -134,6 +140,26 @@ static void sound_applyStretch(int channel, const waveform_t *wave, float durati
 }
 
 
+/* True while the channel is still the emitter's to write to. */
+static bool sound_ownsChannel(const SoundEmitterState *emitter)
+{
+	if (emitter->channel < 0) return false;
+
+	return sound_channel_owner[emitter->channel] == (SoundEmitter)(emitter - sound_emitter);
+}
+
+
+static void sound_dropChannel(SoundEmitterState *emitter)
+{
+	if (sound_ownsChannel(emitter)) {
+		mixer_ch_stop(emitter->channel);
+		sound_channel_owner[emitter->channel] = SOUND_NO_EMITTER;
+	}
+
+	emitter->channel = -1;
+}
+
+
 static bool sound_startEmitter(SoundEmitterState *emitter, float gain, float pan)
 {
 	const SoundDef *def = &sound_bank[emitter->id];
@@ -148,6 +174,10 @@ static bool sound_startEmitter(SoundEmitterState *emitter, float gain, float pan
 			def->priority, &wave->wave, &channel))
 		return false;
 
+	/* Whatever held it is losing it: its emitter has to stop reaching for it. */
+	SoundEmitter previous = sound_channel_owner[channel];
+	if (previous != SOUND_NO_EMITTER) sound_emitter[previous].channel = -1;
+
 	if (mixer_ch_playing(channel))
 		mixer_ch_stop(channel);
 
@@ -157,16 +187,15 @@ static bool sound_startEmitter(SoundEmitterState *emitter, float gain, float pan
 	sound_applyMix(channel, gain, pan, 0);
 
 	emitter->channel = channel;
+	sound_channel_owner[channel] = (SoundEmitter)(emitter - sound_emitter);
 	return true;
 }
 
 
 static void sound_releaseEmitter(SoundEmitterState *emitter)
 {
-	if (emitter->channel >= 0) mixer_ch_stop(emitter->channel);
-
-	emitter->channel = -1;
-	emitter->active  = false;
+	sound_dropChannel(emitter);
+	emitter->active = false;
 }
 
 
@@ -194,6 +223,9 @@ void sound_init(void)
 
 	for (int i = 0; i < SOUND_MAX_EMITTERS; i++)
 		sound_emitter[i].channel = -1;
+
+	for (int i = 0; i < SOUND_MIXER_CHANNELS; i++)
+		sound_channel_owner[i] = SOUND_NO_EMITTER;
 }
 
 
@@ -281,6 +313,12 @@ void sound_setEmitterPosition(SoundEmitter emitter, const Vector3 *position)
 }
 
 
+void sound_poll(void)
+{
+	mixer_try_play();
+}
+
+
 void sound_update(void)
 {
 	int ramp_samples = (int)(time_get()->delta * SOUND_OUTPUT_RATE);
@@ -293,16 +331,16 @@ void sound_update(void)
 
 		const SoundDef *def = &sound_bank[emitter->id];
 
-		/* A one-shot that ran out gives its slot back. A looping one that
-		   stopped lost its channel to something else: it keeps the emitter
-		   and asks for a new one below. */
-		if (emitter->channel >= 0 && !mixer_ch_playing(emitter->channel)) {
+		/* A one-shot that ran out, or lost its channel to a later sound,
+		   gives its slot back. A looping one keeps the emitter and asks for
+		   a new channel below. */
+		if (emitter->channel >= 0 && (!sound_ownsChannel(emitter) || !mixer_ch_playing(emitter->channel))) {
 			if (!def->loop) {
 				sound_releaseEmitter(emitter);
 				continue;
 			}
 
-			emitter->channel = -1;
+			sound_dropChannel(emitter);
 		}
 
 		Vector3 to_emitter = vector3_difference(&emitter->position, &sound_listener.position);
@@ -313,10 +351,7 @@ void sound_update(void)
 			/* Out of range: the channel is worth more to something audible.
 			   The emitter itself stays, waiting for the listener to come
 			   back. */
-			if (emitter->channel >= 0) {
-				mixer_ch_stop(emitter->channel);
-				emitter->channel = -1;
-			}
+			sound_dropChannel(emitter);
 
 			if (!def->loop) emitter->active = false;
 			continue;
@@ -332,5 +367,5 @@ void sound_update(void)
 		sound_applyMix(emitter->channel, gain, pan, ramp_samples);
 	}
 
-	mixer_try_play();
+	sound_poll();
 }

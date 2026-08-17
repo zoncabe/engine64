@@ -5,11 +5,11 @@
 static const char *font_paths[] = {
 
 	[DROID_SANS]   = "rom:/fonts/DroidSans.font64",
-	[HEADLINER_10] = "rom:/fonts/Headliner10.font64",
-	[HEADLINER_14] = "rom:/fonts/Headliner14.font64",
-	[HEADLINER_20] = "rom:/fonts/Headliner20.font64",
-	[HEADLINER_40] = "rom:/fonts/Headliner40.font64",
-	[HEADLINER_60] = "rom:/fonts/Headliner60.font64",
+	[XOLONIUM_10]  = "rom:/fonts/Xolonium10.font64",
+	[XOLONIUM_14]  = "rom:/fonts/Xolonium14.font64",
+	[XOLONIUM_20]  = "rom:/fonts/Xolonium20.font64",
+	[XOLONIUM_40]  = "rom:/fonts/Xolonium40.font64",
+	[XOLONIUM_60]  = "rom:/fonts/Xolonium60.font64",
 
 };
 
@@ -21,19 +21,19 @@ void font_loadAsset(uint8_t id)
 	fonts[id] = rdpq_font_load(font_paths[id]);
 	assert(fonts[id]);
 
-	if (id == HEADLINER_14) {
+	if (id == XOLONIUM_14) {
 		rdpq_font_style(fonts[id], MENU_STYLE_NORMAL,   &(rdpq_fontstyle_t){RGBA32(200, 200, 200, 255)});
 		rdpq_font_style(fonts[id], MENU_STYLE_SELECTED, &(rdpq_fontstyle_t){RGBA32(255, 220, 30,  255)});
 	}
-	if (id == HEADLINER_20) {
+	if (id == XOLONIUM_20) {
 		rdpq_font_style(fonts[id], MENU_STYLE_NORMAL,   &(rdpq_fontstyle_t){RGBA32(200, 200, 200, 255)});
 		rdpq_font_style(fonts[id], MENU_STYLE_SELECTED, &(rdpq_fontstyle_t){RGBA32(255, 220, 30,  255)});
 	}
-	if (id == HEADLINER_40) {
+	if (id == XOLONIUM_40) {
 		rdpq_font_style(fonts[id], MENU_STYLE_NORMAL,   &(rdpq_fontstyle_t){RGBA32(255, 255, 255, 200)});
 		rdpq_font_style(fonts[id], TEXT_STYLE_RED,      &(rdpq_fontstyle_t){RGBA32(230, 30, 30, 255)});
 	}
-	if (id == HEADLINER_60) {
+	if (id == XOLONIUM_60) {
 		rdpq_font_style(fonts[id], MENU_STYLE_NORMAL,   &(rdpq_fontstyle_t){RGBA32(255, 255, 255, 200)});
 		rdpq_font_style(fonts[id], TEXT_STYLE_RED,      &(rdpq_fontstyle_t){RGBA32(230, 30, 30, 255)});
 	}

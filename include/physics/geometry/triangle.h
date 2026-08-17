@@ -1,6 +1,6 @@
 /*
-	triangle.h — triangle primitive for static collision meshes.
-	Vertices gathered by index from a CollisionMesh, normal precomputed.
+	Triangle primitive for static collision meshes. Vertices gathered by index
+	from a CollisionMesh, normal precomputed.
 */
 #ifndef PHYSICS_GEOMETRY_TRIANGLE_H
 #define PHYSICS_GEOMETRY_TRIANGLE_H

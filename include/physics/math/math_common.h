@@ -19,22 +19,17 @@ float angle_wrap_relative(float angle, float reference);
 float lerpf(float a, float b, float t);
 
 /*
- * Fast inverse square root — Quake III original (Q_rsqrt) and Kaze's variant
- * (qi_sqrt).
- *
- * Returns an approximation of 1/sqrt(x) in ~6 cycles instead of the ~58 cycles
- * that 1.0f / sqrtf(x) costs on N64 (29 cycles sqrt + 29 cycles divide).
- *
- * Apply only when ALL THREE of the following hold:
- *   1. You need 1/sqrt(x), not sqrt(x). If you need sqrt, use the hardware sqrtf.
- *   2. The function lives in code already in icache (hot path). A cache miss
- *      loading the 8 extra instructions kills the gain.
- *   3. ~3% precision is acceptable. DO NOT use in physics, contact normals,
- *      raycasts or any accumulating computation.
- *
- * Typical use cases: normalizing vectors for shadows, background lighting,
- * non-critical visual effects, massive particle systems.
- */
+	Fast inverse square root, Kaze's variant of the Quake III Q_rsqrt.
+	Approximates 1/sqrt(x) in ~6 cycles instead of the ~58 that 1.0f / sqrtf(x)
+	costs on N64 (29 for the sqrt, 29 for the divide).
+
+	Only worth it when all three hold:
+	  1. You need 1/sqrt(x), not sqrt(x). For sqrt use the hardware sqrtf.
+	  2. The caller is already in icache. A miss loading the 8 extra
+	     instructions kills the gain.
+	  3. ~3% error is acceptable. Never in physics, contact normals, raycasts
+	     or anything that accumulates.
+*/
 float qi_sqrt(float x);
 
 float ease_linear(float t);

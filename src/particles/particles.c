@@ -1,8 +1,7 @@
 /*
-	particles.c — tpx (tinyPX) particle buffers.
-	tpx is its own RSP ucode, independent of t3d: nothing set up in t3d
-	carries over, so every draw copies the current t3d state first and
-	pushes the buffer matrix on tpx's own stack.
+	tpx (tinyPX) particle buffers. tpx is its own RSP ucode, independent of
+	t3d: nothing set up in t3d carries over, so every draw copies the current
+	t3d state first and pushes the buffer matrix on tpx's own stack.
 */
 #include <assert.h>
 #include <malloc.h>

@@ -1,10 +1,8 @@
 #include "character/character.h"
-#include "assets/male_muscled.h"
+#include "assets/mr_muscles.h"
 
 
-// --- Clip definitions ---
-
-static const CharacterAnimationClipDef male_muscled_clips[] = {
+static const CharacterAnimationClipDef mr_muscles_clips[] = {
 	 
 	[MM_ANIM_IDLE_L]            = { "standing-idle-left",                 ANIMATION_SLOT_MAIN,   true  },
 	[MM_ANIM_IDLE_R]            = { "standing-idle-right",                MM_SLOT_IDLE_R,        true  },
@@ -77,7 +75,7 @@ static const CharacterAnimationClipDef male_muscled_clips[] = {
 
 };
 
-static const CharacterAnimationNode male_muscled_nodes[] = {
+static const CharacterAnimationNode mr_muscles_nodes[] = {
 
 	[MM_NODE_IDLE]         = { ANIMATION_NODE_CLIP,     ANIMATION_CLIPS(MM_ANIM_IDLE_L),                   1, 1, 0,               0                          },
 	[MM_NODE_IDLE_R]       = { ANIMATION_NODE_BLEND,    ANIMATION_CLIPS(MM_ANIM_IDLE_R),                   1, 1, MM_SLOT_IDLE_R,  ANIMATION_PARAM_IDLE_RIGHT },
@@ -120,13 +118,13 @@ _Static_assert(MM_ANIM_JUMP_R      == MM_ANIM_JUMP_L      + 1, "jump L/R must be
 _Static_assert(MM_ANIM_FALL_R      == MM_ANIM_FALL_L      + 1, "fall L/R must be contiguous (character_animation reads L+1)");
 _Static_assert(MM_ANIM_LAND_R      == MM_ANIM_LAND_L      + 1, "land L/R must be contiguous (character_animation reads L+1)");
 
-const CharacterAnimationDef male_muscled_animation_def = {
+const CharacterAnimationDef mr_muscles_animation_def = {
 
-	.clip            = male_muscled_clips,
-	.node            = male_muscled_nodes,
-	.settings        = &male_muscled_animation_settings,
+	.clip            = mr_muscles_clips,
+	.node            = mr_muscles_nodes,
+	.settings        = &mr_muscles_animation_settings,
 	.clip_count      = MM_ANIM_COUNT,
-	.node_count      = sizeof(male_muscled_nodes) / sizeof(male_muscled_nodes[0]),
+	.node_count      = sizeof(mr_muscles_nodes) / sizeof(mr_muscles_nodes[0]),
 	.buffer_count    = MM_SLOT_COUNT,
 	.walk_animation       = MM_ANIM_WALK,
 	.run_animation        = MM_ANIM_RUN,
@@ -144,7 +142,7 @@ const CharacterAnimationDef male_muscled_animation_def = {
 
 };
 
-static const CharacterGaitSettings male_muscled_gaits[] = {
+static const CharacterGaitSettings mr_muscles_gaits[] = {
 
 	{ .target_speed = 1.55f, .response_rate =  8.0f, .rotation_response_rate = 14.0f },
 	{ .target_speed = 3.2f,  .response_rate =  9.0f, .rotation_response_rate = 15.0f },
@@ -152,14 +150,14 @@ static const CharacterGaitSettings male_muscled_gaits[] = {
 
 };
 
-const CharacterMovementSettings male_muscled_movement_settings = {
+const CharacterMovementSettings mr_muscles_movement_settings = {
 
 	.idle_target_speed            = 0,
 	.idle_response_rate           = 10.0f,
 	.idle_rotation_response_rate  = 8.0f,
 
-	.gait       = male_muscled_gaits,
-	.gait_count = sizeof(male_muscled_gaits) / sizeof(male_muscled_gaits[0]),
+	.gait       = mr_muscles_gaits,
+	.gait_count = sizeof(mr_muscles_gaits) / sizeof(mr_muscles_gaits[0]),
 
 	.stamina_drain_rate = 0.15f,
 	.stamina_regen_rate = 0.25f,
@@ -180,7 +178,7 @@ const CharacterMovementSettings male_muscled_movement_settings = {
 
 };
 
-const CharacterColliderSettings male_muscled_collider_settings = {
+const CharacterColliderSettings mr_muscles_collider_settings = {
 
 	.radius = 0.35f,
 	.height = 1.8f,
@@ -188,12 +186,10 @@ const CharacterColliderSettings male_muscled_collider_settings = {
 };
 
 
-// --- Weapons ---
+const char *const mr_muscles_weapon_meshes[] = { "ak47", "bow", "knife", "m1911" };
 
-const char *const male_muscled_weapon_meshes[] = { "ak47", "bow", "knife", "m1911" };
-
-const CharacterWeaponsDef male_muscled_weapons_def = {
-	.mesh       = male_muscled_weapon_meshes,
+const CharacterWeaponsDef mr_muscles_weapons_def = {
+	.mesh       = mr_muscles_weapon_meshes,
 	.mesh_count = 4,
 	.weapon = {
 		[WEAPON_SLOT_BACK]  = &weapon_bow,
@@ -253,7 +249,7 @@ const WeaponDef weapon_knife = {
 	.holding_rotation = {{ 0.0f, 0.0f, 0.0f, 1.0f }},
 };
 
-const CharacterAnimationSettings male_muscled_animation_settings = {
+const CharacterAnimationSettings mr_muscles_animation_settings = {
 
 		.action_idle_max_blending_ratio = 0.85f,
 
@@ -287,41 +283,39 @@ const CharacterAnimationSettings male_muscled_animation_settings = {
 
 
 
-static const SoundID male_muscled_footsteps[] = {
+static const SoundID mr_muscles_footsteps[] = {
 	SOUND_FOOTSTEP_WOOD_1, SOUND_FOOTSTEP_WOOD_2, SOUND_FOOTSTEP_WOOD_3,
 	SOUND_FOOTSTEP_WOOD_4, SOUND_FOOTSTEP_WOOD_5, SOUND_FOOTSTEP_WOOD_6,
 };
 
-static const SoundID male_muscled_rolls[] = {
-	SOUND_DODGE_ROLL_1, SOUND_DODGE_ROLL_2, SOUND_DODGE_ROLL_3, SOUND_DODGE_ROLL_4,
+static const SoundID mr_muscles_rolls[] = {
+	SOUND_DODGE_ROLL_1, SOUND_DODGE_ROLL_2,
 };
 
 /* Both feet land at a quarter and three quarters of the locomotion clip. */
-static const float male_muscled_footings[] = { 0.25f, 0.75f };
+static const float mr_muscles_footings[] = { 0.25f, 0.75f };
 
-static const CharacterSoundDef male_muscled_sound_def = {
+static const CharacterSoundDef mr_muscles_sound_def = {
 
-	.footstep       = male_muscled_footsteps,
+	.footstep       = mr_muscles_footsteps,
 	.footstep_count = 6,
-	.footing        = male_muscled_footings,
+	.footing        = mr_muscles_footings,
 	.footing_count  = 2,
 
 	.footstep_volume_min = 0.1f,
 	.footstep_volume_max = 0.45f,
 	.footstep_speed_max  = 4.4f,
 
-	.roll        = male_muscled_rolls,
-	.roll_count  = 4,
+	.roll        = mr_muscles_rolls,
+	.roll_count  = 2,
 	.roll_volume = 0.7f,
 	.roll_delay  = 0.07f,
 
-	/* No sample of its own yet: the step doubles as the push off the floor
-	   and as the touchdown. */
-	.jump        = male_muscled_footsteps,
+	.jump        = mr_muscles_footsteps,
 	.jump_count  = 6,
 	.jump_volume = 0.2f,
 
-	.land            = male_muscled_footsteps,
+	.land            = mr_muscles_footsteps,
 	.land_count      = 6,
 	.land_volume_min = 0.4f,
 	.land_volume_max = 0.85f,
@@ -330,12 +324,12 @@ static const CharacterSoundDef male_muscled_sound_def = {
 };
 
 
-const CharacterDef male_muscled_character_def = {
+const CharacterDef mr_muscles_character_def = {
 
-	.movement_settings  = &male_muscled_movement_settings,
-	.animation_def      = &male_muscled_animation_def,
-	.collider_settings  = &male_muscled_collider_settings,
-	.weapons_def        = &male_muscled_weapons_def,
-	.sound_def          = &male_muscled_sound_def,
+	.movement_settings  = &mr_muscles_movement_settings,
+	.animation_def      = &mr_muscles_animation_def,
+	.collider_settings  = &mr_muscles_collider_settings,
+	.weapons_def        = &mr_muscles_weapons_def,
+	.sound_def          = &mr_muscles_sound_def,
 
 };

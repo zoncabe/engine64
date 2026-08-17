@@ -1,6 +1,3 @@
-/*
-	capsule.c — capsule methods.
-*/
 #include <math.h>
 
 #include "physics/shapes/capsule.h"

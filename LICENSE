@@ -1,0 +1,79 @@
+MIT License
+
+Copyright (c) 2026 Mariano Alvarez
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+================================================================================
+THIRD PARTY
+================================================================================
+
+The components below belong to their respective authors and are used under
+their own licenses, which require these notices to be kept with any copy of
+the software.
+
+
+DEPENDENCIES
+
+Libdragon                        https://github.com/DragonMinded/libdragon
+Released into the public domain under the Unlicense.
+
+Tiny3D                           https://github.com/HailToDodongo/tiny3d
+Copyright (c) 2023 Max Bebök. MIT licensed.
+
+
+PORTED CODE
+
+Parts of the engine are ports of code by other authors, modified from their
+originals.
+
+qu3e, the physics engine        https://github.com/RandyGaul/qu3e
+Copyright (c) 2014 Randy Gaul. zlib licensed. The zlib license requires that
+altered versions are not misrepresented as the original software: the physics
+engine here is a modified port, not qu3e itself.
+
+Godot Engine, SpringBoneSimulator3D, the spring bone modifier
+                                 https://github.com/godotengine/godot
+Copyright (c) 2014-present Godot Engine contributors.
+Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur. MIT licensed.
+
+Kawaii Physics, AnimNode_KawaiiPhysicsSimulation, world motion damping
+                                 https://github.com/pafuhana1213/KawaiiPhysics
+Copyright (c) 2019-2026 pafuhana1213. MIT licensed.
+
+pyrite64, the collision importer and its mesh collider format
+                                 https://github.com/HailToDodongo/pyrite64
+Max Bebök, Kevin Reier. MIT licensed.
+
+
+ASSETS
+
+Models and textures are original work by Mariano Alvarez, released under the
+same terms as the engine.
+
+DroidSans.ttf
+Copyright (c) 2007 Ascender Corporation. Licensed under the Apache License,
+Version 2.0. https://www.apache.org/licenses/LICENSE-2.0
+
+Xolonium10.ttf, Xolonium14.ttf, Xolonium20.ttf, Xolonium40.ttf, Xolonium60.ttf
+Copyright 2011-2016 Severin Meyer. Licensed under the SIL Open Font License 1.1.
+https://openfontlicense.org
+The five files are the same typeface: mkfont takes the output name from the
+input file, so one copy is needed per size.

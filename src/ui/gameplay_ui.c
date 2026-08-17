@@ -43,9 +43,9 @@ static ScreenAnimationTrack gameplay_track[] = {
 	{ .target_u8 = &gameplay_screen.section[0].element[GAMEPLAY_FADE].rectangle.gradient[2].a, .from = 255.0f, .to = 0.0f, .delay = 0.0f, .duration = 0.35f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
 	{ .target_u8 = &gameplay_screen.section[0].element[GAMEPLAY_FADE].rectangle.gradient[3].a, .from = 255.0f, .to = 0.0f, .delay = 0.0f, .duration = 0.35f, .easing = SCREEN_ANIMATION_EASING_CUBIC_OUT },
 
-	/* Visible solo mientras dura la ventana: terminada, el rect no manda
-	   ningun comando al RDP y el player queda inactivo hasta que otro estado
-	   lo pida. */
+	/* Visible only while the window lasts: once it ends the rect sends no
+	   command to the RDP and the player stays idle until another state asks
+	   for it. */
 	{ .target_bool = &gameplay_screen.section[0].element[GAMEPLAY_FADE].is_hidden, .from_bool = true, .to_bool = false, .duration = 0.55f },
 };
 

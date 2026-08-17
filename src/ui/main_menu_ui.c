@@ -47,11 +47,11 @@ Screen main_menu_screen = {
 		[0] = {
 			.element = {
 				[MAIN_MENU_BG]          = { .type = DRAW_RECTANGLE, .position = {   0.0f,   0.0f }, .scale = { 320.0f, 240.0f }, .rectangle = { SHAPE_FILL_GRADIENT, .gradient = { RGBA32(201, 121, 25, 255), RGBA32(223, 175, 117, 255), RGBA32(223, 175, 117, 255), RGBA32(201, 121, 25, 255) } } },
-				[MAIN_MENU_TITLE]       = { .type = DRAW_TEXT,      .position = {  43.0f,  65.0f },                              .text      = { HEADLINER_40, MENU_STYLE_NORMAL, "Demo 64", &h40_parms } },
-				[MAIN_MENU_PLAY]        = { .type = DRAW_TEXT,      .position = {  45.0f, 137.0f },                              .text      = { HEADLINER_20, MENU_STYLE_NORMAL, "Play",    &h20_parms } },
-				[MAIN_MENU_CREDITS]     = { .type = DRAW_TEXT,      .position = {  45.0f, 162.0f },                              .text      = { HEADLINER_20, MENU_STYLE_NORMAL, "Credits", &h20_parms } },
-				[MAIN_MENU_HINT_MOVE]   = { .type = DRAW_TEXT,      .position = {  65.0f, 225.0f },                              .text      = { HEADLINER_14, 0,                 "Move",    &h14_parms } },
-				[MAIN_MENU_HINT_SELECT] = { .type = DRAW_TEXT,      .position = { 115.0f, 225.0f },                              .text      = { HEADLINER_14, 0,                 "Select",  &h14_parms } },
+				[MAIN_MENU_TITLE]       = { .type = DRAW_TEXT,      .position = {  43.0f,  65.0f },                              .text      = { XOLONIUM_40, MENU_STYLE_NORMAL, "Demo 64", &h40_parms } },
+				[MAIN_MENU_PLAY]        = { .type = DRAW_TEXT,      .position = {  45.0f, 137.0f },                              .text      = { XOLONIUM_20, MENU_STYLE_NORMAL, "Play",    &h20_parms } },
+				[MAIN_MENU_CREDITS]     = { .type = DRAW_TEXT,      .position = {  45.0f, 162.0f },                              .text      = { XOLONIUM_20, MENU_STYLE_NORMAL, "Credits", &h20_parms } },
+				[MAIN_MENU_HINT_MOVE]   = { .type = DRAW_TEXT,      .position = {  65.0f, 225.0f },                              .text      = { XOLONIUM_14, 0,                 "Move",    &h14_parms } },
+				[MAIN_MENU_HINT_SELECT] = { .type = DRAW_TEXT,      .position = { 115.0f, 225.0f },                              .text      = { XOLONIUM_14, 0,                 "Select",  &h14_parms } },
 				[MAIN_MENU_BTN_A]       = { .type = DRAW_SPRITE,    .position = { 102.0f, 216.0f }, .scale = { 0.60f, 0.60f },   .sprite    = { SPRITE_BTN_A   } },
 				[MAIN_MENU_D_UP]        = { .type = DRAW_SPRITE,    .position = {  43.0f, 217.0f }, .scale = { 0.48f, 0.48f },   .sprite    = { SPRITE_D_UP    } },
 				[MAIN_MENU_D_DOWN]      = { .type = DRAW_SPRITE,    .position = {  53.0f, 217.0f }, .scale = { 0.48f, 0.48f },   .sprite    = { SPRITE_D_DOWN  } },

@@ -5,11 +5,11 @@
 #include "physics/math/vector2.h"
 
 #define DROID_SANS    1
-#define HEADLINER_10  2
-#define HEADLINER_14  3
-#define HEADLINER_20  4
-#define HEADLINER_40  5
-#define HEADLINER_60  6
+#define XOLONIUM_10   2
+#define XOLONIUM_14   3
+#define XOLONIUM_20   4
+#define XOLONIUM_40   5
+#define XOLONIUM_60   6
 
 #define MENU_STYLE_NORMAL   1
 #define MENU_STYLE_SELECTED 2
