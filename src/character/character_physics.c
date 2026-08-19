@@ -1,7 +1,11 @@
 /*
-	Capsule collision response for the kinematic body. Collide and slide
-	against static geometry, ported from the original actor_collision_response
-	(libultra demo, commit aeb14e2).
+	Capsule collision response for the kinematic body, against static geometry.
+
+	Depenetration and floor detection ported from Godot: the recovery step of
+	GodotSpace3D::test_body_motion (modules/godot_physics_3d/godot_space_3d.cpp)
+	and the contact classification of CharacterBody3D::_set_collision_direction
+	(scene/3d/physics/character_body_3d.cpp). No swept motion: the body moves
+	the full step first and is recovered out of penetration here.
 */
 #include <math.h>
 #include <stdint.h>
@@ -13,10 +17,15 @@
 #include "physics/collision/collision_mesh.h"
 
 
-#define CHARACTER_MAX_SLIDES         4      /* resolution iterations per frame */
-#define CHARACTER_MAX_TRIANGLES      20     /* triangle candidates per query */
-#define CHARACTER_FLOOR_SNAP_LENGTH  0.1f   /* downward probe, metres */
-#define CHARACTER_FLOOR_MAX_SLOPE    50.0f
+#define CHARACTER_MAX_CONTACTS           16      /* contacts kept per recovery pass */
+#define CHARACTER_MAX_TRIANGLES          20      /* triangle candidates per query */
+#define CHARACTER_RECOVERY_ATTEMPTS      4       /* Godot: recover_attempts */
+#define CHARACTER_RECOVERY_MARGIN        0.001f  /* Godot: default safe margin */
+#define CHARACTER_MIN_CONTACT_DEPTH      (CHARACTER_RECOVERY_MARGIN * 0.05f)  /* Godot: TEST_MOTION_MIN_CONTACT_DEPTH_FACTOR */
+#define CHARACTER_RECOVERY_FACTOR        0.4f    /* Godot: fraction of the depth recovered per pass */
+#define CHARACTER_FLOOR_SNAP_LENGTH      0.1f    /* downward probe, metres */
+#define CHARACTER_FLOOR_MAX_SLOPE        50.0f   /* degrees */
+#define CHARACTER_FLOOR_ANGLE_THRESHOLD  0.01f   /* radians, Godot: FLOOR_ANGLE_THRESHOLD */
 
 
 void characterCollider_init(CharacterCollider *collider, float radius, float half_height)
@@ -75,7 +84,7 @@ void characterPhysics_syncBody(Character *character)
 {
 	RigidBody *rigid = character->body.rigid;
 	if (rigid == NULL) return;
-	
+
 	rigidBody_setTransformPositionAxisAngle(rigid, character->collider.world.position,
 	                                        (Vector3){ 0.0f, 0.0f, 1.0f },
 	                                        deg_to_rad(character->body.rotation.z));
@@ -84,112 +93,239 @@ void characterPhysics_syncBody(Character *character)
 }
 
 
-void characterContact_clear(CharacterContact *contact)
+/* Contact gathering: every touching manifold of the frame, not just one. */
+
+typedef struct CharacterContact {
+	Vector3 normal;   /* unit, from the surface toward the character */
+	float   depth;    /* positive penetration */
+} CharacterContact;
+
+typedef struct CharacterCollisionState {
+	bool    floor;
+	bool    wall;
+	bool    ceiling;
+	Vector3 wall_normal;   /* deepest wall contact, toward the character */
+	float   wall_depth;
+} CharacterCollisionState;
+
+typedef struct TriangleQuery {
+	const CollisionMesh *mesh;
+	int32_t triangle[CHARACTER_MAX_TRIANGLES];
+	int     count;
+} TriangleQuery;
+
+static int characterPhysics_collectTriangle(void *cb, int32_t id)
 {
-	contact->point                 = (Vector3){0.0f, 0.0f, 0.0f};
-	contact->normal                = (Vector3){0.0f, 0.0f, 0.0f};
-	contact->penetration           = 0.0f;
-	contact->axis_closest_to_point = (Vector3){0.0f, 0.0f, 0.0f};
-	contact->velocity_penetration  = (Vector3){0.0f, 0.0f, 0.0f};
-	contact->slope                 = 1000.0f;   /* out of range value to indicate no contact */
-	contact->angle_of_incidence    = 0.0f;
-	contact->displacement          = 0.0f;
+	TriangleQuery *query = cb;
+	if (query->count >= CHARACTER_MAX_TRIANGLES) return 0;
+	query->triangle[query->count++] = (int32_t)(intptr_t)dynamicAABBTree_getUserData(&query->mesh->tree, id);
+	return 1;
 }
 
-static void characterContact_setSlope(CharacterContact *contact)
+/* The manifold normal points from the capsule toward the surface and its
+   penetration is dist - radius, negative when touching. The contact keeps the
+   opposite convention: normal toward the character, positive depth. Degenerate
+   normals are dropped: they cannot recover anything. */
+static int characterPhysics_appendContact(CharacterContact *contacts, int count, const ContactManifold *m)
 {
-	float magnitude = vector3_magnitude(&contact->normal);
-	float cos_slope = clampf(contact->normal.z / magnitude, -1.0f, 1.0f);
-	contact->slope  = rad_to_deg(acosf(cos_slope));
+	if (count >= CHARACTER_MAX_CONTACTS) return count;
+
+	float depth = -m->contacts[0].penetration;
+	if (depth <= 0.0f) return count;
+
+	float magnitude = vector3_magnitude(&m->normal);
+	if (magnitude < 1.0e-6f) return count;
+
+	contacts[count].normal = vector3_scaled(&m->normal, -1.0f / magnitude);
+	contacts[count].depth  = depth;
+	return count + 1;
 }
 
-static void characterContact_setAngleOfIncidence(CharacterContact *contact, const Vector3 *velocity)
+/* All touching triangles of one mesh. The tree lives in mesh-local space:
+   the capsule shifts by -origin for the query. */
+static int characterPhysics_collectMeshContacts(const CharacterCollider *collider,
+                                                const CollisionMesh *mesh, const Vector3 *origin,
+                                                const Vector3 *velocity,
+                                                CharacterContact *contacts, int count)
 {
-	float magnitude = vector3_magnitude(velocity);
-	if (magnitude < 1.0e-6f) {
-		contact->angle_of_incidence = 0.0f;
-		return;
+	Transform local = collider->world;
+	vector3_sub(&local.position, origin);
+
+	AABB aabb;
+	capsule_computeAABB(&collider->shape, &local, &aabb);
+
+	TriangleQuery query = { .mesh = mesh };
+	collisionMesh_queryAABB(mesh, &query, characterPhysics_collectTriangle, aabb);
+
+	for (int i = 0; i < query.count; i++) {
+		Triangle triangle;
+		collisionMesh_getTriangle(mesh, query.triangle[i], &triangle);
+
+		ContactManifold m = {0};
+		capsuleToTriangle(&m, &collider->shape, &local, &triangle);
+		if (!m.contact_count) continue;
+
+		/* Contact point on the triangle: the manifold stores the point on the
+		   capsule surface, the triangle sits penetration further along the
+		   normal. Directions survive the mesh-local shift, so the velocity
+		   can be passed as is. */
+		Vector3 tri_point = m.contacts[0].position;
+		vector3_addScaledVector(&tri_point, &m.normal, m.contacts[0].penetration);
+
+		m.normal = collision_fixTriangleNormal(&triangle, &tri_point, &m.normal, velocity);
+
+		count = characterPhysics_appendContact(contacts, count, &m);
 	}
-	float cos_angle = clampf(vector3_dot(velocity, &contact->normal) / magnitude, -1.0f, 1.0f);
-	contact->angle_of_incidence = -rad_to_deg((PI * 0.5f) - acosf(cos_angle));
+
+	return count;
 }
 
-static void characterContact_setDisplacement(CharacterContact *contact)
+/* Walks the world's bodies instead of a copied list: their shapes are stored
+   relative to their body, so each one is composed into world space here
+   before it is tested. Obstacles are the static geometry plus every other
+   kinematic body — the capsule another character keeps in the world. The
+   solver cannot resolve two kinematic bodies against each other, so the
+   controllers do it: each one walks out of the other. Dynamic bodies stay
+   out, they are pushed by the solver instead. */
+static int characterPhysics_collectContacts(const CharacterCollider *collider,
+                                            const PhysicsWorld *world,
+                                            const RigidBody *self,
+                                            const Vector3 *velocity,
+                                            CharacterContact *contacts)
 {
-	contact->displacement = vector3_dot(&contact->point, &contact->normal);
-}
+	int count = 0;
 
-static void characterContact_setAxisClosestToPoint(CharacterContact *contact, const CharacterCollider *collider)
-{
-	Vector3 a, b;
-	capsule_getSegment(&collider->shape, &collider->world, &a, &b);
-	contact->axis_closest_to_point = segment_closestToPoint(&a, &b, &contact->point);
-}
+	for (const RigidBody *body = world->body_list; body; body = body->next) {
+		if (body == self) continue;
+		if (!(body->flags & (BODY_FLAG_STATIC | BODY_FLAG_KINEMATIC))) continue;
 
-/* The manifold normal points from the capsule (A) toward the surface (B) and
-   its penetration is dist - radius, negative when touching. This side uses
-   the opposite convention: normal toward the character, positive depth. */
-void characterContact_set(CharacterContact *contact, const ContactManifold *m, const CharacterCollider *collider)
-{
-	const ContactPoint *c = &m->contacts[0];
+		for (const PhysicsShape *shape = body->shapes; shape; shape = shape->next) {
+			if (shape->sensor) continue;   /* volumes (water), not obstacles */
 
-	contact->point = c->position;
-	vector3_addScaledVector(&contact->point, &m->normal, c->penetration);
-	contact->normal      = vector3_inverted(&m->normal);
-	contact->penetration = -c->penetration;
+			Transform tx = transform_product(&body->tx, &shape->local);
+			ContactManifold m = {0};
 
-	characterContact_setSlope(contact);
-	characterContact_setDisplacement(contact);
-	characterContact_setAxisClosestToPoint(contact, collider);
-}
+			switch (shape->type) {
+				case SHAPE_MESH:
+					count = characterPhysics_collectMeshContacts(collider, shape->mesh, &tx.position, velocity, contacts, count);
+					continue;
+				case SHAPE_BOX:
+					capsuleToStaticBox(&m, &collider->shape, &collider->world, &shape->box, &tx);
+					break;
+				case SHAPE_SPHERE:
+					capsuleToStaticSphere(&m, &collider->shape, &collider->world, &shape->sphere, &tx);
+					break;
+				case SHAPE_CAPSULE:
+					capsuleToStaticCapsule(&m, &collider->shape, &collider->world, &shape->capsule, &tx);
+					break;
+			}
+			if (!m.contact_count) continue;
 
-
-static void characterCollision_pushTowardsNormal(Character *character, CharacterContact *contact)
-{
-	vector3_addScaledVector(&character->body.position, &contact->normal, contact->penetration);
-}
-
-static void characterCollision_projectVelocity(Character *character, CharacterContact *contact)
-{
-	float t = vector3_dot(&character->body.velocity, &contact->normal);
-	vector3_addScaledVector(&character->body.velocity, &contact->normal, -t);
-}
-
-static void characterCollision_solvePenetration(Character *character, CharacterContact *contact, CharacterCollider *collider)
-{
-	Vector3 velocity_normal = vector3_normalized(&character->body.velocity);
-
-	/* Intersection of the ray (contact point + velocity normal) with the plane.
-	   Standing still or moving parallel to the plane the ray never reaches it:
-	   fall back to the plain push along the normal. */
-	float denominator = vector3_dot(&velocity_normal, &contact->normal);
-	if (fabsf(denominator) < 0.01f) {
-		characterCollision_pushTowardsNormal(character, contact);
-		return;
+			count = characterPhysics_appendContact(contacts, count, &m);
+		}
 	}
 
-	float numerator = contact->displacement + collider->shape.radius - vector3_dot(&contact->point, &contact->normal);
-	float t = numerator / denominator;
-
-	Vector3 axis_closest_at_contact = contact->point;
-	vector3_addScaledVector(&axis_closest_at_contact, &velocity_normal, t);
-
-	Vector3 displacement_vector = axis_closest_at_contact;
-	vector3_sub(&displacement_vector, &contact->axis_closest_to_point);
-
-	contact->velocity_penetration = vector3_inverted(&displacement_vector);
-
-	vector3_add(&character->body.position, &displacement_vector);
+	return count;
 }
 
-static void characterCollision_collideAndSlide(Character *character, CharacterContact *contact)
+
+/* Port of CharacterBody3D::_set_collision_direction: every contact of the
+   pass is classified by its angle against the up axis — floor, ceiling or
+   wall — and the frame state accumulates them. Floor detection can never be
+   masked by a wall contact. */
+static void characterPhysics_classifyContacts(const CharacterContact *contacts, int count, CharacterCollisionState *state)
 {
-	float t = vector3_dot(&contact->velocity_penetration, &contact->normal);
-	Vector3 projection = contact->velocity_penetration;
-	vector3_addScaledVector(&projection, &contact->normal, -t);
+	const float floor_max_angle = deg_to_rad(CHARACTER_FLOOR_MAX_SLOPE);
 
-	vector3_add(&character->body.position, &projection);
+	bool was_wall   = state->wall;
+	bool pass_floor = false;
+	bool pass_wall  = false;
+
+	int     wall_collision_count = 0;
+	Vector3 combined_wall_normal = { 0.0f, 0.0f, 0.0f };
+	Vector3 tmp_wall_col         = { 0.0f, 0.0f, 0.0f };
+
+	for (int i = count - 1; i >= 0; i--) {
+		const CharacterContact *c = &contacts[i];
+
+		/* dot(normal, up) == normal.z */
+		float floor_angle = acosf(clampf(c->normal.z, -1.0f, 1.0f));
+		if (floor_angle <= floor_max_angle + CHARACTER_FLOOR_ANGLE_THRESHOLD) {
+			pass_floor   = true;
+			state->floor = true;
+			continue;
+		}
+
+		float ceiling_angle = acosf(clampf(-c->normal.z, -1.0f, 1.0f));
+		if (ceiling_angle <= floor_max_angle + CHARACTER_FLOOR_ANGLE_THRESHOLD) {
+			state->ceiling = true;
+			continue;
+		}
+
+		/* Collision is wall by default. */
+		pass_wall   = true;
+		state->wall = true;
+
+		if (c->depth > state->wall_depth) {
+			state->wall_depth  = c->depth;
+			state->wall_normal = c->normal;
+		}
+
+		/* Collect normal for calculating average. */
+		Vector3 d = vector3_difference(&c->normal, &tmp_wall_col);
+		if (vector3_dot(&d, &d) > 1.0e-6f) {
+			tmp_wall_col = c->normal;
+			vector3_add(&combined_wall_normal, &c->normal);
+			wall_collision_count++;
+		}
+	}
+
+	/* Two steep walls can add up to walkable support (a wedge): their combined
+	   normal points up within the floor limit even though neither does. */
+	if (pass_wall && wall_collision_count > 1 && !pass_floor) {
+		float magnitude = vector3_magnitude(&combined_wall_normal);
+		if (magnitude > 1.0e-6f) {
+			float floor_angle = acosf(clampf(combined_wall_normal.z / magnitude, -1.0f, 1.0f));
+			if (floor_angle <= floor_max_angle + CHARACTER_FLOOR_ANGLE_THRESHOLD) {
+				state->floor = true;
+				state->wall  = was_wall;
+			}
+		}
+	}
 }
+
+/* Port of test_body_motion STEP 1 (free body if stuck): one recovery vector
+   accumulated over every contact and applied whole, up to four attempts. Each
+   contact's depth is re-measured against the motion accumulated so far in the
+   pass, so stacked contacts on the same plane do not over-correct. */
+static void characterPhysics_recover(Character *character, const PhysicsWorld *world, CharacterCollisionState *state)
+{
+	int recover_attempts = CHARACTER_RECOVERY_ATTEMPTS;
+
+	do {
+		CharacterContact contacts[CHARACTER_MAX_CONTACTS];
+		int count = characterPhysics_collectContacts(&character->collider, world, character->body.rigid,
+		                                             &character->body.velocity, contacts);
+		if (!count) break;
+
+		characterPhysics_classifyContacts(contacts, count, state);
+
+		Vector3 recover_motion = { 0.0f, 0.0f, 0.0f };
+		for (int i = 0; i < count; i++) {
+			float depth = contacts[i].depth - vector3_dot(&contacts[i].normal, &recover_motion);
+			if (depth > CHARACTER_MIN_CONTACT_DEPTH + 1.0e-5f)
+				vector3_addScaledVector(&recover_motion, &contacts[i].normal, (depth - CHARACTER_MIN_CONTACT_DEPTH) * CHARACTER_RECOVERY_FACTOR);
+		}
+
+		if (vector3_dot(&recover_motion, &recover_motion) == 0.0f) break;
+
+		vector3_add(&character->body.position, &recover_motion);
+		characterCollider_setVertical(&character->collider, &character->body.position);
+	} while (--recover_attempts);
+}
+
+
+/* Velocity responses, once per frame from the classified state. */
 
 static void characterCollision_setGroundResponse(Character *character)
 {
@@ -209,131 +345,44 @@ static void characterCollision_setGroundResponse(Character *character)
 static void characterCollision_setCeilingResponse(Character *character)
 {
 	KinematicBody *body = &character->body;
-
 	if (body->velocity.z > 0.0f) body->velocity.z = 0.0f;
-	characterMovement_setMode(&character->movement, MOVEMENT_STATE_FALLING);
 }
 
-void characterCollision_setResponse(Character *character, CharacterContact *contact, CharacterCollider *collider)
+/* Slide: remove the velocity component pushing into the wall, keep the rest.
+   On the floor only the horizontal part of the wall normal is used — edge
+   normals of the mesh carry a vertical component, and letting it through
+   injects upward velocity that kills the floor detection. */
+static void characterCollision_setWallResponse(Character *character, const CharacterCollisionState *state, bool was_on_floor)
 {
-	characterContact_setAngleOfIncidence(contact, &character->body.velocity);
-	characterCollision_solvePenetration(character, contact, collider);
+	KinematicBody *body = &character->body;
 
-	if (contact->slope < CHARACTER_FLOOR_MAX_SLOPE) {
-		characterCollision_setGroundResponse(character);
-		characterCollision_collideAndSlide(character, contact);
-	}
-	else if (contact->slope > 95.0f && !character->movement.data.is_grounded) {
-		characterCollision_collideAndSlide(character, contact);
-		characterCollision_setCeilingResponse(character);
+	if (was_on_floor || character->movement.data.is_grounded) {
+		Vector3 n = state->wall_normal;
+		n.z = 0.0f;
+
+		float magnitude = vector3_magnitude(&n);
+		if (magnitude < 1.0e-6f) return;
+		vector3_scale(&n, 1.0f / magnitude);
+
+		float t = body->velocity.x * n.x + body->velocity.y * n.y;
+		if (t < 0.0f) {
+			body->velocity.x -= t * n.x;
+			body->velocity.y -= t * n.y;
+		}
 	}
 	else {
-		characterCollision_collideAndSlide(character, contact);
-		characterCollision_projectVelocity(character, contact);
+		float t = vector3_dot(&body->velocity, &state->wall_normal);
+		if (t < 0.0f) vector3_addScaledVector(&body->velocity, &state->wall_normal, -t);
 	}
-
-	characterCollider_setVertical(collider, &character->body.position);
 }
 
-
-/* Frame driver: collide and slide, then snap to the floor. */
-
-typedef struct TriangleQuery {
-	const CollisionMesh *mesh;
-	int32_t triangle[CHARACTER_MAX_TRIANGLES];
-	int     count;
-} TriangleQuery;
-
-static int characterPhysics_collectTriangle(void *cb, int32_t id)
+static void characterCollision_respond(Character *character, const CharacterCollisionState *state, bool was_on_floor)
 {
-	TriangleQuery *query = cb;
-	if (query->count >= CHARACTER_MAX_TRIANGLES) return 0;
-	query->triangle[query->count++] = (int32_t)(intptr_t)dynamicAABBTree_getUserData(&query->mesh->tree, id);
-	return 1;
+	if (state->floor)   characterCollision_setGroundResponse(character);
+	if (state->ceiling) characterCollision_setCeilingResponse(character);
+	if (state->wall)    characterCollision_setWallResponse(character, state, was_on_floor);
 }
 
-/* Deepest contact between the capsule and one mesh. The tree lives in
-   mesh-local space: the capsule shifts by -origin for the query and the
-   contact point shifts back afterwards. */
-static int characterPhysics_deepestContact(const CharacterCollider *collider,
-                                           const CollisionMesh *mesh, const Vector3 *origin,
-                                           ContactManifold *out)
-{
-	Transform local = collider->world;
-	vector3_sub(&local.position, origin);
-
-	AABB aabb;
-	capsule_computeAABB(&collider->shape, &local, &aabb);
-
-	TriangleQuery query = { .mesh = mesh };
-	collisionMesh_queryAABB(mesh, &query, characterPhysics_collectTriangle, aabb);
-
-	int found = 0;
-	for (int i = 0; i < query.count; i++) {
-		Triangle triangle;
-		collisionMesh_getTriangle(mesh, query.triangle[i], &triangle);
-
-		ContactManifold m = {0};
-		capsuleToTriangle(&m, &collider->shape, &local, &triangle);
-		if (!m.contact_count) continue;
-
-		if (!found || m.contacts[0].penetration < out->contacts[0].penetration) {
-			*out  = m;
-			found = 1;
-		}
-	}
-
-	if (found) vector3_add(&out->contacts[0].position, origin);
-	return found;
-}
-
-/* Walks the world's bodies instead of a copied list: their shapes are stored
-   relative to their body, so each one is composed into world space here
-   before it is tested. Obstacles are the static geometry plus every other
-   kinematic body — the capsule another character keeps in the world. The
-   solver cannot resolve two kinematic bodies against each other, so the
-   controllers do it: each one walks out of the other. Dynamic bodies stay
-   out, they are pushed by the solver instead. */
-static int characterPhysics_deepestContactAll(const CharacterCollider *collider,
-                                              const PhysicsWorld *world,
-                                              const RigidBody *self,
-                                              ContactManifold *out)
-{
-	int found = 0;
-
-	for (const RigidBody *body = world->body_list; body; body = body->next) {
-		if (body == self) continue;
-		if (!(body->flags & (BODY_FLAG_STATIC | BODY_FLAG_KINEMATIC))) continue;
-
-		for (const PhysicsShape *shape = body->shapes; shape; shape = shape->next) {
-			Transform tx = transform_product(&body->tx, &shape->local);
-			ContactManifold m = {0};
-
-			switch (shape->type) {
-				case SHAPE_MESH:
-					if (!characterPhysics_deepestContact(collider, shape->mesh, &tx.position, &m)) continue;
-					break;
-				case SHAPE_BOX:
-					capsuleToStaticBox(&m, &collider->shape, &collider->world, &shape->box, &tx);
-					break;
-				case SHAPE_SPHERE:
-					capsuleToStaticSphere(&m, &collider->shape, &collider->world, &shape->sphere, &tx);
-					break;
-				case SHAPE_CAPSULE:
-					capsuleToStaticCapsule(&m, &collider->shape, &collider->world, &shape->capsule, &tx);
-					break;
-			}
-			if (!m.contact_count) continue;
-
-			if (!found || m.contacts[0].penetration < out->contacts[0].penetration) {
-				*out  = m;
-				found = 1;
-			}
-		}
-	}
-
-	return found;
-}
 
 /* Floor query: the capsule's bottom sphere swept down by the snap
    length. Answers whether there is walkable floor under the character,
@@ -377,6 +426,8 @@ static void characterPhysics_probeFloor(const PhysicsWorld *world, const Vector3
 	if (!(body->flags & BODY_FLAG_STATIC)) continue;
 
 	for (const PhysicsShape *shape = body->shapes; shape; shape = shape->next) {
+		if (shape->sensor) continue;   /* volumes (water), not floor */
+
 		Transform tx = transform_product(&body->tx, &shape->local);
 
 		switch (shape->type) {
@@ -461,6 +512,39 @@ static void characterPhysics_snapToFloor(Character *character, const FloorProbe 
 	characterCollision_setGroundResponse(character);
 }
 
+/* Water probe: fraction of the capsule under the surface, from the world's
+   buoyancy volumes. The character is kinematic, so it never shows up in a
+   sensor's contact list — it asks the volumes directly. Read by the movement
+   code on the next frame, which is where the fake buoyancy lives. */
+static void characterPhysics_probeWater(Character *character, const PhysicsWorld *world)
+{
+	CharacterMovementData *data = &character->movement.data;
+
+	data->in_water = false;
+	data->submerged_fraction = 0.0f;
+
+	Vector3 feet = character->body.position;
+
+	for (int32_t i = 0; i < world->buoyancy_count; i++) {
+		const BuoyancyVolume *volume = world->buoyancy[i];
+
+		for (const PhysicsShape *shape = volume->body->shapes; shape; shape = shape->next) {
+			if (!shape->sensor) continue;
+			if (!physicsShape_testPoint(shape, &volume->body->tx, &feet)) continue;
+
+			float surface = volume->surface_height(volume->surface, feet.x, feet.y);
+			float height  = 2.0f * (character->collider.shape.half_height + character->collider.shape.radius);
+
+			float fraction = (surface - feet.z) / height;
+			if (fraction <= 0.0f) continue;
+
+			data->in_water = true;
+			data->submerged_fraction = (fraction > 1.0f) ? 1.0f : fraction;
+			return;
+		}
+	}
+}
+
 void characterPhysics_collide(Character *character, const PhysicsWorld *world)
 {
 	CharacterMovementData *data = &character->movement.data;
@@ -471,22 +555,22 @@ void characterPhysics_collide(Character *character, const PhysicsWorld *world)
 
 	characterCollider_setVertical(&character->collider, &character->body.position);
 
-	for (int slide = 0; slide < CHARACTER_MAX_SLIDES; slide++) {
-		ContactManifold m;
-		if (!characterPhysics_deepestContactAll(&character->collider, world, character->body.rigid, &m)) break;
+	characterPhysics_probeWater(character, world);
 
-		CharacterContact contact;
-		characterContact_clear(&contact);
-		characterContact_set(&contact, &m, &character->collider);
-		characterCollision_setResponse(character, &contact, &character->collider);
-	}
+	CharacterCollisionState state = { .wall_depth = -1.0f };
+	characterPhysics_recover(character, world, &state);
+	characterCollision_respond(character, &state, was_on_floor);
 
 	FloorProbe floor;
 	characterPhysics_findFloor(character, world, &floor);
 
 	characterPhysics_snapToFloor(character, &floor, was_on_floor, velocity_facing_up);
 
-	/* Nothing walkable under the probe and no state owns the vertical motion. */
-	if (!floor.found && characterMovement_isLocomotion(character->movement.current))
+	/* Nothing walkable under the probe and no contact resolved as floor.
+	   A contact already classified as floor outranks the probe: pressed against
+	   a wall the probe can miss the floor it is standing on, and falling on that
+	   alone puts the character back on the ground the next frame, one frame at a
+	   time, forever. */
+	if (!floor.found && !data->is_grounded && characterMovement_isLocomotion(character->movement.current))
 		characterMovement_setMode(&character->movement, MOVEMENT_STATE_FALLING);
 }

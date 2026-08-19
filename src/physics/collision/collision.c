@@ -948,6 +948,105 @@ void capsuleToTriangle(ContactManifold *m, const Capsule *capsule, const Transfo
 }
 
 
+/*
+	Contact normal correction on inactive triangle edges, ported from Jolt's
+	ActiveEdges::FixNormal and ClosestPoint::GetBaryCentricCoordinates
+	(JoltPhysics, MIT licensed). A contact landing on an internal seam of the
+	mesh carries a normal pointing from the edge to the capsule axis instead
+	of the surface normal; here it is replaced by the face normal, so sliding
+	over a triangulated floor or ramp does not read as hitting a wall.
+*/
+
+/* Barycentric coordinates of the origin inside triangle (a, b, c), built on
+   the two shortest edges for accuracy. False on a degenerate triangle — the
+   importer drops those, so it cannot trigger on baked meshes. */
+static bool collision_baryCentric(const Vector3 *a, const Vector3 *b, const Vector3 *c,
+                                  float *u, float *v, float *w)
+{
+	Vector3 v0 = vector3_difference(b, a);
+	Vector3 v1 = vector3_difference(c, a);
+	Vector3 v2 = vector3_difference(c, b);
+
+	float d00 = vector3_dot(&v0, &v0);
+	float d11 = vector3_dot(&v1, &v1);
+	float d22 = vector3_dot(&v2, &v2);
+
+	if (d00 <= d22) {
+		float d01 = vector3_dot(&v0, &v1);
+		float denominator = d00 * d11 - d01 * d01;
+		if (denominator < 1.0e-12f) return false;
+
+		float a0 = vector3_dot(a, &v0);
+		float a1 = vector3_dot(a, &v1);
+		*v = (d01 * a1 - d11 * a0) / denominator;
+		*w = (d01 * a0 - d00 * a1) / denominator;
+		*u = 1.0f - *v - *w;
+	}
+	else {
+		float d12 = vector3_dot(&v1, &v2);
+		float denominator = d11 * d22 - d12 * d12;
+		if (denominator < 1.0e-12f) return false;
+
+		float c1 = vector3_dot(c, &v1);
+		float c2 = vector3_dot(c, &v2);
+		*u = (d22 * c1 - d12 * c2) / denominator;
+		*v = (d11 * c2 - d12 * c1) / denominator;
+		*w = 1.0f - *u - *v;
+	}
+	return true;
+}
+
+/* normal and the returned normal follow the manifold convention: unit, from
+   the capsule toward the surface. point is the contact point on the triangle,
+   in the same space as the triangle. movement_direction is the capsule's
+   motion and may be zero; it separates sliding over a seam (use the face
+   normal) from grazing a real wall through an inactive edge (keep the
+   contact normal, the face normal would bounce the capsule back). */
+Vector3 collision_fixTriangleNormal(const Triangle *triangle, const Vector3 *point,
+                                    const Vector3 *normal, const Vector3 *movement_direction)
+{
+	/* All edges active: the normal is already correct. */
+	if ((triangle->active_edges & 0x7) == 0x7) return *normal;
+
+	/* Face normal in the manifold's convention: toward the surface. */
+	Vector3 face_normal = vector3_inverted(&triangle->normal);
+
+	/* If normal would affect movement less than the face normal, keep it. */
+	if (vector3_dot(movement_direction, normal) < vector3_dot(movement_direction, &face_normal))
+		return *normal;
+
+	/* None of the edges are active: the face normal is the only real one. */
+	if (triangle->active_edges == 0) return face_normal;
+
+	/* Some edges are active. Parallel to the face: no need to check them. */
+	if (vector3_dot(&face_normal, normal) > 0.999848f)   /* cos(1 degree) */
+		return *normal;
+
+	const float epsilon = 1.0e-4f;
+	const float one_minus_epsilon = 1.0f - epsilon;
+
+	/* Where the contact point sits in the triangle: vertex, edge or interior.
+	   The coordinates are of the origin relative to the shifted vertices. */
+	Vector3 a = vector3_difference(&triangle->vertices[0], point);
+	Vector3 b = vector3_difference(&triangle->vertices[1], point);
+	Vector3 c = vector3_difference(&triangle->vertices[2], point);
+
+	float u, v, w;
+	if (!collision_baryCentric(&a, &b, &c, &u, &v, &w)) return face_normal;
+
+	uint8_t colliding_edge;
+	if      (u > one_minus_epsilon) colliding_edge = 0x5;   /* vertex v0: edge 0 or 2 */
+	else if (v > one_minus_epsilon) colliding_edge = 0x3;   /* vertex v1: edge 0 or 1 */
+	else if (w > one_minus_epsilon) colliding_edge = 0x6;   /* vertex v2: edge 1 or 2 */
+	else if (u < epsilon)           colliding_edge = 0x2;   /* edge v1v2 */
+	else if (v < epsilon)           colliding_edge = 0x4;   /* edge v2v0 */
+	else if (w < epsilon)           colliding_edge = 0x1;   /* edge v0v1 */
+	else return face_normal;                                /* interior hit */
+
+	return (triangle->active_edges & colliding_edge) ? *normal : face_normal;
+}
+
+
 /* Convex shape against a static triangle mesh.
 
    A mesh is not a convex piece, so it cannot be fed to the SAT routines above.

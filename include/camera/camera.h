@@ -18,6 +18,16 @@ typedef enum {
 #define CAMERA_VIEW_TARGET_BLEND_TIME 0.4f
 
 
+typedef struct {
+
+	CameraType type;
+	union {
+		CameraSpringArmData spring_arm;
+	};
+
+} CameraDef;
+
+
 typedef struct Camera {
 
 	Vector3 position;

@@ -53,6 +53,10 @@ typedef struct MeshDeform {
 	   binding measures the two at rest and keeps the sign that agrees. */
 	const Vector3 *source_normal;
 	float          normal_sign;
+
+	/* Optional: one RGBA per source point, written into the vertex colors.
+	   NULL leaves the model's own colors alone. */
+	const uint8_t *source_rgba;
 } MeshDeform;
 
 

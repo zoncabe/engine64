@@ -7,11 +7,12 @@
 
 
 static const bool movement_updates_locomotion[MOVEMENT_STATE_COUNT] = {
-	[MOVEMENT_STATE_IDLE]    = true,
-	[MOVEMENT_STATE_WALKING] = true,
-	[MOVEMENT_STATE_ROLLING] = false,
-	[MOVEMENT_STATE_JUMPING] = false,
-	[MOVEMENT_STATE_FALLING] = false,
+	[MOVEMENT_STATE_IDLE]     = true,
+	[MOVEMENT_STATE_WALKING]  = true,
+	[MOVEMENT_STATE_ROLLING]  = false,
+	[MOVEMENT_STATE_JUMPING]  = false,
+	[MOVEMENT_STATE_FALLING]  = false,
+	[MOVEMENT_STATE_SWIMMING] = false,
 };
 
 void characterMovement_setMode(CharacterMovement *movement, uint8_t new_mode)
@@ -138,7 +139,34 @@ static void characterMovement_updateBody(Character *character, float dt)
 
 	data->previous_yaw = body->rotation.z;
 
-	if (body->acceleration.z)
+	if (data->in_water) {
+		const CharacterMovementSettings *settings = character->movement.settings;
+
+		/* Stroking raises the equilibrium so the swim pose meets the surface. */
+		float stroke = (settings->swim_slow_speed > 0.0f)
+			? data->horizontal_speed / settings->swim_slow_speed : 0.0f;
+		if (stroke > 1.0f) stroke = 1.0f;
+
+		float equilibrium = CHARACTER_WATER_EQUILIBRIUM_IDLE
+			+ (CHARACTER_WATER_EQUILIBRIUM_SWIM - CHARACTER_WATER_EQUILIBRIUM_IDLE) * stroke;
+
+		/* Gravity scaled by how far the capsule sits from the equilibrium
+		   depth: deeper than it, the push turns upward. The drag grows with
+		   the submerged body, so a dive keeps its momentum through the
+		   surface and brakes progressively on the way down. */
+		float buoyant = CHARACTER_GRAVITY * (1.0f - data->submerged_fraction / equilibrium);
+		body->velocity.z += buoyant * dt;
+		body->velocity.z /= (1.0f + CHARACTER_WATER_DRAG * data->submerged_fraction * dt);
+
+		/* Progressive sink limit: none at the splash so a dive keeps its
+		   momentum, full past the saturation fraction — the pool is barely
+		   deeper than the capsule, so the brake cannot wait for the drag. */
+		float t = data->submerged_fraction / CHARACTER_WATER_SINK_LIMIT_FULL;
+		if (t > 1.0f) t = 1.0f;
+		float limit = CHARACTER_FALL_MAX_SPEED + (CHARACTER_WATER_SINK_MAX_SPEED - CHARACTER_FALL_MAX_SPEED) * t;
+		if (body->velocity.z < limit) body->velocity.z = limit;
+	}
+	else if (body->acceleration.z)
 		body->velocity.z += body->acceleration.z * dt;
 
 	if (fabsf(body->velocity.x) < LOCOMOTION_MIN_SPEED && fabsf(body->velocity.y) < LOCOMOTION_MIN_SPEED && body->velocity.z == 0) {
@@ -299,12 +327,53 @@ static void characterMovement_setFalling(Character *character, MovementCommand *
 		body->velocity.z = CHARACTER_FALL_MAX_SPEED;
 }
 
+/* The vertical is not touched here: the fake buoyancy in updateBody floats,
+   bobs and damps the capsule on its own. The stick only swims horizontally. */
+static void characterMovement_setSwimming(Character *character, MovementCommand *cmd, float dt)
+{
+	const CharacterMovementSettings *settings = character->movement.settings;
+	KinematicBody *body = &character->body;
+
+	float target = 0.0f;
+	if (cmd->swim_gait == CHARACTER_SWIM_GAIT_SLOW) target = settings->swim_slow_speed;
+	if (cmd->swim_gait == CHARACTER_SWIM_GAIT_FAST) target = settings->swim_fast_speed;
+
+	characterMovement_setHorizontalVelocity(character, cmd->target_yaw, target, settings->swim_response_rate, dt);
+	body->acceleration.z = 0.0f;
+}
+
+/* Swim entry and exit, from the water probe of the physics pass. Entering
+   needs the chest under the surface; leaving needs footing and shallower
+   water than that, so the waves cannot flicker the state at the border. */
+static void characterMovement_evaluateWater(Character *character)
+{
+	CharacterMovement *movement = &character->movement;
+	const CharacterMovementData *data = &movement->data;
+	uint8_t current = movement->current;
+
+	if (current != MOVEMENT_STATE_SWIMMING) {
+		bool can_enter = characterMovement_isLocomotion(current)
+		              || current == MOVEMENT_STATE_FALLING
+		              || current == MOVEMENT_STATE_JUMPING;
+
+		if (can_enter && data->in_water && data->submerged_fraction >= CHARACTER_WATER_SWIM_ENTER)
+			movement->next = MOVEMENT_STATE_SWIMMING;
+		return;
+	}
+
+	/* Out of the water entirely, locomotion; airborne, the floor probe of the
+	   physics pass turns it into falling on its own. */
+	if (!data->in_water || (data->is_grounded && data->submerged_fraction < CHARACTER_WATER_SWIM_EXIT))
+		movement->next = movement->locomotion;
+}
+
 static void (*characterMovement_handler[MOVEMENT_STATE_COUNT])(Character *, MovementCommand *, float) = {
-	[MOVEMENT_STATE_IDLE]    = characterMovement_setLocomotion,
-	[MOVEMENT_STATE_WALKING] = characterMovement_setLocomotion,
-	[MOVEMENT_STATE_ROLLING] = characterMovement_setRolling,
-	[MOVEMENT_STATE_JUMPING] = characterMovement_setJump,
-	[MOVEMENT_STATE_FALLING] = characterMovement_setFalling,
+	[MOVEMENT_STATE_IDLE]     = characterMovement_setLocomotion,
+	[MOVEMENT_STATE_WALKING]  = characterMovement_setLocomotion,
+	[MOVEMENT_STATE_ROLLING]  = characterMovement_setRolling,
+	[MOVEMENT_STATE_JUMPING]  = characterMovement_setJump,
+	[MOVEMENT_STATE_FALLING]  = characterMovement_setFalling,
+	[MOVEMENT_STATE_SWIMMING] = characterMovement_setSwimming,
 };
 
 _Static_assert(sizeof(characterMovement_handler) / sizeof(characterMovement_handler[0]) == MOVEMENT_STATE_COUNT, "characterMovement_handler must have one entry per character state");
@@ -334,5 +403,6 @@ void character_updateMovement(Character *character, MovementCommand *cmd, float 
 
 	characterMovement_handler[character->movement.current](character, cmd, dt);
 	characterMovement_updateBody(character, dt);
+	characterMovement_evaluateWater(character);
 	characterMovement_evaluateTransitions(character);
 }

@@ -223,6 +223,7 @@ void meshDeform_apply(const MeshDeform *deform, uint8_t fb_index)
 	if (verts == NULL) return;
 
 	const Vector3 *source_normal = deform->source_normal;
+	const uint8_t *source_rgba   = deform->source_rgba;
 
 	for (uint16_t slot = 0; slot < deform->slot_count; slot++) {
 		uint16_t index = deform->slot_source[slot];
@@ -234,6 +235,9 @@ void meshDeform_apply(const MeshDeform *deform, uint8_t fb_index)
 			*t3d_vertbuffer_get_norm(verts, slot) =
 				meshDeform_packNormal(source_normal[index], deform->normal_sign);
 		}
+
+		if (source_rgba)
+			memcpy(t3d_vertbuffer_get_rgba(verts, slot), &source_rgba[index * 4], 4);
 	}
 
 	/* The buffer is 16-byte aligned and its length is a multiple of 32, so the

@@ -33,6 +33,28 @@ typedef struct Character Character;
 #define CHARACTER_GRAVITY -18.0f
 #define CHARACTER_FALL_MAX_SPEED -15.0f
 
+/* Fake buoyancy: the capsule seeks the depth where the scaled gravity flips
+   sign. The equilibrium follows the pose the clips are authored at: treading
+   water holds the head at the capsule top, stroking holds the body at its
+   middle, so speed slides the target between the two and the swim rides up
+   to the surface on the same spring. */
+#define CHARACTER_WATER_EQUILIBRIUM_IDLE 0.85f
+#define CHARACTER_WATER_EQUILIBRIUM_SWIM 0.55f
+#define CHARACTER_WATER_DRAG             4.0f    /* vertical, per second, at full submersion */
+#define CHARACTER_WATER_SINK_MAX_SPEED  -2.0f    /* fully reached at the fraction below */
+#define CHARACTER_WATER_SINK_LIMIT_FULL  0.8f    /* submersion where the sink limit saturates */
+
+/* Swim state thresholds on the submerged fraction, with hysteresis so the
+   waves cannot flicker the state at the boundary. Exit also needs footing. */
+#define CHARACTER_WATER_SWIM_ENTER     0.6f
+#define CHARACTER_WATER_SWIM_EXIT      0.45f
+
+enum {
+	CHARACTER_SWIM_GAIT_IDLE = 0,
+	CHARACTER_SWIM_GAIT_SLOW = 1,
+	CHARACTER_SWIM_GAIT_FAST = 2,
+};
+
 
 typedef enum {
 	MOVEMENT_STATE_IDLE,
@@ -40,6 +62,7 @@ typedef enum {
 	MOVEMENT_STATE_ROLLING,
 	MOVEMENT_STATE_JUMPING,
 	MOVEMENT_STATE_FALLING,
+	MOVEMENT_STATE_SWIMMING,
 	MOVEMENT_STATE_COUNT,
 	MOVEMENT_STATE_NONE
 } MovementState;
@@ -80,6 +103,10 @@ typedef struct {
 	float jump_minimum_speed;
 	float jump_timer_max;
 
+	float swim_slow_speed;
+	float swim_fast_speed;
+	float swim_response_rate;
+
 } CharacterMovementSettings;
 
 typedef struct {
@@ -91,6 +118,8 @@ typedef struct {
 	float jump_timer;
 	float roll_yaw;
 	bool is_grounded;
+	bool in_water;
+	float submerged_fraction;   /* 0..1 of the capsule under the surface */
 	uint8_t rotation_mode;
 	bool strafe;
 	bool strafe_locked;
@@ -107,6 +136,7 @@ typedef struct {
 	bool strafe_locked;
 	float strafe_yaw;
 	uint8_t gait;
+	uint8_t swim_gait;   /* CHARACTER_SWIM_GAIT_*, from the stick while swimming */
 	float speed_scale;   /* 1.0 normal, tired_speed_scale while tired */
 } MovementCommand;
 

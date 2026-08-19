@@ -2,7 +2,8 @@
 #define SCENE_H
 
 #include "entity/entity.h"
-#include "light/lighting.h"
+#include "scene/lighting.h"
+#include "scene/fog.h"
 #include "camera/camera.h"
 #include "camera/spring_arm.h"
 #include "physics/shapes/physics_shape.h"
@@ -18,23 +19,6 @@
 /* Counts primitives, not entities: one compound collider takes several. */
 
 
-typedef struct {
-
-	color_t ambient_color;
-	DirectionalLight directional[DIRECTIONAL_LIGHT_COUNT];
-	PointLight point[POINT_LIGHT_COUNT];
-
-} LightDef;
-
-typedef struct {
-
-	CameraType type;
-	union {
-		CameraSpringArmData spring_arm;
-	};
-
-} CameraDef;
-
 /* An ambience of the scene itself: it plays from a fixed point in the world
    for as long as the scene is loaded. */
 typedef struct {
@@ -47,6 +31,7 @@ typedef struct {
 typedef struct {
 
 	LightDef light;
+	FogDef fog;
 	CameraDef camera;
 	Vector3 wind;
 	EntityDef entity[SCENE_MAX_ENTITIES];

@@ -72,6 +72,12 @@ typedef struct Cloth {
 	float     damping;         /* 0 = none, bleeds off the Verlet step */
 	uint8_t   iterations;      /* relaxation passes; Jakobsen: 3-4 is plenty */
 
+	/* Set by whoever draws the cloth. Out of view it holds its pose instead of
+	   stepping: Verlet carries the velocity in the current and previous
+	   positions, so leaving both untouched resumes the motion where it
+	   stopped. NULL = always steps. */
+	const bool *culled;
+
 	struct Cloth *next;        /* the world keeps these in one list */
 } Cloth;
 
@@ -84,6 +90,9 @@ bool cloth_create(Cloth *cloth, const CollisionMesh *mesh, const ClothDef *def);
 /* Pins every particle the predicate accepts, in mesh-local space: used to
    hold an edge against a pole. */
 void cloth_pinWhere(Cloth *cloth, bool (*predicate)(Vector3 position, void *user), void *user);
+
+/* True while the body standing for the cloth is out of view. */
+bool cloth_isCulled(const Cloth *cloth);
 
 void cloth_step(Cloth *cloth, float dt);
 

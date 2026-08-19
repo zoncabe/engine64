@@ -41,6 +41,11 @@ typedef enum {
 
 	MJ_SLOT_ROLL_RUN,
 
+	/* Two slots for the swim grid: adjacent columns must land in different
+	   buffers or their poses overwrite each other instead of blending. */
+	MJ_SLOT_SWIM_A,
+	MJ_SLOT_SWIM_B,
+
 	MJ_SLOT_TRANSITION,
 
 	MJ_SLOT_COUNT
@@ -63,6 +68,7 @@ typedef enum {
 	MJ_NODE_STRAFE,
 	MJ_NODE_STRAFE_LOCKED,
 	MJ_NODE_BOW_WALK_AIMING,
+	MJ_NODE_SWIM,
 
 	MJ_NODE_COUNT
 
@@ -132,6 +138,10 @@ typedef enum {
 
 	MJ_ANIM_ROLL_L,
 	MJ_ANIM_ROLL_R,
+
+	MJ_ANIM_SWIM_IDLE,
+	MJ_ANIM_SWIM_SLOW,
+	MJ_ANIM_SWIM_FAST,
 
 	MJ_ANIM_SLIDE_L,
 	MJ_ANIM_SLIDE_R,

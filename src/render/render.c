@@ -5,7 +5,8 @@
 #include <t3d/t3dmath.h>
 #include <t3d/t3dskeleton.h>
 
-#include "light/lighting.h"
+#include "scene/lighting.h"
+#include "scene/fog.h"
 #include "viewport/viewport.h"
 #include "graphics/font.h"
 #include "graphics/sprites.h"
@@ -57,13 +58,28 @@ static void render_pushElement(RenderContext *ctx, DrawElement element)
 }
 
 
+/* Bound and frustum are both in world space and both already built: the mesh
+   placed its boxes with the matrix, the viewport its frustum with the camera,
+   both before the context. */
+static bool render_isBoundVisible(const MeshBound *bound, const T3DViewport *viewport)
+{
+	return t3d_frustum_vs_aabb(&viewport->viewFrustum, &bound->min, &bound->max);
+}
+
 static void render_setSceneContext(RenderContext *ctx, const Scene *s, uint8_t fb_index)
 {
+	const T3DViewport *viewport = &viewport_get()->t3d_viewport;
+
 	for (int i = 0; i < s->entity_count; i++) {
 		Entity    *e      = s->entity[i];
 		Mesh *mesh  = e->mesh;
 		T3DMat4FP  *matrix = mesh->matrix_buffer ? &mesh->matrix_buffer[fb_index] : NULL;
 		T3DSkeleton *skel  = mesh->skeleton;
+
+		if (e->cull) {
+			mesh->culled = !render_isBoundVisible(&mesh->bound[0], viewport);
+			if (mesh->culled) continue;
+		}
 
 		/* Whatever drives this mesh has already moved: fold the new positions
 		   into this frame's vertex buffer, then point the segment its recorded
@@ -71,11 +87,24 @@ static void render_setSceneContext(RenderContext *ctx, const Scene *s, uint8_t f
 		mesh_updateDeform(mesh, fb_index);
 		mesh_bindDeformFrame(mesh, fb_index);
 
+		if (mesh->dl_count == 0) {
+			uint8_t b = 1;
+			T3DModelIter it = t3d_model_iter_create(mesh->model, T3D_CHUNK_TYPE_OBJECT);
+			while (t3d_model_iter_next(&it) && b < mesh->bound_count) {
+				it.object->isVisible = !e->cull || render_isBoundVisible(&mesh->bound[b], viewport);
+				b++;
+			}
+
+			assert(ctx->object_count < RENDER_MAX_T3D_OBJECT);
+			ctx->object[ctx->object_count++] = (T3DElement){ NULL, mesh->model, matrix, skel, mesh->draw_conf };
+			continue;
+		}
+
 		for (int part = 0; part < mesh->dl_count; part++) {
 			if (!(mesh->visible & (1u << part))) continue;
 
 			assert(ctx->object_count < RENDER_MAX_T3D_OBJECT);
-			ctx->object[ctx->object_count++] = (T3DElement){ mesh->dl[part], matrix, skel };
+			ctx->object[ctx->object_count++] = (T3DElement){ mesh->dl[part], NULL, matrix, skel };
 		}
 	}
 }
@@ -126,7 +155,10 @@ void render_setContext(RenderContext *ctx, const Scene *scene, uint8_t fb_index,
 static void render_start(int *fb_index)
 {
 	*fb_index = (*fb_index + 1) % FB_COUNT;
-	viewport_clear();
+
+	/* Geometry fades toward the fog color, so the background must be it. */
+	Fog *fog = fog_get();
+	viewport_clear(fog->enabled ? fog->color : RGBA32(0, 0, 0, 0xFF));
 }
 
 static void render_end(void)
@@ -140,6 +172,7 @@ void render(RenderContext *ctx, int *fb_index)
 
 	if (ctx->object_count > 0) {
 		light_set(light_get());
+		fog_set(fog_get());
 
 		/* A mesh contributes one element per visible part, and every part of
 		   the same mesh shares its skeleton and its matrix: a character with
@@ -163,7 +196,19 @@ void render(RenderContext *ctx, int *fb_index)
 				pushed = obj->matrix;
 			}
 
-			rspq_block_run(obj->dl);
+			if (obj->dl) {
+				rspq_block_run(obj->dl);
+				continue;
+			}
+
+			T3DModelState state = t3d_model_state_create();
+			state.drawConf = obj->conf;
+			T3DModelIter it = t3d_model_iter_create(obj->model, T3D_CHUNK_TYPE_OBJECT);
+			while (t3d_model_iter_next(&it)) {
+				if (!it.object->isVisible) continue;
+				t3d_model_draw_material(it.object->material, &state);
+				rspq_block_run(it.object->userBlock);
+			}
 		}
 
 		if (pushed) t3d_matrix_pop(1);

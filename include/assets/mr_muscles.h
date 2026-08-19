@@ -31,8 +31,13 @@ typedef enum {
 
 	MM_SLOT_ROLL_RUN,
 
+	/* Two slots for the swim grid: adjacent columns must land in different
+	   buffers or their poses overwrite each other instead of blending. */
+	MM_SLOT_SWIM_A,
+	MM_SLOT_SWIM_B,
+
 	MM_SLOT_TRANSITION,
-	
+
 	MM_SLOT_COUNT
 
 } MrMusclesSlot;
@@ -53,6 +58,7 @@ typedef enum {
 	MM_NODE_STRAFE,
 	MM_NODE_STRAFE_LOCKED,
 	MM_NODE_BOW_WALK_AIMING,
+	MM_NODE_SWIM,
 
 	MM_NODE_COUNT
 
@@ -122,6 +128,10 @@ typedef enum {
 
 	MM_ANIM_ROLL_L,
 	MM_ANIM_ROLL_R,
+
+	MM_ANIM_SWIM_IDLE,
+	MM_ANIM_SWIM_SLOW,
+	MM_ANIM_SWIM_FAST,
 
 	MM_ANIM_SLIDE_L,
 	MM_ANIM_SLIDE_R,

@@ -5,7 +5,8 @@
 
 #include "shaders/mesh_deform.h"
 #include "viewport/viewport.h"
-#include "light/lighting.h"
+#include "scene/lighting.h"
+#include "scene/fog.h"
 #include "entity/entity.h"
 #include "scene/scene.h"
 #include "scene/demo_scene.h"
@@ -26,6 +27,7 @@ PhysicsWorld *physics_getWorld(void) { return &g_physics; }
 void scene_load(const SceneDef *def)
 {
 	light_initAmbient(def->light.ambient_color);
+	fog_init(&def->fog);
 	for (int i = 0; i < DIRECTIONAL_LIGHT_COUNT; i++)
 		light_initDirectional(&light_get()->directional[i], def->light.directional[i].direction, def->light.directional[i].color);
 	for (int i = 0; i < POINT_LIGHT_COUNT; i++)
@@ -59,8 +61,29 @@ void scene_load(const SceneDef *def)
 		if (entity_def->cloth) {
 			Cloth *cloth = physicsWorld_createCloth(&g_physics, entity_def->cloth);
 			/* The cloth runs in metres, the vertex buffer in render units. */
-			if (cloth) mesh_setDeform(entity->mesh, cloth->render_position, cloth->normal,
-			                         cloth->particle_count, RENDER_SCALE);
+			if (cloth) {
+				cloth->culled = &entity->mesh->culled;
+				mesh_setDeform(entity->mesh, cloth->render_position, cloth->normal,
+				               NULL, cloth->particle_count, RENDER_SCALE);
+			}
+		}
+
+		if (entity_def->water) {
+			Water *water = water_create(entity_def->water);
+			/* Same contract as the cloth: points in metres, buffer in render
+			   units. The draw conf is what scrolls the texture layers, so it
+			   only works through the per-frame material path. */
+			if (water) {
+				water->culled = &entity->mesh->culled;
+				mesh_setDeform(entity->mesh, water->position, water->normal,
+				               water->rgba, water->count, RENDER_SCALE);
+				entity->mesh->draw_conf = &water->conf;
+
+				/* The entity's collider is the water's sensor volume: bind
+				   them and the bodies inside it start floating. */
+				if (entity->body)
+					water_bindPhysics(water, entity->body, &g_physics);
+			}
 		}
 
 		if (entity_def->character) {
@@ -103,6 +126,7 @@ void scene_unload(void)
 		character_delete(scene.character[i]);
 	for (int i = 0; i < scene.entity_count; i++)
 		entity_delete(scene.entity[i]);
+	water_clear();
 	scene_clear();
 	physicsWorld_shutdown(&g_physics);
 }

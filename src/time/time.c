@@ -5,6 +5,7 @@
 
 static TimeData timer;
 static float time_scale = 1.0f;
+static uint32_t last_ticks;
 
 
 TimeData* time_get(void) { return &timer; }
@@ -17,11 +18,15 @@ void time_init()
 	timer.delta = 0.0f;
 	timer.rate = 0.0f;
 
+	last_ticks = TICKS_READ();
 }
 
 void time_update()
 {
-	timer.delta = display_get_delta_time() * time_scale;
+	uint32_t now = TICKS_READ();
+	timer.delta = (float)TICKS_DISTANCE(last_ticks, now) / TICKS_PER_SECOND * time_scale;
+	last_ticks = now;
+
 	timer.counter += timer.delta;
 	timer.rate = display_get_fps();
 }

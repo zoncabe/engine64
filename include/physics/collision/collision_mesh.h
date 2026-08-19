@@ -34,6 +34,7 @@ typedef struct CollisionMesh {
 	const uint16_t *indices;         /* 3 per triangle */
 	const int16_t  *packed_normals;  /* 3 per triangle, scaled by 32767 */
 	const Vector3  *vertices;
+	const uint8_t  *active_edges;    /* 1 per triangle, see Triangle */
 
 	void           *asset;           /* buffer from asset_load, owns the data above */
 	DynamicAABBTree tree;            /* leaf per triangle, user_data = triangle index */

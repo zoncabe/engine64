@@ -23,6 +23,7 @@ src =   $(wildcard *.c) \
 		$(wildcard src/physics/broadphase/*.c) \
 		$(wildcard src/physics/collision/*.c) \
 		$(wildcard src/physics/world/*.c) \
+		$(wildcard src/physics/buoyancy/*.c) \
 		$(wildcard src/camera/*.c) \
 		$(wildcard src/viewport/*.c) \
 		$(wildcard src/control/*.c) \
@@ -35,7 +36,6 @@ src =   $(wildcard *.c) \
 		$(wildcard src/graphics/*.c) \
 		$(wildcard src/shaders/*.c) \
 		$(wildcard src/resources/*.c) \
-		$(wildcard src/light/*.c) \
 		$(wildcard src/render/*.c) \
 		$(wildcard src/assets/*.c) \
 		$(wildcard src/sound/*.c) \
@@ -53,8 +53,7 @@ assets_conv = $(addprefix filesystem/textures/,$(notdir $(assets_png:%.png=%.spr
 # Models with a collision mesh (declared one per line)
 assets_collision = filesystem/collision/room.collision \
                    filesystem/collision/brew_flag.collision \
-                   filesystem/collision/bandera-uruguay.collision \
-                   filesystem/collision/brasil.collision
+                   filesystem/collision/water.collision
 
 
 all: $(PROJECT_NAME).z64
@@ -86,7 +85,9 @@ filesystem/fonts/%.font64: assets/fonts/%.ttf
 	@echo "    [FONT] $@"
 	$(N64_MKFONT) $(MKFONT_FLAGS) -o filesystem/fonts "$<"
 
-# Xolonium es ancha: --display comprime los glifos al 75% sin tocar su altura.
+# Xolonium is wide: --display squeezes the glyphs to 75% without touching
+# their height. The five Xolonium .ttf are the same typeface, since mkfont
+# takes the output name from the input file: one copy is needed per size.
 XOLONIUM_FLAGS = --display 320x240,2:1
 
 filesystem/fonts/DroidSans.font64:  MKFONT_FLAGS += --size 10

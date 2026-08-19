@@ -6,6 +6,7 @@
 
 #include <libdragon.h>
 #include <t3d/t3dmath.h>
+#include <t3d/t3dmodel.h>
 #include <t3d/t3dskeleton.h>
 #include "graphics/shapes.h"
 #include "graphics/sprites.h"
@@ -55,9 +56,11 @@ typedef struct {
 
 typedef struct {
 
-	rspq_block_t *dl;
+	rspq_block_t *dl;      /* NULL: draw model's visible objects instead */
+	T3DModel     *model;
 	T3DMat4FP    *matrix;
 	T3DSkeleton  *skeleton;
+	T3DModelDrawConf *conf; /* optional, object path only: per-frame tile/texture hooks */
 
 } T3DElement;
 

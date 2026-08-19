@@ -43,6 +43,14 @@ void sphereToCapsule (ContactManifold *m, PhysicsShape *sphere, PhysicsShape *ca
 void capsuleToCapsule(ContactManifold *m, PhysicsShape *a, PhysicsShape *b);
 void capsuleToBox    (ContactManifold *m, PhysicsShape *capsule, PhysicsShape *box);
 
+/* Contact normal correction on inactive triangle edges (port of Jolt's
+   ActiveEdges::FixNormal). normal and the result follow the manifold
+   convention: unit, from the capsule toward the surface. point is the
+   contact point on the triangle, in the triangle's space.
+   movement_direction may be zero. */
+Vector3 collision_fixTriangleNormal(const Triangle *triangle, const Vector3 *point,
+                                    const Vector3 *normal, const Vector3 *movement_direction);
+
 /* Triangles come raw from a collision mesh, without a RigidBody, so this
    pair takes the capsule shape and its world transform directly. */
 void capsuleToTriangle(ContactManifold *m, const Capsule *capsule, const Transform *world,

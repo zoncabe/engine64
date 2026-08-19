@@ -49,7 +49,8 @@ Copyright (c) 2014 Randy Gaul. zlib licensed. The zlib license requires that
 altered versions are not misrepresented as the original software: the physics
 engine here is a modified port, not qu3e itself.
 
-Godot Engine, SpringBoneSimulator3D, the spring bone modifier
+Godot Engine, SpringBoneSimulator3D, the spring bone modifier; the character
+collision recovery and contact classification
                                  https://github.com/godotengine/godot
 Copyright (c) 2014-present Godot Engine contributors.
 Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur. MIT licensed.
@@ -58,22 +59,11 @@ Kawaii Physics, AnimNode_KawaiiPhysicsSimulation, world motion damping
                                  https://github.com/pafuhana1213/KawaiiPhysics
 Copyright (c) 2019-2026 pafuhana1213. MIT licensed.
 
+JoltPhysics, active-edge baking in the collision importer and the contact
+normal correction on inactive edges
+                                 https://github.com/jrouwe/JoltPhysics
+Copyright (c) 2021 Jorrit Rouwe. MIT licensed.
+
 pyrite64, the collision importer and its mesh collider format
                                  https://github.com/HailToDodongo/pyrite64
 Max Bebök, Kevin Reier. MIT licensed.
-
-
-ASSETS
-
-Models and textures are original work by Mariano Alvarez, released under the
-same terms as the engine.
-
-DroidSans.ttf
-Copyright (c) 2007 Ascender Corporation. Licensed under the Apache License,
-Version 2.0. https://www.apache.org/licenses/LICENSE-2.0
-
-Xolonium10.ttf, Xolonium14.ttf, Xolonium20.ttf, Xolonium40.ttf, Xolonium60.ttf
-Copyright 2011-2016 Severin Meyer. Licensed under the SIL Open Font License 1.1.
-https://openfontlicense.org
-The five files are the same typeface: mkfont takes the output name from the
-input file, so one copy is needed per size.

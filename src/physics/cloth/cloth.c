@@ -341,6 +341,12 @@ static void cloth_satisfy(Cloth *cloth)
 }
 
 
+bool cloth_isCulled(const Cloth *cloth)
+{
+	return cloth->culled != NULL && *cloth->culled;
+}
+
+
 void cloth_step(Cloth *cloth, float dt)
 {
 	if (cloth->position == NULL) return;

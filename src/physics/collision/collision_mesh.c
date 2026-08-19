@@ -43,6 +43,13 @@ CollisionMesh *collisionMesh_load(const char *path)
 	data = alignPtr(data, 4);
 
 	const Vector3 *vertices = (const Vector3 *)data;
+	data += header->vert_count * sizeof(Vector3);
+	data = alignPtr(data, 4);
+
+	const uint8_t *active_edges = (const uint8_t *)data;
+
+	/* Trips on assets built before the active-edge block: re-import them. */
+	assert((char *)active_edges + header->tri_count <= (char *)buffer + size);
 
 	CollisionMesh *mesh = malloc(sizeof(CollisionMesh));
 	mesh->triangle_count = (uint16_t)header->tri_count;
@@ -50,6 +57,7 @@ CollisionMesh *collisionMesh_load(const char *path)
 	mesh->indices        = indices;
 	mesh->packed_normals = packed_normals;
 	mesh->vertices       = vertices;
+	mesh->active_edges   = active_edges;
 	mesh->asset          = buffer;
 
 	dynamicAABBTree_init(&mesh->tree);
@@ -91,10 +99,11 @@ void collisionMesh_getTriangle(const CollisionMesh *mesh, int32_t index, Triangl
 	const uint16_t *idx = &mesh->indices[index * 3];
 	const int16_t  *n   = &mesh->packed_normals[index * 3];
 
-	out->vertices[0] = mesh->vertices[idx[0]];
-	out->vertices[1] = mesh->vertices[idx[1]];
-	out->vertices[2] = mesh->vertices[idx[2]];
-	out->normal      = (Vector3){ n[0] * scale, n[1] * scale, n[2] * scale };
+	out->vertices[0]   = mesh->vertices[idx[0]];
+	out->vertices[1]   = mesh->vertices[idx[1]];
+	out->vertices[2]   = mesh->vertices[idx[2]];
+	out->normal        = (Vector3){ n[0] * scale, n[1] * scale, n[2] * scale };
+	out->active_edges  = mesh->active_edges[index];
 }
 
 void collisionMesh_queryAABB(const CollisionMesh *mesh, void *cb, PhysicsQueryCallback callback, AABB aabb)

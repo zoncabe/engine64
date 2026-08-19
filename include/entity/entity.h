@@ -5,6 +5,7 @@
 #include "physics/body/rigid_body.h"
 #include "physics/shapes/physics_shape.h"
 #include "physics/cloth/cloth.h"
+#include "shaders/water.h"
 #include "graphics/mesh.h"
 #include "character/character.h"
 
@@ -24,6 +25,10 @@ typedef struct Entity {
 	/* Set when the entity has a rigid body. If that body is simulated, it is
 	   what places the mesh each frame instead of the transform above. */
 	RigidBody *body;
+
+	/* Test the model's bounding box against the view frustum before drawing
+	   it. Off means the entity is drawn every frame, no questions asked. */
+	bool cull;
 
 } Entity;
 
@@ -47,6 +52,8 @@ typedef struct EntityDef {
 	const RigidBodyDef      *body;
 	const EntityColliderDef *collider;
 	const ClothDef          *cloth;
+	const WaterDef          *water;
+	bool cull;
 
 } EntityDef;
 

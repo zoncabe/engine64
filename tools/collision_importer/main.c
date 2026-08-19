@@ -2,8 +2,13 @@
 	Extracts the collision mesh from a .gltf/.glb and writes the collision
 	binary (big-endian, native N64 format).
 
+	Layout: header, indices, packed normals, vertices, active-edge bytes,
+	each block padded to 4 bytes.
+
 	Originally based on collisionBuilder.cpp from pyrite64 by Max Bebök
 	(HailToDodongo), https://github.com/HailToDodongo/pyrite64, MIT licensed.
+	Active-edge baking ported from JoltPhysics by Jorrit Rouwe, MIT licensed,
+	https://github.com/jrouwe/JoltPhysics.
 */
 #include <stdio.h>
 #include <stdint.h>
@@ -26,6 +31,7 @@ typedef struct {
 	Vec3         *verticesFloat;
 	PackedNormal *normals;
 	uint16_t     *indices;
+	uint8_t      *active_edges;   /* 1 per triangle: bit 0 = v0v1, bit 1 = v1v2, bit 2 = v2v0 */
 	size_t        vertex_count;
 	size_t        index_count;
 	size_t        normal_count;
@@ -167,6 +173,139 @@ static uint16_t weldVertex(CollisionMesh *mesh, VertexHash *hash, Vec3 v)
 	return (uint16_t)mesh->vertex_count++;
 }
 
+/*
+	Active edges, ported from Jolt's MeshShape::sFindActiveEdges and
+	ActiveEdges::IsEdgeActive (JoltPhysics, MIT licensed). An edge is active
+	when a contact normal found on it is real: a border with no neighbour, a
+	convex fold sharper than the threshold, or a non-manifold edge. Inactive
+	edges are the internal seams of flat floors and continuous ramps; at
+	runtime a contact normal landing on one is replaced by the face normal.
+*/
+
+/* Folds between two walkable faces must never produce a blocking normal, so
+   the threshold is the character's walkable limit (CHARACTER_FLOOR_MAX_SLOPE),
+   not Jolt's 5-degree default, which is tuned for rigid-body fidelity. */
+#define ACTIVE_EDGE_COS_THRESHOLD 0.6428f   /* cos(50 degrees) */
+
+static Vec3 vecSub(Vec3 a, Vec3 b)
+{
+	return (Vec3){ a.x - b.x, a.y - b.y, a.z - b.z };
+}
+
+static Vec3 vecCross(Vec3 a, Vec3 b)
+{
+	return (Vec3){
+		a.y * b.z - a.z * b.y,
+		a.z * b.x - a.x * b.z,
+		a.x * b.y - a.y * b.x,
+	};
+}
+
+static float vecDot(Vec3 a, Vec3 b)
+{
+	return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+/* Port of ActiveEdges::IsEdgeActive: normal1 belongs to the triangle whose
+   winding gives edge_direction, normal2 to its neighbour. */
+static int isEdgeActive(Vec3 normal1, Vec3 normal2, Vec3 edge_direction)
+{
+	/* If normals are opposite the edges are active (the triangles are back to back). */
+	float cos_angle_normals = vecDot(normal1, normal2);
+	if (cos_angle_normals < -0.999848f) return 1;   /* cos(179 degrees) */
+
+	/* Concave edge: not active. */
+	if (vecDot(vecCross(normal1, normal2), edge_direction) < 0.0f) return 0;
+
+	/* Convex edge: active when the angle is bigger than the threshold. */
+	return cos_angle_normals < ACTIVE_EDGE_COS_THRESHOLD;
+}
+
+typedef struct {
+	uint32_t key;       /* (min_index << 16) | max_index; EDGE_SLOT_EMPTY marks a free slot */
+	uint8_t  count;     /* triangles seen on this edge, saturating at 3 */
+	uint32_t tri[2];
+	uint8_t  edge[2];   /* which edge of that triangle: 0 = v0v1, 1 = v1v2, 2 = v2v0 */
+} EdgeSlot;
+
+#define EDGE_SLOT_EMPTY 0xFFFFFFFFu
+
+/* Port of MeshShape::sFindActiveEdges over the compacted triangle list.
+   face_normals holds the unit float normal of each triangle. */
+static void findActiveEdges(CollisionMesh *mesh, const Vec3 *face_normals)
+{
+	size_t tri_count = mesh->normal_count;
+
+	mesh->active_edges = calloc(tri_count ? tri_count : 1, 1);
+	if (!mesh->active_edges) fail("Out of memory storing active edges!");
+
+	size_t capacity = 256;
+	while (capacity < tri_count * 6) capacity *= 2;
+
+	EdgeSlot *slots = malloc(capacity * sizeof(EdgeSlot));
+	if (!slots) fail("Out of memory building the edge map!");
+	for (size_t i = 0; i < capacity; i++) slots[i].key = EDGE_SLOT_EMPTY;
+
+	/* Pass 1: map every edge to the triangles that share it. From the third
+	   triangle on an edge is non-manifold: active for that triangle on the
+	   spot, and for the first two in pass 2. */
+	for (size_t t = 0; t < tri_count; t++)
+	{
+		for (int e = 0; e < 3; e++)
+		{
+			uint16_t a = mesh->indices[t*3 + e];
+			uint16_t b = mesh->indices[t*3 + (e + 1) % 3];
+			uint32_t key = a < b ? ((uint32_t)a << 16) | b : ((uint32_t)b << 16) | a;
+
+			size_t pos = (key * 2654435761u) & (capacity - 1);
+			while (slots[pos].key != EDGE_SLOT_EMPTY && slots[pos].key != key)
+				pos = (pos + 1) & (capacity - 1);
+
+			EdgeSlot *slot = &slots[pos];
+			if (slot->key == EDGE_SLOT_EMPTY) {
+				slot->key   = key;
+				slot->count = 0;
+			}
+
+			if (slot->count < 2) {
+				slot->tri[slot->count]  = (uint32_t)t;
+				slot->edge[slot->count] = (uint8_t)e;
+				slot->count++;
+			} else {
+				mesh->active_edges[t] |= 1 << e;
+				slot->count = 3;
+			}
+		}
+	}
+
+	/* Pass 2: border edges are active; edges shared by two triangles follow
+	   the fold test, with the edge direction as wound by the first one. */
+	for (size_t i = 0; i < capacity; i++)
+	{
+		const EdgeSlot *slot = &slots[i];
+		if (slot->key == EDGE_SLOT_EMPTY) continue;
+
+		int num_active;
+		if (slot->count == 1) {
+			num_active = 1;
+		}
+		else if (slot->count == 2) {
+			uint32_t t1 = slot->tri[0];
+			Vec3 e1 = mesh->verticesFloat[mesh->indices[t1*3 + slot->edge[0]]];
+			Vec3 e2 = mesh->verticesFloat[mesh->indices[t1*3 + (slot->edge[0] + 1) % 3]];
+			num_active = isEdgeActive(face_normals[t1], face_normals[slot->tri[1]], vecSub(e2, e1)) ? 2 : 0;
+		}
+		else {
+			num_active = 2;
+		}
+
+		for (int n = 0; n < num_active; n++)
+			mesh->active_edges[slot->tri[n]] |= 1 << slot->edge[n];
+	}
+
+	free(slots);
+}
+
 static Vec3 transformPoint(const cgltf_float m[16], Vec3 v)
 {
 	return (Vec3){
@@ -278,6 +417,11 @@ static void convert(const char *gltfPath, CollisionMesh *out, float baseScale, c
 	out->normals = realloc(out->normals, (out->index_count / 3) * sizeof(PackedNormal));
 	if (out->index_count && !out->normals) fail("Out of memory storing normals!");
 
+	/* Unit float normals, kept aside for the active-edge fold test: the packed
+	   ones lose precision and the test compares angles of 5 degrees. */
+	Vec3 *face_normals = malloc((out->index_count / 3 ? out->index_count / 3 : 1) * sizeof(Vec3));
+	if (!face_normals) fail("Out of memory storing face normals!");
+
 	size_t write = 0;
 
 	for (size_t v = 0; v < out->index_count; v += 3)
@@ -306,6 +450,8 @@ static void convert(const char *gltfPath, CollisionMesh *out, float baseScale, c
 		out->indices[write*3 + 1] = ib;
 		out->indices[write*3 + 2] = ic;
 
+		face_normals[write] = (Vec3){ normal.x / len, normal.y / len, normal.z / len };
+
 		out->normals[write] = (PackedNormal){
 			(int16_t)(normal.x / len * 32767.0f),
 			(int16_t)(normal.y / len * 32767.0f),
@@ -316,6 +462,9 @@ static void convert(const char *gltfPath, CollisionMesh *out, float baseScale, c
 
 	out->index_count  = write * 3;
 	out->normal_count = write;
+
+	findActiveEdges(out, face_normals);
+	free(face_normals);
 
 	cgltf_free(data);
 }
@@ -348,6 +497,10 @@ static void writeFile(const CollisionMesh *mesh, const char *path)
 		write_f32(f, mesh->verticesFloat[i].y);
 		write_f32(f, mesh->verticesFloat[i].z);
 	}
+	align4(f);
+
+	for (size_t i = 0; i < mesh->index_count / 3; i++)
+		write_u8(f, mesh->active_edges[i]);
 	align4(f);
 
 	fclose(f);

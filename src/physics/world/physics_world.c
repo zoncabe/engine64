@@ -90,6 +90,7 @@ void physicsWorld_init(PhysicsWorld *s, float dt, Vector3 gravity, int32_t itera
 	s->body_list        = NULL;
 	s->cloth_count      = 0;
 	s->cloth_list       = NULL;
+	s->buoyancy_count   = 0;
 	s->wind             = vector3_zero();
 	s->gravity          = gravity;
 	s->dt               = dt;
@@ -200,8 +201,13 @@ void physics_update(PhysicsWorld *s, float delta)
 	float ceiling = PHYSICS_TIMESTEP * PHYSICS_CLOTH_MAX_SUBSTEPS;
 	if (s->accumulator > ceiling) s->accumulator = ceiling;
 
+	/* A cloth nobody is looking at holds its pose: skipping its step leaves
+	   both Verlet slots alone, so it resumes with the velocity it had. The
+	   accumulator is the world's and drains either way, so coming back into
+	   view never owes a burst of substeps. */
 	while (s->accumulator >= PHYSICS_TIMESTEP) {
 		for (Cloth *cloth = s->cloth_list; cloth; cloth = cloth->next) {
+			if (cloth_isCulled(cloth)) continue;
 			cloth->gravity = s->gravity;
 			cloth->wind    = s->wind;
 			cloth_step(cloth, PHYSICS_TIMESTEP);
@@ -213,7 +219,7 @@ void physics_update(PhysicsWorld *s, float delta)
 	   fraction, same scheme as the dynamic bones. */
 	float t = s->accumulator / PHYSICS_TIMESTEP;
 	for (Cloth *cloth = s->cloth_list; cloth; cloth = cloth->next)
-		cloth_blendRenderState(cloth, t);
+		if (!cloth_isCulled(cloth)) cloth_blendRenderState(cloth, t);
 }
 
 
@@ -225,6 +231,11 @@ void physics_step(PhysicsWorld *s)
 	}
 
 	contactManager_testCollisions(&s->contact_manager);
+
+	/* After the narrowphase, so the sensors' COLLIDING flags are fresh;
+	   before the islands, so the forces integrate in this same step. */
+	for (int32_t i = 0; i < s->buoyancy_count; i++)
+		buoyancy_apply(s, s->buoyancy[i]);
 
 	for (RigidBody *body = s->body_list; body; body = body->next) {
 		body->flags &= ~BODY_FLAG_ISLAND;
@@ -395,6 +406,12 @@ void physicsWorld_setEnableFriction(PhysicsWorld *s, int enabled)
 Vector3 physicsWorld_getGravity(const PhysicsWorld *s)       { return s->gravity; }
 void    physicsWorld_setGravity(PhysicsWorld *s, Vector3 g)  { s->gravity = g; }
 void    physicsWorld_setWind   (PhysicsWorld *s, Vector3 w)  { s->wind = w; }
+
+void physicsWorld_addBuoyancy(PhysicsWorld *s, const BuoyancyVolume *volume)
+{
+	if (s->buoyancy_count >= PHYSICS_MAX_BUOYANCY_VOLUMES) return;
+	s->buoyancy[s->buoyancy_count++] = volume;
+}
 
 
 void physicsWorld_setContactListener(PhysicsWorld *s, ContactListener *listener)

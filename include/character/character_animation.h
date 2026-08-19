@@ -31,6 +31,8 @@ typedef enum {
 	ANIMATION_PARAM_STRAFE_LOCKED_DIR,
 	ANIMATION_PARAM_BOW_WALK_AIMING,
 	ANIMATION_PARAM_BOW_WALK_AIMING_DIR,
+	ANIMATION_PARAM_SWIM,        /* weight of the swim grid; a timed ramp, not the submersion */
+	ANIMATION_PARAM_SWIM_GAIT,   /* idle -> slow -> fast axis, from the horizontal speed */
 	ANIMATION_PARAM_JUMP_L,
 	ANIMATION_PARAM_JUMP_R,
 	ANIMATION_PARAM_LAND_L,
@@ -102,6 +104,7 @@ typedef struct {
 
 	float strafe_locked_blend_rate;
 	float bow_walk_aiming_blend_rate;
+	float swim_blend_rate;
 
 } CharacterAnimationSettings;
 
@@ -128,6 +131,7 @@ typedef struct {
 	uint8_t strafe_node;
 	uint8_t strafe_locked_node;
 	uint8_t bow_walk_aiming_node;
+	uint8_t swim_node;
 
 } CharacterAnimationDef;
 
@@ -182,6 +186,7 @@ typedef struct CharacterAnimation {
 	float        strafe_blend;
 	float        strafe_locked_blend;
 	float        bow_walk_aiming_blend;
+	float        swim_blend;
 
 } CharacterAnimation;
 

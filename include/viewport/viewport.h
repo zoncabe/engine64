@@ -22,7 +22,7 @@ Viewport *viewport_get(void);
 
 
 void viewport_init(void);
-void viewport_clear(void);
+void viewport_clear(color_t color);
 void viewport_updateCamera(const ControllerActions *actions, Vector3 *center);
 
 #endif

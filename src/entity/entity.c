@@ -19,6 +19,7 @@ void entity_init(Entity *entity, const EntityDef *def)
 	entity->transform.position = def->position;
 	entity->transform.rotation = def->rotation;
 	entity->transform.scale    = def->scale;
+	entity->cull               = def->cull;
 
 }
 
@@ -36,14 +37,16 @@ Entity *entity_create(const EntityDef *def)
 	assert(entity->mesh->matrix_buffer);
 	t3d_mat4fp_identity(entity->mesh->matrix_buffer);
 
-	entity->mesh->skeleton = NULL;
-	entity->mesh->deform   = NULL;
+	entity->mesh->skeleton  = NULL;
+	entity->mesh->deform    = NULL;
+	entity->mesh->draw_conf = NULL;
+	mesh_initBounds(entity->mesh);
 
 	if (def->character) {
 		entity->mesh->dl = NULL;   /* character_create builds the skinned parts */
 		entity->mesh->dl_count = 0;
 		entity->mesh->visible  = 0;
-	} else {
+	} else if (def->cloth) {
 		entity->mesh->dl = malloc(sizeof(rspq_block_t *));
 		assert(entity->mesh->dl);
 		rspq_block_begin();
@@ -51,6 +54,8 @@ Entity *entity_create(const EntityDef *def)
 		entity->mesh->dl[0]    = rspq_block_end();
 		entity->mesh->dl_count = 1;
 		entity->mesh->visible  = 1;
+	} else {
+		mesh_recordObjects(entity->mesh);
 	}
 
 	return entity;
@@ -65,6 +70,7 @@ void entity_delete(Entity *entity)
 		meshDeform_delete(entity->mesh->deform);
 		free(entity->mesh->deform);
 	}
+	free(entity->mesh->bound);
 	free_uncached(entity->mesh->matrix_buffer);
 	t3d_model_free(entity->mesh->model);
 	free(entity->mesh);

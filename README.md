@@ -6,10 +6,17 @@ Framework type game engine. Written in C on top of the open source SDK [Libdrago
 
 **Physics engine**<br/>
 A port of [qu3e](https://github.com/RandyGaul/qu3e) by Randy Gaul, expanded to use all basic primitives plus triangle meshes. Rigid bodies with island solving and sleeping, sequential impulse contact solver with warm starting, friction and restitution.<br/>
+
+**Cloth**<br/>
 Cloth simulation implemented using the [Advanced Character Physics](https://www.cs.cmu.edu/afs/cs/academic/class/15462-s13/www/lec_slides/Jakobsen.pdf) papers, a Verlet method developed by Thomas Jakobsen at IO Interactive for the Hitman games.
+
+**Water**<br/>
+Procedural water surfaces: sum of directional sine waves over a subdivided plane through the mesh deform path, analytic normals, height shaded vertex colors and dual scrolling texture layers. Analytic surface height query at any point, shared with the physics.<br/>
+Buoyancy: water registered as sensor volumes in the physics world, overlap tracked by the broadphase and skipped by the solver. Archimedes force on dynamic bodies, per shape column sampling of the submerged volume against the wave surface, closed form spherical cap, force applied at the submerged centroid. Linear and angular drag scaled by submersion, floating depth set by density.
 
 **Character physics**<br/>
 Kinematic capsule resolved by collide and slide against boxes, spheres, capsules and triangle meshes, with floor detection and snapping. Registered in the physics world for two way interaction with rigid bodies.
+Fake buoyancy; equilibrium depth spring, submersion scaled drag and sink limit.
 
 **Character movement**<br/>
 Gait based movement system: target speed, acceleration and rotation response per gait, with exponential velocity convergence. Per asset settings for charged jump, air control and roll phases.
@@ -25,7 +32,7 @@ World motion damping and teleport thresholds from [AnimNode_KawaiiPhysicsSimulat
 2D screen system with a track based animation engine: rectangles, sprites and text grouped in scissor sections, with easing curves, timed visibility windows and state driven lookups.
 
 **Scenes**<br/>
-Data driven scene definitions: lighting, camera setup, wind, entities and sound emitters. Loading resolves a definition into the physics world, character instances, cloth bindings and active emitters.
+Data driven scene definitions: lighting, fog, camera setup, wind, and sound emitters. Loading resolves a definition into the physics world, character instances, cloth bindings and active emitters.
 
 **Sound**<br/>
 Positional sound system on top of the Libdragon mixer. Per sample volume, min and max distance with inverse falloff, priority based channel allocation and out of range culling. Constant power panning from listener position and camera orientation, damped at close range. Distance and panning applied on independent mixer paths with RSP driven ramps. Playback rate scaling to fit a sample to a requested duration.<br/>

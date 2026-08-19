@@ -11,6 +11,7 @@
 #include "ui/credits_ui.h"
 #include "menu/menu.h"
 #include "particles/particles.h"
+#include "shaders/water.h"
 #include "player/player.h"
 #include "control/player_control.h"
 #include "game/game.h"
@@ -65,6 +66,7 @@ static void gameState_updateGameplay(GameContext *ctx)
 	uint8_t fb_index = ctx->viewport->fb_index;
 
 	physics_update(scene_getPhysics(), time_get()->delta);
+	water_update(time_get()->delta);
 
 	for (int i = 0; i < scene->character_count; i++) {
 		Character *character = scene->character[i];

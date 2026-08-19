@@ -41,6 +41,14 @@ static void characterControl_setLocomotionWithStick(Character *character, Moveme
 		cmd->target_yaw = rad_to_deg(fm_atan2f(actions->stick_x, -actions->stick_y) - deg_to_rad(camera_angle_around));
 	}
 
+	/* Swimming keeps its state; the stick only picks the swim gait. */
+	if (movement->current == MOVEMENT_STATE_SWIMMING) {
+		if (stick_magnitude == 0)  cmd->swim_gait = CHARACTER_SWIM_GAIT_IDLE;
+		else if (actions->sprint)  cmd->swim_gait = CHARACTER_SWIM_GAIT_FAST;
+		else                       cmd->swim_gait = CHARACTER_SWIM_GAIT_SLOW;
+		return;
+	}
+
 	if (!characterMovement_isLocomotion(movement->current)) return;
 
 	if (stick_magnitude == 0) {

@@ -67,6 +67,10 @@ static const CharacterAnimationClipDef mr_muscles_clips[] = {
 	[MM_ANIM_ROLL_L]            = { "running-to-roll-left",               MM_SLOT_ROLL_RUN,      false },
 	[MM_ANIM_ROLL_R]            = { "running-to-roll-right",              MM_SLOT_ROLL_RUN,      false },
 
+	[MM_ANIM_SWIM_IDLE]         = { "swimming-idle",                      MM_SLOT_SWIM_A,        true  },
+	[MM_ANIM_SWIM_SLOW]         = { "swimming-slow",                      MM_SLOT_SWIM_B,        true  },
+	[MM_ANIM_SWIM_FAST]         = { "swimming-fast",                      MM_SLOT_SWIM_A,        true  },
+
 	[MM_ANIM_SLIDE_L]           = { "slide-left",                         MM_SLOT_ROLL_RUN,      false },
 	[MM_ANIM_SLIDE_R]           = { "slide-right",                        MM_SLOT_ROLL_RUN,      false },
 
@@ -110,6 +114,10 @@ static const CharacterAnimationNode mr_muscles_nodes[] = {
 	[MM_NODE_BOW_WALK_AIMING] = { ANIMATION_NODE_BLEND_2D,
 	  ANIMATION_CLIPS(MM_ANIM_BOW_WALK_AIMING_BACK, MM_ANIM_BOW_WALK_AIMING_L, MM_ANIM_BOW_WALK_AIMING_FWD, MM_ANIM_BOW_WALK_AIMING_R, MM_ANIM_BOW_WALK_AIMING_BACK),
 	  5, 1, 0, ANIMATION_PARAM_BOW_WALK_AIMING_DIR, ANIMATION_PARAM_BOW_WALK_AIMING_DIR, ANIMATION_PARAM_BOW_WALK_AIMING },
+
+	[MM_NODE_SWIM] = { ANIMATION_NODE_BLEND_2D,
+	  ANIMATION_CLIPS(MM_ANIM_SWIM_IDLE, MM_ANIM_SWIM_SLOW, MM_ANIM_SWIM_FAST),
+	  3, 1, 0, ANIMATION_PARAM_SWIM_GAIT, ANIMATION_PARAM_SWIM_GAIT, ANIMATION_PARAM_SWIM },
 };
 
 _Static_assert(MM_ANIM_TURN_WALK_R == MM_ANIM_TURN_WALK_L + 1, "turn_walk L/R must be contiguous (character_animation reads L+1)");
@@ -139,6 +147,7 @@ const CharacterAnimationDef mr_muscles_animation_def = {
 	.strafe_node          = MM_NODE_STRAFE,
 	.strafe_locked_node   = MM_NODE_STRAFE_LOCKED,
 	.bow_walk_aiming_node = MM_NODE_BOW_WALK_AIMING,
+	.swim_node            = MM_NODE_SWIM,
 
 };
 
@@ -175,6 +184,10 @@ const CharacterMovementSettings mr_muscles_movement_settings = {
 	.jump_force_multiplier = 30.0f,
 	.jump_minimum_speed    = 4.4f,
 	.jump_timer_max        = 0.233333f,
+
+	.swim_slow_speed    = 1.2f,
+	.swim_fast_speed    = 2.6f,
+	.swim_response_rate = 4.0f,
 
 };
 
@@ -278,18 +291,19 @@ const CharacterAnimationSettings mr_muscles_animation_settings = {
 
 		.strafe_locked_blend_rate   = 2.0f,
 		.bow_walk_aiming_blend_rate = 2.0f,
+		.swim_blend_rate            = 6.0f,
 
 };
 
 
 
 static const SoundID mr_muscles_footsteps[] = {
-	SOUND_FOOTSTEP_WOOD_1, SOUND_FOOTSTEP_WOOD_2, SOUND_FOOTSTEP_WOOD_3,
-	SOUND_FOOTSTEP_WOOD_4, SOUND_FOOTSTEP_WOOD_5, SOUND_FOOTSTEP_WOOD_6,
+	SOUND_FOOTSTEP_1, SOUND_FOOTSTEP_2, SOUND_FOOTSTEP_3,
+	SOUND_FOOTSTEP_4,
 };
 
 static const SoundID mr_muscles_rolls[] = {
-	SOUND_DODGE_ROLL_1, SOUND_DODGE_ROLL_2,
+	SOUND_ROLL_1, SOUND_ROLL_2,
 };
 
 /* Both feet land at a quarter and three quarters of the locomotion clip. */
@@ -298,25 +312,28 @@ static const float mr_muscles_footings[] = { 0.25f, 0.75f };
 static const CharacterSoundDef mr_muscles_sound_def = {
 
 	.footstep       = mr_muscles_footsteps,
-	.footstep_count = 6,
+	.footstep_count = sizeof(mr_muscles_footsteps)/sizeof(*mr_muscles_footsteps),
 	.footing        = mr_muscles_footings,
-	.footing_count  = 2,
+	.footing_count  = sizeof(mr_muscles_footings)/sizeof(*mr_muscles_footings),
 
 	.footstep_volume_min = 0.1f,
 	.footstep_volume_max = 0.45f,
 	.footstep_speed_max  = 4.4f,
 
 	.roll        = mr_muscles_rolls,
-	.roll_count  = 2,
-	.roll_volume = 0.7f,
+	.roll_count  = sizeof(mr_muscles_rolls)/sizeof(*mr_muscles_rolls),
+	.roll_volume = 0.9f,
 	.roll_delay  = 0.07f,
+	.roll_launch_gap      = 0.05f,
+	.roll_launch_volume   = 0.20f,
+	.roll_stand_volume = 0.22f,
 
 	.jump        = mr_muscles_footsteps,
-	.jump_count  = 6,
+	.jump_count  = sizeof(mr_muscles_footsteps)/sizeof(*mr_muscles_footsteps),
 	.jump_volume = 0.2f,
 
 	.land            = mr_muscles_footsteps,
-	.land_count      = 6,
+	.land_count      = sizeof(mr_muscles_footsteps)/sizeof(*mr_muscles_footsteps),
 	.land_volume_min = 0.4f,
 	.land_volume_max = 0.85f,
 	.land_speed_max  = 15.0f,

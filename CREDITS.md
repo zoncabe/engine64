@@ -4,38 +4,27 @@ The engine source code is released under the MIT License (see `LICENSE`).
 Third-party assets bundled in this repository keep their own licenses, listed
 below.
 
-## Models and textures
-
-Original work by Mariano Alvarez (zoncabe), created for this project:
+## Original
 
 `assets/models/arrow.glb`
 `assets/models/axis.glb`
-`assets/models/bandera-uruguay.glb`
-`assets/models/brasil.glb`
 `assets/models/brew_flag.glb`
-`assets/models/capsule.glb`
-`assets/models/costenaro.glb`
-`assets/models/green_box.glb`
-`assets/models/green_sphere.glb`
 `assets/models/lamp.glb`
 `assets/models/miss_jiggles.glb`
 `assets/models/mr_muscles.glb`
 `assets/models/pole.glb`
-`assets/models/red_box.glb`
-`assets/models/red_sphere.glb`
 `assets/models/room.glb`
-`assets/models/yellow_box.glb`
-`assets/models/yellow_sphere.glb`
-`assets/textures/brasil-*.png`
-`assets/textures/sol-*.png`
+
 `assets/textures/arrow.png`
 `assets/textures/camouflage.png`
-`assets/textures/capsule_skin.png`
 `assets/textures/eye.png`
 `assets/textures/gorilla.rgba32.png`
 `assets/textures/zoncabe.png`
+Original work by Mariano Alvarez (zoncabe), created for this project.
 
-### Third-party textures
+### Third-party 
+
+## Textures
 
 `assets/textures/Prototype_blue_persian_32x32px.png`
 `assets/textures/Prototype_green_lime_32x32px.png`
@@ -46,6 +35,13 @@ Original work by Mariano Alvarez (zoncabe), created for this project:
 `assets/textures/Prototype_yellow_gold_32x32px.png`
 Prototype retro textures pack by Emerald Eel Entertainment
 -- https://opengameart.org/content/prototype-textures-32x32px
+-- License: CC0 / Public Domain
+
+`assets/textures/caustics-a.i4.png`
+`assets/textures/caustics-b.i4.png`
+Water caustic textures by Calinou, downscaled to 64x64 greyscale
+-- https://opengameart.org/content/caustic-textures
+-- https://opengameart.org/users/calinou
 -- License: CC0 / Public Domain
 
 `assets/textures/AButton.png`
@@ -123,34 +119,29 @@ Droid Sans by Ascender Corporation, digitized data Copyright 2007 Google
 
 ## Audio
 
-Every sound below comes from Freesound and was converted to 32 kHz mono
-16-bit PCM for the Nintendo 64 audio pipeline; no other processing was
-applied. Attribution 4.0 requires crediting the author, which the lines below
-provide.
+Every sound below comes from Freesound. All were converted to 32 kHz mono
+16-bit PCM for the Nintendo 64 audio pipeline and renamed; the footsteps and
+rolls were also gain adjusted to sit at a common level. Their length is
+untouched and nothing else was edited. Attribution 4.0 requires crediting the
+author and stating that changes were made, which the lines below provide.
 
-`assets/audio/80079__benboncan__cotton-flapping.wav`
+`assets/audio/flag-flapping.wav`
 Cotton Flapping.wav by Benboncan -- https://freesound.org/s/80079/ -- License: Attribution 4.0
 
-`assets/audio/458326__dwoboyle__footsteps-tile-run-01.wav`
-Footsteps-Tile-Run-01.wav by DWOBoyle -- https://freesound.org/s/458326/ -- License: Attribution 4.0
-
-`assets/audio/458361__dwoboyle__footsteps-tile-run-09.wav`
-Footsteps-Tile-Run-09.wav by DWOBoyle -- https://freesound.org/s/458361/ -- License: Attribution 4.0
-
-`assets/audio/458365__dwoboyle__footsteps-tile-run-10.wav`
-Footsteps-Tile-Run-10.wav by DWOBoyle -- https://freesound.org/s/458365/ -- License: Attribution 4.0
-
-`assets/audio/458366__dwoboyle__footsteps-tile-run-13.wav`
-Footsteps-Tile-Run-13.wav by DWOBoyle -- https://freesound.org/s/458366/ -- License: Attribution 4.0
-
-`assets/audio/458335__dwoboyle__footsteps-tile-run-24.wav`
+`assets/audio/footstep-01.wav`
 Footsteps-Tile-Run-24.wav by DWOBoyle -- https://freesound.org/s/458335/ -- License: Attribution 4.0
 
-`assets/audio/458336__dwoboyle__footsteps-tile-run-25.wav`
+`assets/audio/footstep-02.wav`
 Footsteps-Tile-Run-25.wav by DWOBoyle -- https://freesound.org/s/458336/ -- License: Attribution 4.0
 
-`assets/audio/458355__dwoboyle__footsteps-tile-light-13.wav`
+`assets/audio/footstep-03.wav`
+Footsteps-Tile-Run-09.wav by DWOBoyle -- https://freesound.org/s/458361/ -- License: Attribution 4.0
+
+`assets/audio/footstep-04.wav`
+Footsteps-Tile-Run-13.wav by DWOBoyle -- https://freesound.org/s/458366/ -- License: Attribution 4.0
+
+`assets/audio/roll-01.wav`
 Footsteps-Tile-light-13.wav by DWOBoyle -- https://freesound.org/s/458355/ -- License: Attribution 4.0
 
-`assets/audio/458337__dwoboyle__footsteps-tile-light-14.wav`
+`assets/audio/roll-02.wav`
 Footsteps-Tile-light-14.wav by DWOBoyle -- https://freesound.org/s/458337/ -- License: Attribution 4.0

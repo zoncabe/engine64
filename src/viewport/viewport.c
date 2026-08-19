@@ -16,29 +16,6 @@ static Viewport viewport;
 
 Viewport* viewport_get(void) { return &viewport; }
 
-void viewport_init()
-{
-	display_init(RESOLUTION_320x240, DEPTH_16_BPP, FB_COUNT, GAMMA_NONE, FILTERS_DISABLED);
-	viewport.t3d_viewport = t3d_viewport_create_buffered(FB_COUNT);
-	t3d_init((T3DInitParams){});
-	camera_init(&viewport.camera);
-	viewport.fb_index = 0;
-}
-
-void viewport_clear()
-{
-	rdpq_attach(display_get(), display_get_zbuf());
-
-	/* display_get blocks until a framebuffer frees up, which is the longest
-	   the loop ever sits still without feeding the mixer. */
-	sound_poll();
-	t3d_frame_start();
-	t3d_viewport_attach(&viewport.t3d_viewport);
-
-	t3d_screen_clear_color(RGBA32(0, 0, 0, 0xFF));
-	t3d_screen_clear_depth();
-}
-
 void viewport_setPerspectiveCamera()
 {
 	t3d_viewport_set_projection(
@@ -59,7 +36,7 @@ void viewport_setPerspectiveCamera()
 void viewport_setIsometricCamera()
 {
 	t3d_viewport_set_ortho(
-		&viewport.t3d_viewport,
+		&viewport.t3d_viewport, 
 		-640, 640,
 		-480, 480,
 		viewport.camera.near_clipping,
@@ -72,6 +49,33 @@ void viewport_setIsometricCamera()
 		&(T3DVec3){{viewport.camera.target.x, viewport.camera.target.y, viewport.camera.target.z}}, 
 		&(T3DVec3){{0, 0, 1}}
 	);
+}
+
+void viewport_init()
+{
+	display_init(RESOLUTION_320x240, DEPTH_16_BPP, FB_COUNT, GAMMA_NONE, FILTERS_DISABLED);
+	viewport.t3d_viewport = t3d_viewport_create_buffered(FB_COUNT);
+	t3d_init((T3DInitParams){});
+	camera_init(&viewport.camera);
+	viewport.fb_index = 0;
+
+	/* A state can render the scene on the same frame it is entered, before its
+	   update ever runs: without this the view matrices are still zeroed. */
+	viewport_setPerspectiveCamera();
+}
+
+void viewport_clear(color_t color)
+{
+	rdpq_attach(display_get(), display_get_zbuf());
+
+	/* display_get blocks until a framebuffer frees up, which is the longest
+	   the loop ever sits still without feeding the mixer. */
+	sound_poll();
+	t3d_frame_start();
+	t3d_viewport_attach(&viewport.t3d_viewport);
+
+	t3d_screen_clear_color(color);
+	t3d_screen_clear_depth();
 }
 
 void viewport_updateCamera(const ControllerActions *actions, Vector3 *center)

@@ -174,10 +174,10 @@ static bool sound_startEmitter(SoundEmitterState *emitter, float gain, float pan
 			def->priority, &wave->wave, &channel))
 		return false;
 
-	/* Whatever held it is losing it: its emitter has to stop reaching for it. */
-	SoundEmitter previous = sound_channel_owner[channel];
-	if (previous != SOUND_NO_EMITTER) sound_emitter[previous].channel = -1;
-
+	/* Whatever held it is losing it. Only the owner changes hands: the previous
+	   emitter keeps its channel number so sound_update still finds it by the
+	   >= 0 test, sees it no longer owns the channel and gives its slot back.
+	   Clearing its channel here would hide it from that test forever. */
 	if (mixer_ch_playing(channel))
 		mixer_ch_stop(channel);
 
@@ -360,7 +360,12 @@ void sound_update(void)
 		float pan = sound_panning(def, &to_emitter, distance);
 
 		if (emitter->channel < 0) {
-			sound_startEmitter(emitter, gain, pan);
+			/* A looping emitter keeps asking until the mixer has room. A
+			   one-shot that cannot get a channel has missed its moment, and
+			   holding the slot open would starve everything after it. */
+			if (!sound_startEmitter(emitter, gain, pan) && !def->loop)
+				emitter->active = false;
+
 			continue;
 		}
 

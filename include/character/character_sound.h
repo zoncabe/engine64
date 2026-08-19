@@ -41,6 +41,15 @@ typedef struct CharacterSoundDef {
 	   wants to come in. */
 	float roll_delay;
 
+	/* Feet on either end of the roll: the one that pushes off on entry, and
+	   the one planted at roll_grip_time to come out of it. */
+	float roll_launch_volume;
+	float roll_stand_volume;
+
+	/* Seconds a footstep has to be behind for the roll's launch foot to fire.
+	   A step right before the roll makes the two land too close together. */
+	float roll_launch_gap;
+
 	/* Fires when the crouch ends and the body leaves the floor. */
 	const SoundID *jump;
 	uint8_t jump_count;
@@ -72,6 +81,10 @@ typedef struct CharacterSound {
 	   the impact is the one the previous frame carried. */
 	float previous_fall_speed;
 	bool previous_grounded;
+
+	/* Clock reading of the last footstep, for whoever has to keep its distance
+	   from one. */
+	float last_footstep;
 
 } CharacterSound;
 

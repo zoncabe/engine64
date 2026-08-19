@@ -182,7 +182,10 @@ static void characterAnimation_setLocomotionSpeed(const CharacterAnimationParamC
 static void characterAnimation_snapRollToLocomotion(const CharacterAnimationParamCtx *ctx, bool left)
 {
 	const CharacterAnimationNode *node = &ctx->def->node[ctx->def->locomotion_node];
-	float phase = left ? 0.0f : 0.5f;
+
+	/* the quarters are where the footing wave peaks: clip 0.25 is footing 0 (left
+	   foot), clip 0.75 is footing 1 (right foot). the halves are the crossing point */
+	float phase = left ? 0.75f : 0.25f;
 
 	for (int i = 0; i < node->cols * node->rows; i++) {
 		T3DAnim *clip = characterAnimation_clip(ctx->animation, node->animation[i]);
@@ -738,6 +741,63 @@ static void characterAnimation_setStrafeLockedParams(const CharacterAnimationPar
 	animation->param[ANIMATION_PARAM_STRAFE] *= (1.0f - blend);
 }
 
+/* Swim grid: weight is a timed ramp gated by the SWIMMING state, never the
+   raw submersion — the waves oscillate the submerged fraction and would
+   jitter the blend. The gait axis crosses idle -> slow -> fast strokes by
+   the horizontal speed. While the ramp is up, every land-borne param fades
+   with it: the water owns the pose. */
+static void characterAnimation_setSwimParams(const CharacterAnimationParamCtx *ctx)
+{
+	CharacterAnimation *animation = ctx->animation;
+	const CharacterMovementData *data = &ctx->character->movement.data;
+	const CharacterMovementSettings *movement = ctx->character->movement.settings;
+
+	bool swimming = ctx->character->movement.current == MOVEMENT_STATE_SWIMMING;
+
+	float prev_blend = animation->swim_blend;
+	float factor = fm_expf(-ctx->settings->swim_blend_rate * ctx->delta);
+	float blend  = swimming ? 1.0f - (1.0f - prev_blend) * factor : prev_blend * factor;
+	if (blend > 0.999f) blend = 1.0f;
+	if (blend < 0.001f) blend = 0.0f;
+
+	animation->swim_blend = blend;
+
+	if (blend == 0.0f) {
+		animation->param[ANIMATION_PARAM_SWIM] = 0.0f;
+		return;
+	}
+
+	const CharacterAnimationNode *node = &ctx->def->node[ctx->def->swim_node];
+
+	/* Fading in from nothing: restart the strokes so they enter in phase. */
+	if (prev_blend == 0.0f)
+		for (int c = 0; c < node->cols * node->rows; c++)
+			t3d_anim_set_time(characterAnimation_clip(animation, node->animation[c]), 0.0f);
+
+	float speed = data->horizontal_speed;
+	float gait;
+	if (speed <= movement->swim_slow_speed)
+		gait = 0.5f * speed / movement->swim_slow_speed;
+	else
+		gait = 0.5f + 0.5f * (speed - movement->swim_slow_speed)
+		            / (movement->swim_fast_speed - movement->swim_slow_speed);
+	if (gait < 0.0f) gait = 0.0f;
+	if (gait > 1.0f) gait = 1.0f;
+
+	characterAnimation_syncGridClips(ctx, node, gait, 0.0f);
+
+	animation->param[ANIMATION_PARAM_SWIM]      = blend;
+	animation->param[ANIMATION_PARAM_SWIM_GAIT] = gait;
+
+	animation->param[ANIMATION_PARAM_WALK]          *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_STRAFE]        *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_STRAFE_LOCKED] *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_JUMP_L]        *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_JUMP_R]        *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_LAND_L]        *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_LAND_R]        *= (1.0f - blend);
+}
+
 static void characterAnimation_setActiveNodes(const CharacterAnimationParamCtx *ctx)
 {
 	const CharacterAnimationDef *def = ctx->def;
@@ -790,6 +850,7 @@ void characterAnimation_setParams(Character *character, const CharacterAnimation
 	characterAnimation_setRollParam (&ctx);
 	characterAnimation_setStrafeParams (&ctx);
 	characterAnimation_setStrafeLockedParams (&ctx);
+	characterAnimation_setSwimParams (&ctx);
 	characterAnimation_setActiveNodes (&ctx);
 }
 

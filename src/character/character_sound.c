@@ -4,6 +4,7 @@
 #include "character/character_sound.h"
 #include "entity/entity.h"
 #include "sound/sound.h"
+#include "time/time.h"
 
 
 static SoundID characterSound_pick(const SoundID *id, uint8_t count)
@@ -54,6 +55,8 @@ static void characterSound_updateFootsteps(Character *character, const Character
 		sound_play(characterSound_pick(def->footstep, def->footstep_count),
 			&character->entity->transform.position,
 			characterSound_footstepVolume(def, speed), 0.0f);
+
+		character->sound.last_footstep = time_get()->counter;
 	}
 }
 
@@ -62,21 +65,36 @@ static void characterSound_updateFootsteps(Character *character, const Character
    the roll timer reaches roll_ground_time, and that is where the noise is. */
 static void characterSound_updateRoll(Character *character, const CharacterSoundDef *def)
 {
-	if (!def->roll_count) return;
 	if (character->movement.current != MOVEMENT_STATE_ROLLING) return;
 
 	const CharacterMovementSettings *settings = character->movement.settings;
 
-	float start = settings->roll_ground_time + def->roll_delay;
-	float timer = character->movement.data.roll_timer;
+	float previous = character->sound.previous_roll_timer;
+	float timer    = character->movement.data.roll_timer;
 
-	if (character->sound.previous_roll_timer >= start || timer < start) return;
+	float start = settings->roll_ground_time + def->roll_delay;
+
+	/* The timer is reset on the way out, so a zero behind a running one is
+	   the frame the roll started: the foot pushing off. Dropped when a
+	   footstep just played, or the two land too close together. */
+	if (def->footstep_count && previous == 0.0f && timer > 0.0f
+	    && time_get()->counter - character->sound.last_footstep >= def->roll_launch_gap)
+		sound_play(characterSound_pick(def->footstep, def->footstep_count),
+			&character->entity->transform.position,
+			def->roll_launch_volume, 0.0f);
 
 	/* The body scrapes the floor until grip: the sample is asked to cover
-	   what is left of that, and slows down as far as its def allows. */
-	sound_play(characterSound_pick(def->roll, def->roll_count),
-		&character->entity->transform.position,
-		def->roll_volume, settings->roll_grip_time - start);
+	   what is left of that, and slows down as much as that takes. */
+	if (def->roll_count && previous < start && timer >= start)
+		sound_play(characterSound_pick(def->roll, def->roll_count),
+			&character->entity->transform.position,
+			def->roll_volume, settings->roll_grip_time - start);
+
+	/* Grip is the foot planting to come out of the roll. */
+	if (def->footstep_count && previous < settings->roll_grip_time && timer >= settings->roll_grip_time)
+		sound_play(characterSound_pick(def->footstep, def->footstep_count),
+			&character->entity->transform.position,
+			def->roll_stand_volume, 0.0f);
 }
 
 
@@ -90,13 +108,17 @@ static void characterSound_updateJump(Character *character, const CharacterSound
 	if (!def->jump_count) return;
 	if (character->movement.current != MOVEMENT_STATE_JUMPING) return;
 
-	float charge = character->movement.settings->jump_timer_max;
-	float timer  = character->movement.data.jump_timer;
+	float timer = character->movement.data.jump_timer;
 
-	if (character->sound.previous_jump_timer >= charge || timer < charge) return;
+	/* The timer is reset on entry, so a zero behind a running one is the frame
+	   the crouch started. */
+	if (character->sound.previous_jump_timer != 0.0f || timer <= 0.0f) return;
 
+	/* jump_anim_air is where the clip has the body leaving the floor: the
+	   sample is stretched to cover exactly that. */
 	sound_play(characterSound_pick(def->jump, def->jump_count),
-		&character->entity->transform.position, def->jump_volume, 0.0f);
+		&character->entity->transform.position, def->jump_volume,
+		character->animation.def->settings->jump_anim_air);
 }
 
 

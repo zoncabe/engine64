@@ -34,6 +34,7 @@
 #include "physics/memory/physics_paged_allocator.h"
 #include "physics/collision/contact_manager.h"
 #include "physics/body/rigid_body.h"
+#include "physics/buoyancy/buoyancy.h"
 #include "physics/cloth/cloth.h"
 #include "physics/shapes/physics_shape.h"
 #include "physics/geometry/aabb.h"
@@ -53,6 +54,10 @@ typedef struct ContactListener {
 typedef int (*PhysicsWorldQueryCallback)(void *user_data, PhysicsShape *shape);
 
 
+/* Registered water volumes; one per water surface. */
+#define PHYSICS_MAX_BUOYANCY_VOLUMES 2
+
+
 typedef struct PhysicsWorld {
 	ContactManager        contact_manager;
 	PhysicsPagedAllocator shape_allocator;
@@ -62,6 +67,9 @@ typedef struct PhysicsWorld {
 
 	int32_t               cloth_count;
 	Cloth                *cloth_list;
+
+	const BuoyancyVolume *buoyancy[PHYSICS_MAX_BUOYANCY_VOLUMES];
+	int32_t               buoyancy_count;
 
 	PhysicsStack          stack;
 	PhysicsHeap           heap;
@@ -110,6 +118,11 @@ void    physicsWorld_setGravity(PhysicsWorld *s, Vector3 gravity);
 
 /* Only cloths feel it. Meant to be rewritten every frame, gusts included. */
 void    physicsWorld_setWind(PhysicsWorld *s, Vector3 wind);
+
+/* The volume is borrowed, not copied: its owner keeps it alive for the
+   world's lifetime. Buoyancy runs inside physics_step on every dynamic
+   body overlapping the volume's sensor shape. */
+void    physicsWorld_addBuoyancy(PhysicsWorld *s, const BuoyancyVolume *volume);
 
 void physicsWorld_setContactListener(PhysicsWorld *s, ContactListener *listener);
 
