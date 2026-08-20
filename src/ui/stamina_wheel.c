@@ -267,13 +267,15 @@ static void staminaWheel_setRenderState(const StaminaWheel *wheel)
 static void staminaWheel_setRenderStateA(void) { staminaWheel_setRenderState(&wheel_slot[0]); }
 static void staminaWheel_setRenderStateB(void) { staminaWheel_setRenderState(&wheel_slot[1]); }
 
-/* The characters died with the previous scene: a slot still holding one
-   would read freed memory. */
+/* The scene and this UI's resources die with the gameplay state: a slot
+   still holding a character would read freed memory, and a particle left
+   visible would draw with its sprites already unloaded. */
 void stamina_wheel_reset(void)
 {
 	for (int i = 0; i < STAMINA_WHEEL_COUNT; i++) {
-		wheel_slot[i].character = NULL;
-		wheel_slot[i].alpha     = 0.0f;
+		wheel_slot[i].character         = NULL;
+		wheel_slot[i].alpha             = 0.0f;
+		wheel_slot[i].particle->visible = false;
 	}
 }
 
