@@ -12,6 +12,7 @@
 #include "graphics/mesh.h"
 #include "character/character_physics.h"
 #include "character/character_movement.h"
+#include "character/character_stats.h"
 #include "character/character_animation.h"
 #include "character/character_weapon.h"
 #include "character/character_skeleton.h"
@@ -28,6 +29,7 @@ typedef struct CharacterDef {
 	const CharacterWeaponsDef *weapons_def;
 	const SpringBonesDef *spring_bones;   /* optional: array of sets, one tuning each, count 0 terminates */
 	const CharacterSoundDef *sound_def;
+	const CharacterStatsSettings *stats_settings;
 
 } CharacterDef;
 
@@ -41,6 +43,7 @@ typedef struct Character {
 	CharacterWeapons    weapons;
 	CharacterSound      sound;
 	SkeletonModifiers   skeleton_modifiers;
+	CharacterStats      stats;
 
 } Character;
 

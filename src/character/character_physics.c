@@ -23,7 +23,7 @@
 #define CHARACTER_RECOVERY_MARGIN        0.001f  /* Godot: default safe margin */
 #define CHARACTER_MIN_CONTACT_DEPTH      (CHARACTER_RECOVERY_MARGIN * 0.05f)  /* Godot: TEST_MOTION_MIN_CONTACT_DEPTH_FACTOR */
 #define CHARACTER_RECOVERY_FACTOR        0.4f    /* Godot: fraction of the depth recovered per pass */
-#define CHARACTER_FLOOR_SNAP_LENGTH      0.1f    /* downward probe, metres */
+#define CHARACTER_FLOOR_SNAP_LENGTH      0.15f    /* downward probe, metres */
 #define CHARACTER_FLOOR_MAX_SLOPE        50.0f   /* degrees */
 #define CHARACTER_FLOOR_ANGLE_THRESHOLD  0.01f   /* radians, Godot: FLOOR_ANGLE_THRESHOLD */
 

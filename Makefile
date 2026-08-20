@@ -8,7 +8,7 @@ GLTF_FLAGS = '--base-scale=1'
 
 PROJECT_NAME = game
 
-src =   $(wildcard *.c) \
+src =   src/main.c \
 		$(wildcard src/game/*.c) \
 		$(wildcard src/screen/*.c) \
 		$(wildcard src/cutscene/*.c) \

@@ -7,19 +7,10 @@
 #define PLAYER_COUNT 1
 
 
-typedef struct {
-
-	float hp;
-	float stamina;
-	bool tired;
-
-} PlayerStats;
-
 typedef struct Player {
 
 	Character *character;
 	Entity *entity;
-	PlayerStats stats;
 	MovementCommand cmd;
 
 } Player;

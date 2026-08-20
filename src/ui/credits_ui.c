@@ -11,7 +11,7 @@
 
 
 /* Scroll window: the content lives in section 1, clipped by the scissor.
-   credits_update integrates the offset from the velocity the control sets
+   credits_ui_update integrates the offset from the velocity the control sets
    each frame. */
 #define CREDITS_CLIP_Y       50.0f
 #define CREDITS_CLIP_H      162.0f
@@ -167,12 +167,12 @@ static const ScreenAnimation credits_transition_animation = {
 };
 
 
-void credits_setScrollVelocity(float velocity)
+void credits_ui_setScrollVelocity(float velocity)
 {
 	credits_scroll_velocity = velocity;
 }
 
-void credits_update(void)
+void credits_ui_update(void)
 {
 	if (credits_player.is_active)
 		screenAnimationPlayer_update(&credits_player, time_get()->delta);
@@ -187,7 +187,7 @@ void credits_update(void)
 }
 
 
-void credits_startEnter(void)
+void credits_ui_startEnter(void)
 {
 	credits_offset          = 0.0f;
 	credits_scroll_velocity = 0.0f;
@@ -203,7 +203,7 @@ void credits_startEnter(void)
 }
 
 
-void credits_startExit(void (*on_finish)(void *ctx), void *ctx)
+void credits_ui_startExit(void (*on_finish)(void *ctx), void *ctx)
 {
 	screenAnimationPlayer_start(&credits_player, &credits_transition_animation, SCREEN_ANIMATION_PLAY_ONCE, true);
 	credits_player.on_finish     = on_finish;
@@ -211,7 +211,7 @@ void credits_startExit(void (*on_finish)(void *ctx), void *ctx)
 }
 
 
-bool credits_isTransitioning(void)
+bool credits_ui_isTransitioning(void)
 {
 	return credits_player.is_active;
 }

@@ -15,7 +15,7 @@ Procedural water surfaces: sum of directional sine waves over a subdivided plane
 Buoyancy: water registered as sensor volumes in the physics world, overlap tracked by the broadphase and skipped by the solver. Archimedes force on dynamic bodies, per shape column sampling of the submerged volume against the wave surface, closed form spherical cap, force applied at the submerged centroid. Linear and angular drag scaled by submersion, floating depth set by density.
 
 **Character physics**<br/>
-Kinematic capsule resolved by collide and slide against boxes, spheres, capsules and triangle meshes, with floor detection and snapping. Registered in the physics world for two way interaction with rigid bodies.
+A port of the character collision from Godot Engine, the recovery step of [GodotSpace3D::test_body_motion](https://github.com/godotengine/godot/blob/master/modules/godot_physics_3d/godot_space_3d.cpp) and the contact classification of [CharacterBody3D::_set_collision_direction](https://github.com/godotengine/godot/blob/master/scene/3d/physics/character_body_3d.cpp): kinematic capsule against boxes, spheres, capsules and triangle meshes, moved the full step and recovered out of penetration, with floor detection and snapping. Contact normals on internal mesh edges corrected with a port of [ActiveEdges::FixNormal](https://github.com/jrouwe/JoltPhysics/blob/master/Jolt/Physics/Collision/ActiveEdges.h) from Jolt Physics. Registered in the physics world for two way interaction with rigid bodies.<br/>
 Fake buoyancy; equilibrium depth spring, submersion scaled drag and sink limit.
 
 **Character movement**<br/>
@@ -44,7 +44,7 @@ Spring arm third person camera: exponential convergence on yaw and pitch with ve
 ### Building
 
 1. Install the Libdragon toolchain following their [installation guide](https://github.com/DragonMinded/libdragon/wiki/Installing-libdragon).
-2. Build and install [Tiny3D](https://github.com/HailToDodongo/tiny3d/blob/main/README.md).
+2. Build and install [Tiny3D](https://github.com/HailToDodongo/tiny3d/blob/main/README.md#usage).
 3. From the project root run:
 
 ```

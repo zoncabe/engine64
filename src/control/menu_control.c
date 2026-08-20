@@ -46,17 +46,17 @@ static void menuControl_handleMainMenu(Player *player, const ControllerActions *
 {
 	(void)player;
 
-	if (main_menu_isTransitioning()) return;
+	if (main_menu_ui_isTransitioning()) return;
 
 	if (actions->confirm) {
 		int8_t idx = menuStack_getIndex();
 		if (idx == 0) {
 			mainMenu_exit_game = game;
-			main_menu_startExit(mainMenu_onExitToGameplay, NULL);
+			main_menu_ui_startExit(mainMenu_onExitToGameplay, NULL);
 		}
 		if (idx == 1) {
 			mainMenu_exit_game = game;
-			main_menu_startExit(mainMenu_onExitToCredits, NULL);
+			main_menu_ui_startExit(mainMenu_onExitToCredits, NULL);
 		}
 	}
 	if (actions->menu_up)   menuStack_moveIndex(-1, 1);
@@ -71,11 +71,11 @@ static void menuControl_handleCredits(Player *player, const ControllerActions *a
 {
 	(void)player;
 
-	if (credits_isTransitioning()) return;
+	if (credits_ui_isTransitioning()) return;
 
 	if (actions->cancel) {
 		mainMenu_exit_game = game;
-		credits_startExit(credits_onExitToMainMenu, NULL);
+		credits_ui_startExit(credits_onExitToMainMenu, NULL);
 		return;
 	}
 
@@ -92,7 +92,7 @@ static void menuControl_handleCredits(Player *player, const ControllerActions *a
 	if (stick > CREDITS_STICK_DEAD || stick < -CREDITS_STICK_DEAD)
 		velocity -= stick * CREDITS_STICK_SPEED;
 
-	credits_setScrollVelocity(velocity);
+	credits_ui_setScrollVelocity(velocity);
 }
 
 static void menuControl_handleGameplay(Player *player, const ControllerActions *actions, Game *game)
@@ -107,22 +107,22 @@ static void menuControl_handlePause(Player *player, const ControllerActions *act
 
 	if (actions->pause) {
 		pause_exit_game = game;
-		if (!pause_isTransitioning())
-			pause_startExit(pause_onExitToGameplay, NULL);
+		if (!pause_ui_isTransitioning())
+			pause_ui_startExit(pause_onExitToGameplay, NULL);
 		return;
 	}
 
-	if (pause_isTransitioning()) return;
+	if (pause_ui_isTransitioning()) return;
 
 	if (actions->cancel || (actions->confirm && menuStack_getIndex() == 0)) {
 		pause_exit_game = game;
-		pause_startExit(pause_onExitToGameplay, NULL);
+		pause_ui_startExit(pause_onExitToGameplay, NULL);
 		menuStack_setIndex(0);
 		return;
 	}
 	if (actions->confirm && menuStack_getIndex() == 1) {
 		pause_exit_game = game;
-		pause_startQuit(pause_onQuitToMainMenu, NULL);
+		pause_ui_startQuit(pause_onQuitToMainMenu, NULL);
 		menuStack_setIndex(0);
 	}
 	if (actions->menu_up)   menuStack_moveIndex(-1, 1);

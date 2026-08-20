@@ -7,6 +7,11 @@
 #include "time/time.h"
 
 
+/* Submersion above this keeps the dry footsteps quiet: wading out of the
+   ramp is still water, and tile steps from inside it sound wrong. */
+#define CHARACTER_SOUND_WET_FRACTION 0.25f
+
+
 static SoundID characterSound_pick(const SoundID *id, uint8_t count)
 {
 	return id[rand() % count];
@@ -25,6 +30,9 @@ static bool characterSound_crossed(float previous, float current, float mark)
 }
 
 
+/* A step at walking pace lands softer than one at a sprint: linear ramp
+   from volume_min to volume_max over [0, footstep_speed_max]. A zero
+   speed_max opts out of the scaling and every step hits at max. */
 static float characterSound_footstepVolume(const CharacterSoundDef *def, float speed)
 {
 	if (def->footstep_speed_max <= 0.0f) return def->footstep_volume_max;
@@ -37,6 +45,11 @@ static float characterSound_footstepVolume(const CharacterSoundDef *def, float s
 }
 
 
+/* One step each time the cycle walks past a footing mark. The cycle is the
+   phase of the grid's dominant clip, left behind by the graph, so the marks
+   land on the feet no matter which gait carries the blend. Grounded and in
+   locomotion only: airborne or rolling feet touch nothing, and the swim
+   reads the same cycle through its own marks. */
 static void characterSound_updateFootsteps(Character *character, const CharacterSoundDef *def)
 {
 	const CharacterMovement *movement = &character->movement;
@@ -44,6 +57,9 @@ static void characterSound_updateFootsteps(Character *character, const Character
 	if (!def->footstep_count || !def->footing_count) return;
 	if (!movement->data.is_grounded) return;
 	if (!characterMovement_isLocomotion(movement->current)) return;
+
+	/* Wading: no dry steps until the body is mostly out of the water. */
+	if (movement->data.in_water && movement->data.submerged_fraction > CHARACTER_SOUND_WET_FRACTION) return;
 
 	float cycle = character->animation.locomotion_cycle;
 	float speed = movement->data.horizontal_speed;
@@ -56,6 +72,8 @@ static void characterSound_updateFootsteps(Character *character, const Character
 			&character->entity->transform.position,
 			characterSound_footstepVolume(def, speed), 0.0f);
 
+		/* Clock reading for whoever must keep distance from a step: the
+		   roll's launch foot skips itself when one just landed. */
 		character->sound.last_footstep = time_get()->counter;
 	}
 }
@@ -114,6 +132,10 @@ static void characterSound_updateJump(Character *character, const CharacterSound
 	   the crouch started. */
 	if (character->sound.previous_jump_timer != 0.0f || timer <= 0.0f) return;
 
+	/* The jump set is the footstep samples: taking off mid stride right
+	   after a step would flam two of them, same case as the roll launch. */
+	if (time_get()->counter - character->sound.last_footstep < def->jump_launch_gap) return;
+
 	/* jump_anim_air is where the clip has the body leaving the floor: the
 	   sample is stretched to cover exactly that. */
 	sound_play(characterSound_pick(def->jump, def->jump_count),
@@ -148,6 +170,56 @@ static void characterSound_updateLanding(Character *character, const CharacterSo
 }
 
 
+static void characterSound_updateSwim(Character *character, const CharacterSoundDef *def)
+{
+	const CharacterMovement *movement = &character->movement;
+
+	/* Splash on the frame the body enters the water, scaled by the plunge:
+	   the minimum sits near zero, so wading in from the ramp is close to
+	   silent and a jump from the deck slaps. */
+	if (def->splash_count && movement->data.in_water && !character->sound.previous_in_water) {
+		float speed  = -character->sound.previous_plunge_speed;
+		float volume = def->splash_volume_max;
+
+		if (def->splash_speed_max > 0.0f) {
+			float t = speed / def->splash_speed_max;
+			if (t > 1.0f) t = 1.0f;
+			if (t < 0.0f) t = 0.0f;
+
+			volume = def->splash_volume_min + t * (def->splash_volume_max - def->splash_volume_min);
+		}
+
+		sound_play(characterSound_pick(def->splash, def->splash_count),
+			&character->entity->transform.position, volume, 0.0f);
+	}
+
+	/* Strokes on their phases of the swim cycle, which owns the dominant
+	   clip while the state holds. Treading water pulls no arm, so nothing
+	   fires until the body actually swims. */
+	if (movement->current != MOVEMENT_STATE_SWIMMING) return;
+	if (!def->stroke_count) return;
+
+	const CharacterMovementSettings *settings = movement->settings;
+	float speed = movement->data.horizontal_speed;
+	if (speed < settings->swim_slow_speed * 0.5f) return;
+
+	bool heavy = speed > (settings->swim_slow_speed + settings->swim_fast_speed) * 0.5f;
+	const SoundID *stroke = heavy ? def->swim_stroke_heavy       : def->swim_stroke_light;
+	uint8_t count         = heavy ? def->swim_stroke_heavy_count : def->swim_stroke_light_count;
+	if (!count) return;
+
+	float cycle = character->animation.locomotion_cycle;
+
+	for (int i = 0; i < def->stroke_count; i++) {
+		if (!characterSound_crossed(character->sound.previous_cycle, cycle, def->stroke[i]))
+			continue;
+
+		sound_play(characterSound_pick(stroke, count),
+			&character->entity->transform.position, def->stroke_volume, 0.0f);
+	}
+}
+
+
 void characterSound_update(Character *character)
 {
 	const CharacterSoundDef *def = character->sound.def;
@@ -158,12 +230,17 @@ void characterSound_update(Character *character)
 	characterSound_updateRoll(character, def);
 	characterSound_updateJump(character, def);
 	characterSound_updateLanding(character, def);
+	characterSound_updateSwim(character, def);
 
 	character->sound.previous_cycle      = character->animation.locomotion_cycle;
 	character->sound.previous_roll_timer = character->movement.data.roll_timer;
 	character->sound.previous_jump_timer = character->movement.data.jump_timer;
 	character->sound.previous_grounded   = character->movement.data.is_grounded;
+	character->sound.previous_in_water   = character->movement.data.in_water;
 
 	if (!character->movement.data.is_grounded)
 		character->sound.previous_fall_speed = character->body.velocity.z;
+
+	if (!character->movement.data.in_water)
+		character->sound.previous_plunge_speed = character->body.velocity.z;
 }

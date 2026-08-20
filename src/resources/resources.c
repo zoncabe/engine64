@@ -26,23 +26,23 @@ static const uint8_t credits_font[] = {
 	DROID_SANS, XOLONIUM_14, XOLONIUM_40,
 };
 
-static const uint8_t gameplay_font[] = { DROID_SANS };
-
-static const SpriteID pause_sprite[] = {
+/* The pause overlays gameplay and can open on any frame: its assets ride
+   the gameplay set, loaded and freed with it, so no heap traffic happens
+   mid-session. */
+static const SpriteID gameplay_sprite[] = {
+	SPRITE_CIRCLE_MASK, SPRITE_CIRCLE_PROGRESS,
 	SPRITE_BTN_A, SPRITE_BTN_B, SPRITE_D_UP, SPRITE_D_DOWN, SPRITE_D_LEFT, SPRITE_D_RIGHT,
 };
 
-static const uint8_t pause_font[] = {
-	XOLONIUM_14, XOLONIUM_20,
-};
+static const uint8_t gameplay_font[] = { DROID_SANS, XOLONIUM_14, XOLONIUM_20 };
 
 static const ResourceSet state_resource[GAME_STATE_COUNT] = {
 
 	[GAME_STATE_INTRO]     = RESOURCES(intro_sprite,    intro_font),
 	[GAME_STATE_MAIN_MENU] = RESOURCES(mainmenu_sprite, mainmenu_font),
 	[GAME_STATE_CREDITS]   = RESOURCES(credits_sprite,  credits_font),
-	[GAME_STATE_GAMEPLAY]  = { NULL, 0, gameplay_font, sizeof(gameplay_font)/sizeof(*gameplay_font) },
-	[GAME_STATE_PAUSE]     = RESOURCES(pause_sprite,    pause_font),
+	[GAME_STATE_GAMEPLAY]  = RESOURCES(gameplay_sprite, gameplay_font),
+	[GAME_STATE_PAUSE]     = NO_RESOURCES,
 	[GAME_STATE_GAME_OVER] = NO_RESOURCES,
 };
 

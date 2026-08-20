@@ -1,6 +1,6 @@
 #include <libdragon.h>
 
-#include "include/game/game.h"
+#include "game/game.h"
 
 
 int main()

@@ -1,6 +1,7 @@
 #include "resources/resources.h"
 #include "time/time.h"
 #include "scene/scene.h"
+#include "scene/demo_scene.h"
 #include "render/render.h"
 #include "cutscene/intro.h"
 #include "screen/screen.h"
@@ -14,6 +15,7 @@
 #include "shaders/water.h"
 #include "player/player.h"
 #include "control/player_control.h"
+#include "sound/sound.h"
 #include "game/game.h"
 #include "viewport/viewport.h"
 #include "game/game_states.h"
@@ -25,7 +27,14 @@ typedef struct {
 	void (*setDescriptor)(const GameContext *, GameRenderDescriptor *);
 	void (*bindCharacter)(void);
 	void (*onEnter)(void);
-	SceneID            scene_id;
+	void (*onExit)(void);
+
+	/* The scene this state runs on; NULL for the ones that live on screens. */
+	SceneDef          *scene;
+
+	/* The state this one rides on top of; GAME_STATE_COUNT for none.
+	   Switching between an overlay and its base leaves the base untouched. */
+	GameState          overlay_of;
 
 } GameStateDef;
 
@@ -44,13 +53,13 @@ static void gameState_updateIntro(GameContext *ctx)
 static void gameState_updateMainMenu(GameContext *ctx)
 {
 	(void)ctx;
-	main_menu_update();
+	main_menu_ui_update();
 }
 
 static void gameState_updateCredits(GameContext *ctx)
 {
 	(void)ctx;
-	credits_update();
+	credits_ui_update();
 }
 
 static void gameState_updateGameplay(GameContext *ctx)
@@ -66,6 +75,7 @@ static void gameState_updateGameplay(GameContext *ctx)
 	uint8_t fb_index = ctx->viewport->fb_index;
 
 	physics_update(scene_getPhysics(), time_get()->delta);
+	assetSound_update(scene_getPhysics());
 	water_update(time_get()->delta);
 
 	for (int i = 0; i < scene->character_count; i++) {
@@ -84,7 +94,7 @@ static void gameState_updateGameplay(GameContext *ctx)
 	particles_update(ctx, fb_index);
 
 	viewport_updateCamera(&control[0].actions, &ctx->player[0].entity->transform.position);
-	gameplay_update();
+	gameplay_ui_update();
 	(void)game;
 }
 
@@ -104,7 +114,7 @@ static void gameState_updatePause(GameContext *ctx)
 		}
 	}
 
-	pause_update();
+	pause_ui_update();
 }
 
 static void gameState_updateGameOver(GameContext *ctx)
@@ -159,39 +169,49 @@ static const GameStateDef game_state[GAME_STATE_COUNT] = {
 		.setDescriptor = gameState_setIntroDescriptor,
 		.bindCharacter     = NULL,
 		.onEnter       = intro_init,
-		.scene_id      = SCENE_COUNT,
+		.onExit        = NULL,
+		.scene         = NULL,
+		.overlay_of    = GAME_STATE_COUNT,
 	},
 
 	[GAME_STATE_MAIN_MENU] = {
 		.update        = gameState_updateMainMenu,
 		.setDescriptor = gameState_setMainMenuDescriptor,
 		.bindCharacter     = NULL,
-		.onEnter       = main_menu_startEnter,
-		.scene_id      = SCENE_COUNT,
+		.onEnter       = main_menu_ui_startEnter,
+		.onExit        = NULL,
+		.scene         = NULL,
+		.overlay_of    = GAME_STATE_COUNT,
 	},
 
 	[GAME_STATE_CREDITS] = {
 		.update        = gameState_updateCredits,
 		.setDescriptor = gameState_setCreditsDescriptor,
 		.bindCharacter     = NULL,
-		.onEnter       = credits_startEnter,
-		.scene_id      = SCENE_COUNT,
+		.onEnter       = credits_ui_startEnter,
+		.onExit        = NULL,
+		.scene         = NULL,
+		.overlay_of    = GAME_STATE_COUNT,
 	},
 
 	[GAME_STATE_GAMEPLAY] = {
 		.update        = gameState_updateGameplay,
 		.setDescriptor = gameState_setGameplayDescriptor,
 		.bindCharacter     = gameState_bindGameplayCharacter,
-		.onEnter       = gameplay_startEnter,
-		.scene_id      = SCENE_DEMO,
+		.onEnter       = gameplay_ui_startEnter,
+		.onExit        = gameplay_ui_exit,
+		.scene         = &demo_scene,
+		.overlay_of    = GAME_STATE_COUNT,
 	},
 
 	[GAME_STATE_PAUSE] = {
 		.update        = gameState_updatePause,
 		.setDescriptor = gameState_setPauseDescriptor,
 		.bindCharacter     = NULL,
-		.onEnter       = pause_startEnter,
-		.scene_id      = SCENE_COUNT,
+		.onEnter       = pause_ui_startEnter,
+		.onExit        = NULL,
+		.scene         = NULL,
+		.overlay_of    = GAME_STATE_GAMEPLAY,
 	},
 
 	[GAME_STATE_GAME_OVER] = {
@@ -199,7 +219,9 @@ static const GameStateDef game_state[GAME_STATE_COUNT] = {
 		.setDescriptor = gameState_setGameOverDescriptor,
 		.bindCharacter     = NULL,
 		.onEnter       = NULL,
-		.scene_id      = SCENE_COUNT,
+		.onExit        = NULL,
+		.scene         = NULL,
+		.overlay_of    = GAME_STATE_COUNT,
 	},
 
 };
@@ -207,8 +229,8 @@ static const GameStateDef game_state[GAME_STATE_COUNT] = {
 static void gameState_load(GameState id)
 {
 	resources_load(resources_forState(id));
-	if (game_state[id].scene_id != SCENE_COUNT) {
-		scene_load(scene_getDef(game_state[id].scene_id));
+	if (game_state[id].scene) {
+		scene_load(game_state[id].scene);
 		if (game_state[id].bindCharacter) game_state[id].bindCharacter();
 	}
 	if (game_state[id].onEnter) game_state[id].onEnter();
@@ -216,18 +238,17 @@ static void gameState_load(GameState id)
 
 static void gameState_unload(GameState id)
 {
-	if (game_state[id].scene_id != SCENE_COUNT) {
+	if (game_state[id].onExit) game_state[id].onExit();
+	if (game_state[id].scene) {
 		player_init();
 		scene_unload();
 	}
 	resources_unload(resources_forState(id));
 }
 
-static bool gameState_preservesScene(GameState prev, GameState next)
+static bool gameState_isOverlayPair(GameState prev, GameState next)
 {
-	if (prev == GAME_STATE_GAMEPLAY && next == GAME_STATE_PAUSE)    return true;
-	if (prev == GAME_STATE_PAUSE    && next == GAME_STATE_GAMEPLAY) return true;
-	return false;
+	return game_state[next].overlay_of == prev || game_state[prev].overlay_of == next;
 }
 
 void game_setState(Game *game, GameState new_state)
@@ -235,39 +256,33 @@ void game_setState(Game *game, GameState new_state)
 	if (game->state == new_state) return;
 
 	GameState prev = game->state;
-	bool preserves = gameState_preservesScene(prev, new_state);
 
-	if (preserves) {
-		/* Pause overlays gameplay, so its resources stay loaded. Entering
-		   adds the pause ones, leaving drops them without re-entering
-		   gameplay, which would fade in again. */
-		if (new_state == GAME_STATE_PAUSE) {
-			resources_load(resources_forState(GAME_STATE_PAUSE));
-			game->state = new_state;
-			if (game_state[GAME_STATE_PAUSE].onEnter) game_state[GAME_STATE_PAUSE].onEnter();
-		} else {
-			resources_unload(resources_forState(GAME_STATE_PAUSE));
-			game->state = new_state;
-		}
+	/* An overlay rides its base: switching between the two touches no
+	   memory at all, and dropping back does not re-enter the base. */
+	if (gameState_isOverlayPair(prev, new_state)) {
+		game->state = new_state;
+		if (game_state[new_state].overlay_of == prev && game_state[new_state].onEnter)
+			game_state[new_state].onEnter();
 		return;
 	}
 
 	rspq_wait();
-	/* Leaving pause for a state that does not preserve the scene also tears
-	   down the gameplay scene underneath. */
-	if (prev == GAME_STATE_PAUSE) {
-		resources_unload(resources_forState(GAME_STATE_PAUSE));
-		gameState_unload(GAME_STATE_GAMEPLAY);
-	} else {
-		gameState_unload(prev);
-	}
+	gameState_unload(prev);
+	/* An abandoned overlay takes its base state down with it. */
+	if (game_state[prev].overlay_of != GAME_STATE_COUNT)
+		gameState_unload(game_state[prev].overlay_of);
 	game->state = new_state;
 	gameState_load(new_state);
+
+	/* The load blocked for as long as it took: none of it counts as a
+	   played frame, or the enter animations would swallow it as one. */
+	time_reset();
 }
 
 void game_loadInitialState(void)
 {
 	gameState_load(GAME_INITIAL_STATE);
+	time_reset();
 }
 
 void game_updateState(GameContext *ctx)

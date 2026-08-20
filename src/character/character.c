@@ -31,6 +31,7 @@ Character *character_create(const CharacterDef *def, Entity *entity)
 
 	*character = (Character){
 		.entity    = entity,
+		.stats     = (CharacterStats){ .settings = def->stats_settings, .stamina = 1.0f },
 		.body      = (KinematicBody){ .position = vector3_scaled(&entity->transform.position, RENDER_SCALE_INV), .rotation = entity->transform.rotation },
 		.movement  = (CharacterMovement){ .settings = def->movement_settings, .data.is_grounded = true, .current = MOVEMENT_STATE_IDLE },
 		.animation = (CharacterAnimation){ .def = def->animation_def },

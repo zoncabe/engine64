@@ -10,9 +10,9 @@ extern Screen main_menu_screen;
 
 
 void main_menu_ui_init(void);
-void main_menu_update(void);
-void main_menu_startExit(void (*on_finish)(void *ctx), void *ctx);
-void main_menu_startEnter(void);
-bool main_menu_isTransitioning(void);
+void main_menu_ui_update(void);
+void main_menu_ui_startExit(void (*on_finish)(void *ctx), void *ctx);
+void main_menu_ui_startEnter(void);
+bool main_menu_ui_isTransitioning(void);
 
 #endif

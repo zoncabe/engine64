@@ -3,6 +3,7 @@
 
 #include "viewport/viewport.h"
 #include "entity/entity.h"
+#include "control/character_control.h"
 #include "character/character.h"
 #include "character/character_movement.h"
 #include "character/character_animation.h"
@@ -19,7 +20,7 @@ Player *player_get(void) { return player; }
 void player_init(void)
 {
 	for (int i = 0; i < PLAYER_COUNT; i++)
-		player[i] = (Player){ .stats = { .stamina = 1.0f } };
+		player[i] = (Player){0};
 }
 
 void player_setCharacter(Player *player, Character *character)
@@ -59,35 +60,11 @@ void player_switchCharacter(Player *player, int8_t direction)
 }
 
 
-/* Running at the top gait drains stamina, anything else recovers it. Hitting
-   zero flags the player tired, which caps locomotion speed through the
-   command until stamina is back at full. */
-static void player_updateStamina(Player *player, float dt)
-{
-	const CharacterMovement *movement = &player->character->movement;
-	const CharacterMovementSettings *settings = movement->settings;
-	PlayerStats *stats = &player->stats;
-
-	bool running = movement->current == MOVEMENT_STATE_WALKING
-	            && movement->data.gait == settings->gait_count - 1;
-
-	/* Transitions run first, on the value the previous frame rendered: the
-	   frame that lands on zero stays at zero on screen, and regen can only
-	   move it from the next update on. */
-	if (stats->stamina <= 0.0f) stats->tired = true;
-	if (stats->stamina >= 1.0f) stats->tired = false;
-
-	float rate = running && !stats->tired ? -settings->stamina_drain_rate : settings->stamina_regen_rate;
-	stats->stamina = clampf(stats->stamina + rate * dt, 0.0f, 1.0f);
-
-	player->cmd.speed_scale = stats->tired ? settings->tired_speed_scale : 1.0f;
-}
-
 void player_update(void)
 {
 	const float dt = time_get()->delta;
 	for (int i = 0; i < PLAYER_COUNT; i++) {
-		player_updateStamina(&player[i], dt);
+		characterStats_update(player[i].character, &player[i].cmd, dt);
 		character_updateMovement(player[i].character, &player[i].cmd, dt);
 		character_setAnimation(player[i].character);
 		characterSound_update(player[i].character);
@@ -105,7 +82,15 @@ void player_update(void)
 			if (player[p].character == character) driven = true;
 		if (driven) continue;
 
+		/* Same pipeline as a driven body, on a controller nobody holds: the
+		   released stick idles it through the control's own rule (treading
+		   water if it was swimming), and idling never drains, so a body
+		   left behind rests and refills on its own. */
+		static const ControllerActions no_actions;
+
 		idle_cmd.target_yaw = character->body.rotation.z;
+		characterControl_update(character, &idle_cmd, &no_actions, 0.0f);
+		characterStats_update(character, &idle_cmd, dt);
 		character_updateMovement(character, &idle_cmd, dt);
 		character_setAnimation(character);
 		characterSound_update(character);

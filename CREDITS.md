@@ -119,29 +119,57 @@ Droid Sans by Ascender Corporation, digitized data Copyright 2007 Google
 
 ## Audio
 
-Every sound below comes from Freesound. All were converted to 32 kHz mono
-16-bit PCM for the Nintendo 64 audio pipeline and renamed; the footsteps and
-rolls were also gain adjusted to sit at a common level. Their length is
-untouched and nothing else was edited. Attribution 4.0 requires crediting the
-author and stating that changes were made, which the lines below provide.
+All sounds were converted to 32 kHz mono 16-bit PCM for the Nintendo 64
+audio pipeline, renamed, and gain adjusted to sit at a common level. The
+swim sounds are takes cut from their pack's longer recordings, and the ball
+bounces are single hits cut from one longer recording; every other length
+is untouched. Sources and licenses are listed per file; the Attribution 4.0
+entries state that changes were made, as that license requires.
 
-`assets/audio/flag-flapping.wav`
+`assets/audio/flag_flapping.wav`
 Cotton Flapping.wav by Benboncan -- https://freesound.org/s/80079/ -- License: Attribution 4.0
 
-`assets/audio/footstep-01.wav`
+`assets/audio/footstep_01.wav`
 Footsteps-Tile-Run-24.wav by DWOBoyle -- https://freesound.org/s/458335/ -- License: Attribution 4.0
 
-`assets/audio/footstep-02.wav`
+`assets/audio/footstep_02.wav`
 Footsteps-Tile-Run-25.wav by DWOBoyle -- https://freesound.org/s/458336/ -- License: Attribution 4.0
 
-`assets/audio/footstep-03.wav`
+`assets/audio/footstep_03.wav`
 Footsteps-Tile-Run-09.wav by DWOBoyle -- https://freesound.org/s/458361/ -- License: Attribution 4.0
 
-`assets/audio/footstep-04.wav`
+`assets/audio/footstep_04.wav`
 Footsteps-Tile-Run-13.wav by DWOBoyle -- https://freesound.org/s/458366/ -- License: Attribution 4.0
 
-`assets/audio/roll-01.wav`
+`assets/audio/roll_01.wav`
 Footsteps-Tile-light-13.wav by DWOBoyle -- https://freesound.org/s/458355/ -- License: Attribution 4.0
 
-`assets/audio/roll-02.wav`
+`assets/audio/roll_02.wav`
 Footsteps-Tile-light-14.wav by DWOBoyle -- https://freesound.org/s/458337/ -- License: Attribution 4.0
+
+`assets/audio/swim_stroke_light.wav`
+Water Swirl 2_2.wav by Joao_Janz -- https://freesound.org/s/478681/ -- License: Creative Commons 0
+
+`assets/audio/swim_stroke_light_2.wav`
+Water Swirl 2_1.wav by Joao_Janz -- https://freesound.org/s/478683/ -- License: Creative Commons 0
+
+`assets/audio/swim_stroke_heavy.wav`
+Water Swirl 4_2.wav by Joao_Janz -- https://freesound.org/s/478689/ -- License: Creative Commons 0
+
+`assets/audio/swim_stroke_heavy_2.wav`
+Water Swirl 4_1.wav by Joao_Janz -- https://freesound.org/s/478688/ -- License: Creative Commons 0
+
+`assets/audio/swim_splash.wav`
+Water Swirl 4_4.wav by Joao_Janz -- https://freesound.org/s/478701/ -- License: Creative Commons 0
+
+`assets/audio/swim_splash_2.wav`
+Water Swirl 4_3.wav by Joao_Janz -- https://freesound.org/s/478700/ -- License: Creative Commons 0
+
+
+`assets/audio/thud_01.wav`
+`assets/audio/thud_02.wav`
+`assets/audio/thud_03.wav`
+`assets/audio/thud_04.wav`
+Carpet footstep samples by Kenney (footstep_carpet 000, 002-004)
+-- https://www.kenney.nl
+-- License: CC0 / Public Domain

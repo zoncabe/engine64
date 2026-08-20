@@ -13,8 +13,10 @@ static const char *sprite_paths[SPRITE_COUNT] = {
 	[SPRITE_D_LEFT]    = "rom:/textures/DLeft.sprite",
 	[SPRITE_D_RIGHT]   = "rom:/textures/DRight.sprite",
 	[SPRITE_LIBDRAGON] = "rom:/textures/libdragon.sprite",
-	[SPRITE_TINY3D]    = "rom:/textures/tiny3d.sprite",
-	[SPRITE_ZONCABE]   = "rom:/textures/zoncabe.sprite",
+	[SPRITE_TINY3D]          = "rom:/textures/tiny3d.sprite",
+	[SPRITE_ZONCABE]         = "rom:/textures/zoncabe.sprite",
+	[SPRITE_CIRCLE_MASK]     = "rom:/textures/CircleMask.i8.sprite",
+	[SPRITE_CIRCLE_PROGRESS] = "rom:/textures/CircleProgress.i8.sprite",
 
 };
 
@@ -31,6 +33,11 @@ void sprite_unloadAsset(SpriteID id)
 {
 	sprite_free(sprite[id]);
 	sprite[id] = NULL;
+}
+
+sprite_t *sprite_getAsset(SpriteID id)
+{
+	return sprite[id];
 }
 
 void sprite_setMode()

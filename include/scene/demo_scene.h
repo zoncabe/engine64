@@ -3,6 +3,6 @@
 
 #include "scene.h"
 
-extern const SceneDef demo_scene;
+extern SceneDef demo_scene;
 
 #endif

@@ -2,6 +2,11 @@
 	Radial stamina gauge, a textured particle anchored to the character hip
 	bone so it follows the run cycle.
 
+	One wheel per body, two slots: the stats live in the character, so when
+	the player switches away the abandoned body keeps its wheel fading out
+	in place — showing its real recovery — while the new body fades its
+	own in. A slot follows its character until the fade completes.
+
 	The radial cutout comes from the N64brew GameJam 2024 setup screen:
 	TILE0 holds an angular sweep gradient and TILE1 the ring artwork; the
 	combiner routes the sweep into alpha, and alpha compare discards every
@@ -21,9 +26,13 @@
 #include "player/player.h"
 #include "game/game.h"
 #include "particles/particles.h"
+#include "graphics/sprites.h"
 #include "ui/stamina_wheel.h"
 
 #define STAMINA_WHEEL_BONE     "mixamorig:Hips"
+
+/* Enough for the switch: the wheel leaving and the wheel arriving. */
+#define STAMINA_WHEEL_COUNT    2
 
 /* Offset from the hip, render units: X runs along the camera right axis so
    the wheel keeps its place on screen while the camera orbits, Z stays on
@@ -44,6 +53,10 @@
 #define STAMINA_WHEEL_PULSE_SPEED  8.0f   /* radians per second */
 #define STAMINA_WHEEL_GREEN_RATE   6.0f   /* recovery lerp response */
 
+/* Seconds at full stamina before the wheel may leave: the ease back to
+   green happens on screen instead of being cut off. */
+#define STAMINA_WHEEL_SETTLE_TIME  0.6f
+
 /* Completion burst: while the settled wheel fades out it pops in scale and
    the green flashes toward white. */
 #define STAMINA_WHEEL_BURST_SCALE  0.35f
@@ -54,32 +67,40 @@ static const float wheel_yellow[3] = { 230.0f, 200.0f, 40.0f };
 static const float wheel_red[3]    = { 220.0f,  50.0f, 40.0f };
 
 
-static sprite_t *wheel_sweep;   /* angular gradient, becomes the cutout alpha */
-static sprite_t *wheel_ring;    /* ring artwork, tinted by the particle color */
+typedef struct {
 
-static int16_t wheel_bone = -1;
-static float wheel_progress = 1.0f;
-static float wheel_alpha = 0.0f;
-static float wheel_color[3] = { 80.0f, 200.0f, 90.0f };
-static float wheel_pulse = 0.0f;
+	Particle        *particle;
+	const Character *character;   /* NULL leaves the slot free */
+
+	int16_t bone;
+	float   progress;
+	float   alpha;
+	float   pulse;
+	float   settle_timer;   /* runs while stamina is full; the leave waits on it */
+	float   color[3];
+
+} StaminaWheel;
+
+
+static StaminaWheel wheel_slot[STAMINA_WHEEL_COUNT];
 
 
 /* Banded while draining, pulsing yellow-to-red while tired (less red as it
    refills), easing back to green once full. */
-static void staminaWheel_setColor(const PlayerStats *stats, float dt)
+static void staminaWheel_setColor(StaminaWheel *wheel, const CharacterStats *stats, float dt)
 {
 	if (stats->tired) {
-		wheel_pulse += dt * STAMINA_WHEEL_PULSE_SPEED;
-		float red_mix = (0.5f + 0.5f * fm_sinf(wheel_pulse)) * (1.0f - stats->stamina);
+		wheel->pulse += dt * STAMINA_WHEEL_PULSE_SPEED;
+		float red_mix = (0.5f + 0.5f * fm_sinf(wheel->pulse)) * (1.0f - stats->stamina);
 		for (int i = 0; i < 3; i++)
-			wheel_color[i] = wheel_yellow[i] + (wheel_red[i] - wheel_yellow[i]) * red_mix;
+			wheel->color[i] = wheel_yellow[i] + (wheel_red[i] - wheel_yellow[i]) * red_mix;
 		return;
 	}
 
 	if (stats->stamina >= 1.0f) {
 		float t = clampf(STAMINA_WHEEL_GREEN_RATE * dt, 0.0f, 1.0f);
 		for (int i = 0; i < 3; i++)
-			wheel_color[i] += (wheel_green[i] - wheel_color[i]) * t;
+			wheel->color[i] += (wheel_green[i] - wheel->color[i]) * t;
 		return;
 	}
 
@@ -93,57 +114,92 @@ static void staminaWheel_setColor(const PlayerStats *stats, float dt)
 
 	float t = clampf((stats->stamina - band) / STAMINA_WHEEL_BLEND_SPAN, 0.0f, 1.0f);
 	for (int i = 0; i < 3; i++)
-		wheel_color[i] = lower[i] + (upper[i] - lower[i]) * t;
+		wheel->color[i] = lower[i] + (upper[i] - lower[i]) * t;
 }
 
-static bool staminaWheel_colorIsGreen(void)
+
+/* The driven character always owns a slot: a free one, or failing that the
+   faintest wheel, restarted on the new body. The color starts on green and
+   the first setColor writes the band the real stamina asks for. */
+static void staminaWheel_assign(const Character *driven)
 {
-	for (int i = 0; i < 3; i++)
-		if (fabsf(wheel_color[i] - wheel_green[i]) > 2.0f) return false;
-	return true;
-}
+	if (driven == NULL) return;
 
+	StaminaWheel *claim = &wheel_slot[0];
+	for (int i = 0; i < STAMINA_WHEEL_COUNT; i++) {
+		StaminaWheel *slot = &wheel_slot[i];
+		if (slot->character == driven) return;
+		if (claim->character != NULL
+		    && (slot->character == NULL || slot->alpha < claim->alpha))
+			claim = slot;
+	}
+
+	claim->character    = driven;
+	claim->bone         = -1;
+	claim->progress     = driven->stats.stamina;
+	claim->alpha        = 0.0f;
+	claim->pulse        = 0.0f;
+
+	/* A body taken over while already full has no recovery to show: its
+	   timer starts spent, or the wheel would flash in on every switch. */
+	claim->settle_timer = (driven->stats.stamina >= 1.0f) ? STAMINA_WHEEL_SETTLE_TIME : 0.0f;
+	for (int i = 0; i < 3; i++) claim->color[i] = wheel_green[i];
+}
 
 static void staminaWheel_setInput(Particle *particle, const GameContext *ctx, uint8_t fb_index)
 {
-	const Player *player = &ctx->player[0];
-	const Character *character = player->character;
+	const Character *driven = ctx->player[0].character;
+
+	/* The first wheel of the frame settles who owns which slot. */
+	if (particle == wheel_slot[0].particle)
+		staminaWheel_assign(driven);
+
+	StaminaWheel *wheel = &wheel_slot[(particle == wheel_slot[0].particle) ? 0 : 1];
+	const Character *character = wheel->character;
 
 	if (!character) { particle->visible = false; return; }
 
 	float dt = time_get()->delta;
-	staminaWheel_setColor(&player->stats, dt);
+	staminaWheel_setColor(wheel, &character->stats, dt);
+
+	if (character->stats.stamina >= 1.0f) wheel->settle_timer += dt;
+	else                                  wheel->settle_timer  = 0.0f;
 
 	/* Fade in whenever stamina is short; fade out while aiming, or once the
 	   color has settled back on green so the lerp is seen before the wheel
-	   leaves. */
-	bool aiming  = ctx->viewport->camera.spring_arm.state == CAMERA_SPRING_ARM_AIMING;
-	bool settled = player->stats.stamina >= 1.0f && staminaWheel_colorIsGreen();
-	float fade_step = STAMINA_WHEEL_FADE_RATE * dt;
-	wheel_alpha += clampf((aiming || settled ? 0.0f : STAMINA_WHEEL_MAX_ALPHA) - wheel_alpha, -fade_step, fade_step);
+	   leaves. An abandoned body's wheel just fades out where it stands. */
+	bool is_driven = character == driven;
+	bool aiming    = is_driven && ctx->viewport->camera.spring_arm.state == CAMERA_SPRING_ARM_AIMING;
+	bool settled   = wheel->settle_timer >= STAMINA_WHEEL_SETTLE_TIME;
 
-	particle->visible = wheel_alpha > 0.0f;
+	float target = (is_driven && !aiming && !settled) ? STAMINA_WHEEL_MAX_ALPHA : 0.0f;
+	float fade_step = STAMINA_WHEEL_FADE_RATE * dt;
+	wheel->alpha += clampf(target - wheel->alpha, -fade_step, fade_step);
+
+	if (!is_driven && wheel->alpha <= 0.0f) wheel->character = NULL;
+
+	particle->visible = wheel->alpha > 0.0f;
 	if (!particle->visible) return;
 
-	wheel_progress = player->stats.stamina;
+	wheel->progress = character->stats.stamina;
 
 	/* 0 while active; climbs to 1 along the settled fade-out. */
-	float burst = settled ? 1.0f - wheel_alpha / STAMINA_WHEEL_MAX_ALPHA : 0.0f;
+	float burst = settled ? 1.0f - wheel->alpha / STAMINA_WHEEL_MAX_ALPHA : 0.0f;
 
 	for (int i = 0; i < 3; i++) {
-		float flash = wheel_color[i] + (255.0f - wheel_color[i]) * STAMINA_WHEEL_FLASH_MIX * burst;
+		float flash = wheel->color[i] + (255.0f - wheel->color[i]) * STAMINA_WHEEL_FLASH_MIX * burst;
 		particle->buffer.s8[0].colorA[i] = (uint8_t)flash;
 	}
 
 	const T3DSkeleton *skeleton = &character->animation.main;
-	if (wheel_bone < 0) {
-		wheel_bone = (int16_t)t3d_skeleton_find_bone((T3DSkeleton *)skeleton, STAMINA_WHEEL_BONE);
-		if (wheel_bone < 0) { particle->visible = false; return; }
+	if (wheel->bone < 0) {
+		wheel->bone = (int16_t)t3d_skeleton_find_bone((T3DSkeleton *)skeleton, STAMINA_WHEEL_BONE);
+		if (wheel->bone < 0) { particle->visible = false; return; }
 	}
 
 	T3DVec3 bone_position;
 	T3DQuat bone_rotation;
-	character_getBonePose(skeleton, wheel_bone, &bone_position, &bone_rotation);
+	character_getBonePose(skeleton, wheel->bone, &bone_position, &bone_rotation);
 
 	/* Model space to world with the same matrix the renderer builds for the
 	   mesh, then the offset keeps the wheel clear of the body. */
@@ -178,7 +234,7 @@ static void staminaWheel_setInput(Particle *particle, const GameContext *ctx, ui
 	particle->matrix = &particle->buffer.matrix[fb_index];
 }
 
-static void staminaWheel_setRenderState(void)
+static void staminaWheel_setRenderState(const StaminaWheel *wheel)
 {
 	rdpq_set_mode_standard();
 	rdpq_mode_blender(RDPQ_BLENDER_MULTIPLY);
@@ -193,42 +249,70 @@ static void staminaWheel_setRenderState(void)
 		(TEX1,0,PRIM,0),  (0,0,0,TEX0),
 		(0,0,0,COMBINED), (TEX1,0,ENV,0)
 	));
-	rdpq_set_env_color(RGBA32(0, 0, 0, (uint8_t)(wheel_alpha * 255.0f)));
-	rdpq_mode_alphacompare((1.0f - wheel_progress) * 255.0f);
+	rdpq_set_env_color(RGBA32(0, 0, 0, (uint8_t)(wheel->alpha * 255.0f)));
+	rdpq_mode_alphacompare((1.0f - wheel->progress) * 255.0f);
 
 	/* tpx maps UVs to an 8x8px base no matter the real size: scale_log
 	   stretches the 32px textures over the whole particle. */
+	/* Sweep gradient (the cutout alpha) and ring artwork, owned by the
+	   gameplay resource set: loaded with the state, gone with it. */
 	rdpq_texparms_t parms = { .s.scale_log = -2, .t.scale_log = -2 };
 	rdpq_tex_multi_begin();
-	rdpq_sprite_upload(TILE0, wheel_sweep, &parms);
-	rdpq_sprite_upload(TILE1, wheel_ring, &parms);
+	rdpq_sprite_upload(TILE0, sprite_getAsset(SPRITE_CIRCLE_MASK), &parms);
+	rdpq_sprite_upload(TILE1, sprite_getAsset(SPRITE_CIRCLE_PROGRESS), &parms);
 	rdpq_tex_multi_end();
+}
+
+/* One trampoline per slot: the render pass carries no particle context. */
+static void staminaWheel_setRenderStateA(void) { staminaWheel_setRenderState(&wheel_slot[0]); }
+static void staminaWheel_setRenderStateB(void) { staminaWheel_setRenderState(&wheel_slot[1]); }
+
+/* The characters died with the previous scene: a slot still holding one
+   would read freed memory. */
+void stamina_wheel_reset(void)
+{
+	for (int i = 0; i < STAMINA_WHEEL_COUNT; i++) {
+		wheel_slot[i].character = NULL;
+		wheel_slot[i].alpha     = 0.0f;
+	}
 }
 
 float stamina_wheel_getProgress(void)
 {
-	return wheel_progress;
+	const StaminaWheel *strongest = &wheel_slot[0];
+	for (int i = 1; i < STAMINA_WHEEL_COUNT; i++)
+		if (wheel_slot[i].alpha > strongest->alpha) strongest = &wheel_slot[i];
+	return strongest->character ? strongest->progress : 1.0f;
 }
 
 void stamina_wheel_init(void)
 {
-	Particle wheel = {
-		.buffer           = particleBuffer_create(PARTICLE_S8, 2),
-		.update           = staminaWheel_setInput,
-		.set_render_state = staminaWheel_setRenderState,
-		.textured         = true,
+	static void (*const render_state[STAMINA_WHEEL_COUNT])(void) = {
+		staminaWheel_setRenderStateA,
+		staminaWheel_setRenderStateB,
 	};
 
-	/* One particle at the buffer origin; the pair rule leaves B at size 0.
-	   Color goes out as prim color, its alpha is a texture offset. */
-	wheel.buffer.s8[0] = (TPXParticleS8){
-		.posA   = { 0, 0, 0 },
-		.sizeA  = STAMINA_WHEEL_SIZE,
-		.colorA = { 80, 200, 90, 0 },
-	};
+	for (int i = 0; i < STAMINA_WHEEL_COUNT; i++) {
+		Particle wheel = {
+			.buffer           = particleBuffer_create(PARTICLE_S8, 2),
+			.update           = staminaWheel_setInput,
+			.set_render_state = render_state[i],
+			.textured         = true,
+		};
 
-	wheel_sweep = sprite_load("rom:/textures/CircleMask.i8.sprite");
-	wheel_ring  = sprite_load("rom:/textures/CircleProgress.i8.sprite");
+		/* One particle at the buffer origin; the pair rule leaves B at size 0.
+		   Color goes out as prim color, its alpha is a texture offset. */
+		wheel.buffer.s8[0] = (TPXParticleS8){
+			.posA   = { 0, 0, 0 },
+			.sizeA  = STAMINA_WHEEL_SIZE,
+			.colorA = { 80, 200, 90, 0 },
+		};
 
-	particles_add(&wheel);
+		wheel_slot[i] = (StaminaWheel){
+			.particle = particles_add(&wheel),
+			.bone     = -1,
+			.progress = 1.0f,
+			.color    = { wheel_green[0], wheel_green[1], wheel_green[2] },
+		};
+	}
 }

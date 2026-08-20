@@ -131,35 +131,35 @@ void pause_ui_init(void)
 	pause_cursor_track[1].source_int = index;
 }
 
-void pause_update(void)
+void pause_ui_update(void)
 {
 	if (pause_animation_player.is_active)
 		screenAnimationPlayer_update(&pause_animation_player, time_get()->delta);
 	screenAnimation_apply(&pause_cursor_animation, 0.0f);
 }
 
-void pause_startEnter(void)
+void pause_ui_startEnter(void)
 {
 	screenAnimationPlayer_start(&pause_animation_player, &pause_transition_animation, SCREEN_ANIMATION_PLAY_ONCE, false);
 	pause_animation_player.on_finish     = NULL;
 	pause_animation_player.on_finish_ctx = NULL;
 }
 
-void pause_startExit(void (*on_finish)(void *ctx), void *ctx)
+void pause_ui_startExit(void (*on_finish)(void *ctx), void *ctx)
 {
 	screenAnimationPlayer_start(&pause_animation_player, &pause_transition_animation, SCREEN_ANIMATION_PLAY_ONCE, true);
 	pause_animation_player.on_finish     = on_finish;
 	pause_animation_player.on_finish_ctx = ctx;
 }
 
-void pause_startQuit(void (*on_finish)(void *ctx), void *ctx)
+void pause_ui_startQuit(void (*on_finish)(void *ctx), void *ctx)
 {
 	screenAnimationPlayer_start(&pause_animation_player, &pause_quit_animation, SCREEN_ANIMATION_PLAY_ONCE, false);
 	pause_animation_player.on_finish     = on_finish;
 	pause_animation_player.on_finish_ctx = ctx;
 }
 
-bool pause_isTransitioning(void)
+bool pause_ui_isTransitioning(void)
 {
 	return pause_animation_player.is_active;
 }

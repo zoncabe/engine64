@@ -46,8 +46,8 @@ typedef struct CharacterSoundDef {
 	float roll_launch_volume;
 	float roll_stand_volume;
 
-	/* Seconds a footstep has to be behind for the roll's launch foot to fire.
-	   A step right before the roll makes the two land too close together. */
+	/* Seconds a footstep has to be behind for the roll's launch foot to fire:
+	   pushing off right after a step would flam two samples into one. */
 	float roll_launch_gap;
 
 	/* Fires when the crouch ends and the body leaves the floor. */
@@ -55,12 +55,35 @@ typedef struct CharacterSoundDef {
 	uint8_t jump_count;
 	float jump_volume;
 
+	/* Same guard for the jump takeoff, tuned on its own. */
+	float jump_launch_gap;
+
 	/* Fires on touchdown, scaled by how fast the body was falling. */
 	const SoundID *land;
 	uint8_t land_count;
 	float land_volume_min;
 	float land_volume_max;
 	float land_speed_max;
+
+	/* Swim strokes fire on the stroke phases of the swim cycle; the pace
+	   picks the set, calm strokes against sprint ones. */
+	const SoundID *swim_stroke_light;
+	uint8_t swim_stroke_light_count;
+	const SoundID *swim_stroke_heavy;
+	uint8_t swim_stroke_heavy_count;
+
+	/* Points of the swim clips where an arm pulls, like the footings. */
+	const float *stroke;
+	uint8_t stroke_count;
+	float stroke_volume;
+
+	/* Fires entering the water, scaled by the plunge speed. The minimum sits
+	   near zero: wading in from the ramp barely whispers, a jump slaps. */
+	const SoundID *splash;
+	uint8_t splash_count;
+	float splash_volume_min;
+	float splash_volume_max;
+	float splash_speed_max;
 
 } CharacterSoundDef;
 
@@ -81,6 +104,11 @@ typedef struct CharacterSound {
 	   the impact is the one the previous frame carried. */
 	float previous_fall_speed;
 	bool previous_grounded;
+
+	/* Same scheme for the splash: the water damps the fall on the entry
+	   frame, so the plunge speed is the last dry frame's. */
+	float previous_plunge_speed;
+	bool previous_in_water;
 
 	/* Clock reading of the last footstep, for whoever has to keep its distance
 	   from one. */

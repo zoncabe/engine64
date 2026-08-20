@@ -3,6 +3,8 @@
 #include "sound/sound.h"
 #include "sound/sound_bank.h"
 #include "time/time.h"
+#include "player/player.h"
+#include "viewport/viewport.h"
 
 /* Output rate of the AI. The mixer resamples every voice to it, so its cost is
    paid per output sample: this is the number that sets the RSP budget, not the
@@ -319,8 +321,27 @@ void sound_poll(void)
 }
 
 
+/* The ear rides the driven body — the camera floats away on the spring arm,
+   and hearing from there detaches the sound from the character. With nobody
+   possessed (menus, cutscenes) it falls back to the camera. The right vector
+   is always the camera's: panning follows what the screen shows. */
+static void sound_updateListener(void)
+{
+	const Player   *player   = player_get();
+	const Viewport *viewport = viewport_get();
+
+	Vector3 ear = player[0].entity ? player[0].entity->transform.position
+	                               : viewport->camera.position;
+	Vector3 right = camera_getRight(&viewport->camera);
+
+	sound_setListener(&ear, &right);
+}
+
+
 void sound_update(void)
 {
+	sound_updateListener();
+
 	int ramp_samples = (int)(time_get()->delta * SOUND_OUTPUT_RATE);
 	if (ramp_samples < SOUND_RAMP_MIN_SAMPLES) ramp_samples = SOUND_RAMP_MIN_SAMPLES;
 

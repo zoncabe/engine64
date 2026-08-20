@@ -16,6 +16,8 @@ typedef enum {
 
 } EntityType;
 
+struct Asset;
+
 typedef struct Entity {
 
 	EntityType type;

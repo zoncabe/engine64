@@ -33,21 +33,14 @@ typedef struct Character Character;
 #define CHARACTER_GRAVITY -18.0f
 #define CHARACTER_FALL_MAX_SPEED -15.0f
 
-/* Fake buoyancy: the capsule seeks the depth where the scaled gravity flips
-   sign. The equilibrium follows the pose the clips are authored at: treading
-   water holds the head at the capsule top, stroking holds the body at its
-   middle, so speed slides the target between the two and the swim rides up
-   to the surface on the same spring. */
-#define CHARACTER_WATER_EQUILIBRIUM_IDLE 0.85f
-#define CHARACTER_WATER_EQUILIBRIUM_SWIM 0.55f
 #define CHARACTER_WATER_DRAG             4.0f    /* vertical, per second, at full submersion */
 #define CHARACTER_WATER_SINK_MAX_SPEED  -2.0f    /* fully reached at the fraction below */
 #define CHARACTER_WATER_SINK_LIMIT_FULL  0.8f    /* submersion where the sink limit saturates */
 
 /* Swim state thresholds on the submerged fraction, with hysteresis so the
    waves cannot flicker the state at the boundary. Exit also needs footing. */
-#define CHARACTER_WATER_SWIM_ENTER     0.6f
-#define CHARACTER_WATER_SWIM_EXIT      0.45f
+#define CHARACTER_WATER_SWIM_ENTER     0.45f
+#define CHARACTER_WATER_SWIM_EXIT      0.44f
 
 enum {
 	CHARACTER_SWIM_GAIT_IDLE = 0,
@@ -84,12 +77,6 @@ typedef struct {
 	const CharacterGaitSettings *gait;
 	uint8_t gait_count;
 
-	/* Stamina is normalized 0..1; rates are per second. Tired caps the
-	   reachable speed at this fraction of the top gait. */
-	float stamina_drain_rate;
-	float stamina_regen_rate;
-	float tired_speed_scale;
-
 	float roll_target_speed;
 	float roll_launch_response_rate;
 	float roll_spin_response_rate;
@@ -106,6 +93,14 @@ typedef struct {
 	float swim_slow_speed;
 	float swim_fast_speed;
 	float swim_response_rate;
+
+	/* Fake buoyancy: submerged fraction of the capsule where the scaled
+	   gravity flips sign. The equilibrium follows the pose the clips are
+	   authored at: treading water holds the head at the capsule top,
+	   stroking holds the body at its middle, and speed slides the target
+	   between the two so the swim rides up to the surface. */
+	float water_equilibrium_idle;
+	float water_equilibrium_swim;
 
 } CharacterMovementSettings;
 

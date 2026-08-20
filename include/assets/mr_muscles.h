@@ -2,6 +2,7 @@
 #define MR_MUSCLES_H
 
 #include "character/character.h"
+#include "scene/scene.h"
 
 #define mr_muscles_model "rom:/models/mr_muscles.t3dm"
 #define gorilla_model "rom:/models/gorilla.t3dm"
@@ -145,6 +146,7 @@ typedef enum {
 
 
 extern const CharacterMovementSettings    mr_muscles_movement_settings;
+extern const CharacterStatsSettings       mr_muscles_stats_settings;
 extern const CharacterColliderSettings    mr_muscles_collider_settings;
 
 extern const char *const mr_muscles_weapon_meshes[];
@@ -157,5 +159,7 @@ extern const WeaponDef weapon_m1911;
 extern const WeaponDef weapon_knife;
 extern const CharacterAnimationSettings mr_muscles_animation_settings;
 extern const CharacterAnimationDef           mr_muscles_animation_def;
+
+extern const Asset mr_muscles;
 
 #endif

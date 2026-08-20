@@ -147,8 +147,8 @@ static void characterMovement_updateBody(Character *character, float dt)
 			? data->horizontal_speed / settings->swim_slow_speed : 0.0f;
 		if (stroke > 1.0f) stroke = 1.0f;
 
-		float equilibrium = CHARACTER_WATER_EQUILIBRIUM_IDLE
-			+ (CHARACTER_WATER_EQUILIBRIUM_SWIM - CHARACTER_WATER_EQUILIBRIUM_IDLE) * stroke;
+		float equilibrium = settings->water_equilibrium_idle
+			+ (settings->water_equilibrium_swim - settings->water_equilibrium_idle) * stroke;
 
 		/* Gravity scaled by how far the capsule sits from the equilibrium
 		   depth: deeper than it, the push turns upward. The drag grows with
@@ -334,11 +334,16 @@ static void characterMovement_setSwimming(Character *character, MovementCommand 
 	const CharacterMovementSettings *settings = character->movement.settings;
 	KinematicBody *body = &character->body;
 
-	float target = 0.0f;
-	if (cmd->swim_gait == CHARACTER_SWIM_GAIT_SLOW) target = settings->swim_slow_speed;
-	if (cmd->swim_gait == CHARACTER_SWIM_GAIT_FAST) target = settings->swim_fast_speed;
+	/* Tired locks the fast stroke away, same as the top gait on land. */
+	uint8_t swim_gait = cmd->swim_gait;
+	if (cmd->speed_scale < 1.0f && swim_gait == CHARACTER_SWIM_GAIT_FAST)
+		swim_gait = CHARACTER_SWIM_GAIT_SLOW;
 
-	characterMovement_setHorizontalVelocity(character, cmd->target_yaw, target, settings->swim_response_rate, dt);
+	float target = 0.0f;
+	if (swim_gait == CHARACTER_SWIM_GAIT_SLOW) target = settings->swim_slow_speed;
+	if (swim_gait == CHARACTER_SWIM_GAIT_FAST) target = settings->swim_fast_speed;
+
+	characterMovement_setHorizontalVelocity(character, cmd->target_yaw, target * cmd->speed_scale, settings->swim_response_rate, dt);
 	body->acceleration.z = 0.0f;
 }
 

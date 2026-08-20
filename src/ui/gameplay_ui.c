@@ -57,27 +57,32 @@ void gameplay_ui_init(void)
 	stamina_wheel_init();
 }
 
-void gameplay_update(void)
+void gameplay_ui_update(void)
 {
 	if (gameplay_player.is_active)
 		screenAnimationPlayer_update(&gameplay_player, time_get()->delta);
 }
 
-void gameplay_startEnter(void)
+void gameplay_ui_startEnter(void)
 {
 	screenAnimationPlayer_start(&gameplay_player, &gameplay_animation, SCREEN_ANIMATION_PLAY_ONCE, false);
 	gameplay_player.on_finish     = NULL;
 	gameplay_player.on_finish_ctx = NULL;
 }
 
-void gameplay_startExit(void (*on_finish)(void *ctx), void *ctx)
+void gameplay_ui_startExit(void (*on_finish)(void *ctx), void *ctx)
 {
 	screenAnimationPlayer_start(&gameplay_player, &gameplay_animation, SCREEN_ANIMATION_PLAY_ONCE, true);
 	gameplay_player.on_finish     = on_finish;
 	gameplay_player.on_finish_ctx = ctx;
 }
 
-bool gameplay_isTransitioning(void)
+void gameplay_ui_exit(void)
+{
+	stamina_wheel_reset();
+}
+
+bool gameplay_ui_isTransitioning(void)
 {
 	return gameplay_player.is_active;
 }

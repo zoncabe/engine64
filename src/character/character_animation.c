@@ -118,13 +118,18 @@ static float characterAnimation_getWalkWeight(float speed, const CharacterMoveme
 	return speed / first;
 }
 
-static float characterAnimation_getLocomotionPhase(float clip_time, float clip_length)
+/* Footing wave: 0 on the left plant, 1 on the right one, eased through the
+   cycle. The plant phases come from the asset's settings. */
+static float characterAnimation_getLocomotionPhase(const CharacterAnimationSettings *settings, float clip_time, float clip_length)
 {
+	float left  = settings->footing_left;
+	float right = settings->footing_right;
+
 	float phase = clip_time / clip_length;
 	float f;
-	if      (phase <= 0.25f) f = 0.5f - 2.0f * phase;
-	else if (phase <= 0.75f) f = 2.0f * (phase - 0.25f);
-	else                     f = 1.0f - 2.0f * (phase - 0.75f);
+	if      (phase <= left)  f = 0.5f * (1.0f - phase / left);
+	else if (phase <= right) f = (phase - left) / (right - left);
+	else                     f = 1.0f - 0.5f * (phase - right) / (1.0f - right);
 	if (f > 0.9999999f) f = 0.9999999f;
 	if (f < 0.0000001f) f = 0.0000001f;
 	return f;
@@ -183,9 +188,9 @@ static void characterAnimation_snapRollToLocomotion(const CharacterAnimationPara
 {
 	const CharacterAnimationNode *node = &ctx->def->node[ctx->def->locomotion_node];
 
-	/* the quarters are where the footing wave peaks: clip 0.25 is footing 0 (left
-	   foot), clip 0.75 is footing 1 (right foot). the halves are the crossing point */
-	float phase = left ? 0.75f : 0.25f;
+	/* the plant phases are where the footing wave peaks: footing_left is
+	   footing 0, footing_right is footing 1 */
+	float phase = left ? ctx->settings->footing_right : ctx->settings->footing_left;
 
 	for (int i = 0; i < node->cols * node->rows; i++) {
 		T3DAnim *clip = characterAnimation_clip(ctx->animation, node->animation[i]);
@@ -741,6 +746,29 @@ static void characterAnimation_setStrafeLockedParams(const CharacterAnimationPar
 	animation->param[ANIMATION_PARAM_STRAFE] *= (1.0f - blend);
 }
 
+/* The swim clips run at their own native lengths; blending two strokes of
+   different period desyncs the arms mid-blend. Same cure as the locomotion
+   grid: the cycle length is interpolated at the blend point and every clip
+   gets the speed that makes its cycle last exactly that long. */
+static void characterAnimation_setSwimSpeed(const CharacterAnimationParamCtx *ctx,
+                                            const CharacterAnimationNode *node, float gait)
+{
+	CharacterAnimation *animation = ctx->animation;
+
+	float t;
+	uint8_t col = characterAnimation_blendSegment(gait, node->cols, &t);
+
+	float low    = t3d_anim_get_length(characterAnimation_clip(animation, node->animation[col]));
+	float high   = t3d_anim_get_length(characterAnimation_clip(animation, node->animation[col + 1]));
+	float length = low + t * (high - low);
+	if (length <= 0.0f) return;
+
+	for (int i = 0; i < node->cols * node->rows; i++) {
+		T3DAnim *clip = characterAnimation_clip(animation, node->animation[i]);
+		t3d_anim_set_speed(clip, t3d_anim_get_length(clip) / length);
+	}
+}
+
 /* Swim grid: weight is a timed ramp gated by the SWIMMING state, never the
    raw submersion — the waves oscillate the submerged fraction and would
    jitter the blend. The gait axis crosses idle -> slow -> fast strokes by
@@ -784,6 +812,7 @@ static void characterAnimation_setSwimParams(const CharacterAnimationParamCtx *c
 	if (gait < 0.0f) gait = 0.0f;
 	if (gait > 1.0f) gait = 1.0f;
 
+	characterAnimation_setSwimSpeed(ctx, node, gait);
 	characterAnimation_syncGridClips(ctx, node, gait, 0.0f);
 
 	animation->param[ANIMATION_PARAM_SWIM]      = blend;
@@ -839,7 +868,7 @@ void characterAnimation_setParams(Character *character, const CharacterAnimation
 
 	T3DAnim *base = characterAnimation_clip(animation, locomotion->animation[row * locomotion->cols + locomotion->cols / 2]);
 
-	ctx.locomotion_phase = characterAnimation_getLocomotionPhase(base->time, t3d_anim_get_length(base));
+	ctx.locomotion_phase = characterAnimation_getLocomotionPhase(ctx.settings, base->time, t3d_anim_get_length(base));
 	ctx.turning          = characterAnimation_getTurningAvg(animation, ctx.settings, character->body.rotation.z, character->movement.data.previous_yaw);
 
 	characterAnimation_setLocomotionSpeed (&ctx);

@@ -16,6 +16,8 @@ typedef enum {
 	SPRITE_LIBDRAGON,
 	SPRITE_TINY3D,
 	SPRITE_ZONCABE,
+	SPRITE_CIRCLE_MASK,
+	SPRITE_CIRCLE_PROGRESS,
 	SPRITE_COUNT
 
 } SpriteID;
@@ -29,6 +31,10 @@ typedef struct {
 
 void sprite_loadAsset(SpriteID id);
 void sprite_unloadAsset(SpriteID id);
+
+/* The loaded sprite behind an id, for whoever uploads it by hand instead of
+   going through sprite_draw. NULL while its state has it unloaded. */
+struct sprite_s *sprite_getAsset(SpriteID id);
 void sprite_setMode(void);
 void sprite_draw(const Sprite *element, Vector2 position, Vector2 scale, float rotation);
 

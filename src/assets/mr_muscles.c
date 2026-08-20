@@ -1,6 +1,15 @@
 #include "character/character.h"
 #include "assets/mr_muscles.h"
 
+/* Both feet land at a quarter and three quarters of the locomotion clip.
+   Single source for the animation settings and the footstep sounds. */
+#define MM_FOOTING_LEFT  0.25f
+#define MM_FOOTING_RIGHT 0.75f
+
+/* The swim clips pull an arm at the start and the middle of the cycle. */
+#define MM_STROKE_A 0.0f
+#define MM_STROKE_B 0.5f
+
 
 static const CharacterAnimationClipDef mr_muscles_clips[] = {
 	 
@@ -168,10 +177,6 @@ const CharacterMovementSettings mr_muscles_movement_settings = {
 	.gait       = mr_muscles_gaits,
 	.gait_count = sizeof(mr_muscles_gaits) / sizeof(mr_muscles_gaits[0]),
 
-	.stamina_drain_rate = 0.15f,
-	.stamina_regen_rate = 0.25f,
-	.tired_speed_scale  = 0.8f,
-
 	.roll_target_speed         = 4.6f,
 	.roll_launch_response_rate = 15.0f,
 	.roll_spin_response_rate   = 5.0f,
@@ -188,6 +193,17 @@ const CharacterMovementSettings mr_muscles_movement_settings = {
 	.swim_slow_speed    = 1.2f,
 	.swim_fast_speed    = 2.6f,
 	.swim_response_rate = 4.0f,
+
+	.water_equilibrium_idle = 0.75f,
+	.water_equilibrium_swim = 0.45f,
+
+};
+
+const CharacterStatsSettings mr_muscles_stats_settings = {
+
+	.stamina_drain_rate = 0.15f,
+	.stamina_regen_rate = 0.25f,
+	.tired_speed_scale  = 0.8f,
 
 };
 
@@ -266,6 +282,9 @@ const CharacterAnimationSettings mr_muscles_animation_settings = {
 
 		.action_idle_max_blending_ratio = 0.85f,
 
+		.footing_left  = MM_FOOTING_LEFT,
+		.footing_right = MM_FOOTING_RIGHT,
+
 		.turn_max_angle  = 5.0f,
 		.turn_max_weight = 0.4f,
 
@@ -291,7 +310,7 @@ const CharacterAnimationSettings mr_muscles_animation_settings = {
 
 		.strafe_locked_blend_rate   = 2.0f,
 		.bow_walk_aiming_blend_rate = 2.0f,
-		.swim_blend_rate            = 6.0f,
+		.swim_blend_rate            = 7.0f,
 
 };
 
@@ -306,8 +325,12 @@ static const SoundID mr_muscles_rolls[] = {
 	SOUND_ROLL_1, SOUND_ROLL_2,
 };
 
-/* Both feet land at a quarter and three quarters of the locomotion clip. */
-static const float mr_muscles_footings[] = { 0.25f, 0.75f };
+static const float mr_muscles_footings[] = { MM_FOOTING_LEFT, MM_FOOTING_RIGHT };
+static const float mr_muscles_strokes[]  = { MM_STROKE_A, MM_STROKE_B };
+
+static const SoundID mr_muscles_strokes_light[] = { SOUND_SWIM_STROKE_LIGHT_1, SOUND_SWIM_STROKE_LIGHT_2 };
+static const SoundID mr_muscles_strokes_heavy[] = { SOUND_SWIM_STROKE_HEAVY_1, SOUND_SWIM_STROKE_HEAVY_2 };
+static const SoundID mr_muscles_splashes[]      = { SOUND_SWIM_SPLASH_1, SOUND_SWIM_SPLASH_2 };
 
 static const CharacterSoundDef mr_muscles_sound_def = {
 
@@ -324,19 +347,35 @@ static const CharacterSoundDef mr_muscles_sound_def = {
 	.roll_count  = sizeof(mr_muscles_rolls)/sizeof(*mr_muscles_rolls),
 	.roll_volume = 0.9f,
 	.roll_delay  = 0.07f,
-	.roll_launch_gap      = 0.05f,
+	.roll_launch_gap      = 0.1f,
 	.roll_launch_volume   = 0.20f,
 	.roll_stand_volume = 0.22f,
 
 	.jump        = mr_muscles_footsteps,
 	.jump_count  = sizeof(mr_muscles_footsteps)/sizeof(*mr_muscles_footsteps),
 	.jump_volume = 0.2f,
+	.jump_launch_gap = 0.1f,
 
 	.land            = mr_muscles_footsteps,
 	.land_count      = sizeof(mr_muscles_footsteps)/sizeof(*mr_muscles_footsteps),
 	.land_volume_min = 0.4f,
 	.land_volume_max = 0.85f,
 	.land_speed_max  = 15.0f,
+
+	.swim_stroke_light       = mr_muscles_strokes_light,
+	.swim_stroke_light_count = sizeof(mr_muscles_strokes_light)/sizeof(*mr_muscles_strokes_light),
+	.swim_stroke_heavy       = mr_muscles_strokes_heavy,
+	.swim_stroke_heavy_count = sizeof(mr_muscles_strokes_heavy)/sizeof(*mr_muscles_strokes_heavy),
+
+	.stroke        = mr_muscles_strokes,
+	.stroke_count  = sizeof(mr_muscles_strokes)/sizeof(*mr_muscles_strokes),
+	.stroke_volume = 0.4f,
+
+	.splash            = mr_muscles_splashes,
+	.splash_count      = sizeof(mr_muscles_splashes)/sizeof(*mr_muscles_splashes),
+	.splash_volume_min = 0.05f,
+	.splash_volume_max = 0.85f,
+	.splash_speed_max  = 8.0f,
 
 };
 
@@ -348,5 +387,12 @@ const CharacterDef mr_muscles_character_def = {
 	.collider_settings  = &mr_muscles_collider_settings,
 	.weapons_def        = &mr_muscles_weapons_def,
 	.sound_def          = &mr_muscles_sound_def,
+	.stats_settings     = &mr_muscles_stats_settings,
 
+};
+
+const Asset mr_muscles = {
+	.type      = ASSET_CHARACTER,
+	.model     = mr_muscles_model,
+	.character = { &mr_muscles_character_def },
 };

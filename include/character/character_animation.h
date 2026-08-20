@@ -81,6 +81,12 @@ typedef struct {
 
 	float action_idle_max_blending_ratio;
 
+	/* Phase of the locomotion cycle where each foot plants. They shape the
+	   footing wave, the roll exit re-phases the cycle on them, and the
+	   asset's footstep sounds fire on the same values. */
+	float footing_left;
+	float footing_right;
+
 	float turn_max_angle;
 	float turn_max_weight;
 

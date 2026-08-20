@@ -1,6 +1,15 @@
 #include "character/character.h"
 #include "assets/miss_jiggles.h"
 
+/* Both feet land at a quarter and three quarters of the locomotion clip.
+   Single source for the animation settings and the footstep sounds. */
+#define MJ_FOOTING_LEFT  0.25f
+#define MJ_FOOTING_RIGHT 0.75f
+
+/* The swim clips pull an arm at the start and the middle of the cycle. */
+#define MJ_STROKE_A 0.0f
+#define MJ_STROKE_B 0.5f
+
 
 static const CharacterAnimationClipDef miss_jiggles_clips[] = {
 
@@ -169,10 +178,6 @@ const CharacterMovementSettings miss_jiggles_movement_settings = {
 	.gait       = miss_jiggles_gaits,
 	.gait_count = sizeof(miss_jiggles_gaits) / sizeof(miss_jiggles_gaits[0]),
 
-	.stamina_drain_rate = 0.15f,
-	.stamina_regen_rate = 0.25f,
-	.tired_speed_scale  = 0.8f,
-
 	/* Timers stay equal to mr_muscles: they track the clip lengths, which
 	   are the same animations. */
 	.roll_target_speed         = 4.2f,
@@ -191,6 +196,17 @@ const CharacterMovementSettings miss_jiggles_movement_settings = {
 	.swim_slow_speed    = 1.1f,
 	.swim_fast_speed    = 2.4f,
 	.swim_response_rate = 4.0f,
+
+	.water_equilibrium_idle = 0.70f,
+	.water_equilibrium_swim = 0.45f,
+
+};
+
+const CharacterStatsSettings miss_jiggles_stats_settings = {
+
+	.stamina_drain_rate = 0.15f,
+	.stamina_regen_rate = 0.25f,
+	.tired_speed_scale  = 0.8f,
 
 };
 
@@ -319,6 +335,9 @@ const CharacterAnimationSettings miss_jiggles_animation_settings = {
 
 		.action_idle_max_blending_ratio = 0.85f,
 
+		.footing_left  = MJ_FOOTING_LEFT,
+		.footing_right = MJ_FOOTING_RIGHT,
+
 		.turn_max_angle  = 5.0f,
 		.turn_max_weight = 0.4f,
 
@@ -344,7 +363,7 @@ const CharacterAnimationSettings miss_jiggles_animation_settings = {
 
 		.strafe_locked_blend_rate   = 2.0f,
 		.bow_walk_aiming_blend_rate = 2.0f,
-		.swim_blend_rate            = 6.0f,
+		.swim_blend_rate            = 7.0f,
 
 };
 
@@ -359,7 +378,12 @@ static const SoundID miss_jiggles_rolls[] = {
 };
 
 /* Both feet land at a quarter and three quarters of the locomotion clip. */
-static const float miss_jiggles_footings[] = { 0.25f, 0.75f };
+static const float miss_jiggles_footings[] = { MJ_FOOTING_LEFT, MJ_FOOTING_RIGHT };
+static const float miss_jiggles_strokes[]  = { MJ_STROKE_A, MJ_STROKE_B };
+
+static const SoundID miss_jiggles_strokes_light[] = { SOUND_SWIM_STROKE_LIGHT_1, SOUND_SWIM_STROKE_LIGHT_2 };
+static const SoundID miss_jiggles_strokes_heavy[] = { SOUND_SWIM_STROKE_HEAVY_1, SOUND_SWIM_STROKE_HEAVY_2 };
+static const SoundID miss_jiggles_splashes[]      = { SOUND_SWIM_SPLASH_1, SOUND_SWIM_SPLASH_2 };
 
 static const CharacterSoundDef miss_jiggles_sound_def = {
 
@@ -376,7 +400,7 @@ static const CharacterSoundDef miss_jiggles_sound_def = {
 	.roll_count  = sizeof(miss_jiggles_rolls)/sizeof(*miss_jiggles_rolls),
 	.roll_volume = 0.8f,
 	.roll_delay  = 0.07f,
-	.roll_launch_gap      = 0.05f,
+	.roll_launch_gap      = 0.1f,
 	.roll_launch_volume   = 0.18f,
 	.roll_stand_volume = 0.20f,
 
@@ -385,12 +409,28 @@ static const CharacterSoundDef miss_jiggles_sound_def = {
 	.jump        = miss_jiggles_footsteps,
 	.jump_count  = sizeof(miss_jiggles_footsteps)/sizeof(*miss_jiggles_footsteps),
 	.jump_volume = 0.15f,
+	.jump_launch_gap = 0.1f,
 
 	.land            = miss_jiggles_footsteps,
 	.land_count      = sizeof(miss_jiggles_footsteps)/sizeof(*miss_jiggles_footsteps),
 	.land_volume_min = 0.35f,
 	.land_volume_max = 0.8f,
 	.land_speed_max  = 15.0f,
+
+	.swim_stroke_light       = miss_jiggles_strokes_light,
+	.swim_stroke_light_count = sizeof(miss_jiggles_strokes_light)/sizeof(*miss_jiggles_strokes_light),
+	.swim_stroke_heavy       = miss_jiggles_strokes_heavy,
+	.swim_stroke_heavy_count = sizeof(miss_jiggles_strokes_heavy)/sizeof(*miss_jiggles_strokes_heavy),
+
+	.stroke        = miss_jiggles_strokes,
+	.stroke_count  = sizeof(miss_jiggles_strokes)/sizeof(*miss_jiggles_strokes),
+	.stroke_volume = 0.4f,
+
+	.splash            = miss_jiggles_splashes,
+	.splash_count      = sizeof(miss_jiggles_splashes)/sizeof(*miss_jiggles_splashes),
+	.splash_volume_min = 0.05f,
+	.splash_volume_max = 0.85f,
+	.splash_speed_max  = 8.0f,
 
 };
 
@@ -403,5 +443,12 @@ const CharacterDef miss_jiggles_character_def = {
 	.weapons_def        = &miss_jiggles_weapons_def,
 	.spring_bones       = miss_jiggles_spring_bones,
 	.sound_def          = &miss_jiggles_sound_def,
+	.stats_settings     = &miss_jiggles_stats_settings,
 
+};
+
+const Asset miss_jiggles = {
+	.type      = ASSET_CHARACTER,
+	.model     = miss_jiggles_model,
+	.character = { &miss_jiggles_character_def },
 };

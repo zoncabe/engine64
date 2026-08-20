@@ -2,6 +2,7 @@
 #define MISS_JIGGLES_H
 
 #include "character/character.h"
+#include "scene/scene.h"
 
 #define miss_jiggles_model "rom:/models/miss_jiggles.t3dm"
 
@@ -155,11 +156,13 @@ typedef enum {
 
 
 extern const CharacterMovementSettings  miss_jiggles_movement_settings;
+extern const CharacterStatsSettings     miss_jiggles_stats_settings;
 extern const CharacterColliderSettings  miss_jiggles_collider_settings;
 extern const CharacterWeaponsDef        miss_jiggles_weapons_def;
 extern const SpringBonesDef             miss_jiggles_spring_bones[];
 extern const CharacterAnimationSettings miss_jiggles_animation_settings;
 extern const CharacterAnimationDef      miss_jiggles_animation_def;
 extern const CharacterDef               miss_jiggles_character_def;
+extern const Asset                      miss_jiggles;
 
 #endif

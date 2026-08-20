@@ -158,7 +158,7 @@ void main_menu_ui_init(void)
 }
 
 
-void main_menu_update(void)
+void main_menu_ui_update(void)
 {
 	if (main_menu_player.is_active) {
 		screenAnimationPlayer_update(&main_menu_player, time_get()->delta);
@@ -167,7 +167,7 @@ void main_menu_update(void)
 }
 
 
-void main_menu_startEnter(void)
+void main_menu_ui_startEnter(void)
 {
 	screenAnimationPlayer_start(&main_menu_player, &main_menu_transition_animation, SCREEN_ANIMATION_PLAY_ONCE, false);
 	main_menu_player.on_finish     = NULL;
@@ -175,7 +175,7 @@ void main_menu_startEnter(void)
 }
 
 
-void main_menu_startExit(void (*on_finish)(void *ctx), void *ctx)
+void main_menu_ui_startExit(void (*on_finish)(void *ctx), void *ctx)
 {
 	screenAnimationPlayer_start(&main_menu_player, &main_menu_exit_animation, SCREEN_ANIMATION_PLAY_ONCE, false);
 	main_menu_player.on_finish     = on_finish;
@@ -183,7 +183,7 @@ void main_menu_startExit(void (*on_finish)(void *ctx), void *ctx)
 }
 
 
-bool main_menu_isTransitioning(void)
+bool main_menu_ui_isTransitioning(void)
 {
 	return main_menu_player.is_active;
 }

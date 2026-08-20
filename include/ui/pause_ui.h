@@ -10,10 +10,10 @@ extern Screen pause_screen;
 
 
 void pause_ui_init(void);
-void pause_update(void);
-void pause_startEnter(void);
-void pause_startExit(void (*on_finish)(void *ctx), void *ctx);
-void pause_startQuit(void (*on_finish)(void *ctx), void *ctx);
-bool pause_isTransitioning(void);
+void pause_ui_update(void);
+void pause_ui_startEnter(void);
+void pause_ui_startExit(void (*on_finish)(void *ctx), void *ctx);
+void pause_ui_startQuit(void (*on_finish)(void *ctx), void *ctx);
+bool pause_ui_isTransitioning(void);
 
 #endif

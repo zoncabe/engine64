@@ -21,6 +21,11 @@ void time_init()
 	last_ticks = TICKS_READ();
 }
 
+void time_reset()
+{
+	last_ticks = TICKS_READ();
+}
+
 void time_update()
 {
 	uint32_t now = TICKS_READ();
