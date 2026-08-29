@@ -14,15 +14,16 @@ typedef enum {
 } CameraType;
 
 
-/* default duration of a view target transition, in seconds */
-#define CAMERA_VIEW_TARGET_BLEND_TIME 0.4f
-
-
 typedef struct {
 
 	CameraType type;
+
+	float field_of_view;
+	float near_clipping;
+	float far_clipping;
+
 	union {
-		CameraSpringArmData spring_arm;
+		CameraSpringArmDef spring_arm;
 	};
 
 } CameraDef;
@@ -47,7 +48,6 @@ typedef struct Camera {
 
 	union {
 		struct {
-			CameraSpringArmState state;
 			CameraSpringArmSettings settings;
 			CameraSpringArmData     data;
 		} spring_arm;

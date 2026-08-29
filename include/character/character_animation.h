@@ -12,7 +12,7 @@ typedef struct Character Character;
 typedef struct CharacterAnimation CharacterAnimation;
 
 #define LAND_ANIMATION_STARTING_HEIGHT 130
-#define ANIMATION_MAX_LAYERS 16
+#define ANIMATION_MAX_LAYERS 24
 
 #define ANIMATION_SLOT_MAIN          0xFF
 #define ANIMATION_TURN_AVG_COUNT  5
@@ -29,10 +29,18 @@ typedef enum {
 	ANIMATION_PARAM_STRAFE_LOCKED,
 	ANIMATION_PARAM_STRAFE_LOCKED_GAIT,
 	ANIMATION_PARAM_STRAFE_LOCKED_DIR,
-	ANIMATION_PARAM_BOW_WALK_AIMING,
-	ANIMATION_PARAM_BOW_WALK_AIMING_DIR,
+	ANIMATION_PARAM_BOW_HOLD_IDLE,   /* weight of the bow-holding idle over the base idle */
+	ANIMATION_PARAM_BOW_HOLD,        /* weight of the bow-holding grid */
+	ANIMATION_PARAM_BOW_HOLD_GAIT,
+	ANIMATION_PARAM_BOW_HOLD_DIR,
+	ANIMATION_PARAM_BOW_AIM_IDLE,
+	ANIMATION_PARAM_BOW_AIM,
+	ANIMATION_PARAM_BOW_AIM_GAIT,
+	ANIMATION_PARAM_BOW_AIM_DIR,
 	ANIMATION_PARAM_SWIM,        /* weight of the swim grid; a timed ramp, not the submersion */
 	ANIMATION_PARAM_SWIM_GAIT,   /* idle -> slow -> fast axis, from the horizontal speed */
+	ANIMATION_PARAM_CLIMB,       /* weight of the climb layer; a timed ramp */
+	ANIMATION_PARAM_CLIMB_DIR,   /* negative descends, positive climbs */
 	ANIMATION_PARAM_JUMP_L,
 	ANIMATION_PARAM_JUMP_R,
 	ANIMATION_PARAM_LAND_L,
@@ -100,6 +108,10 @@ typedef struct {
 	float land_anim_crouch;
 	float land_anim_stand;
 
+	/* Phase the roll exit lands ahead of the plant it re-phases the cycle on:
+	   the leg is caught reaching for the ground, not already standing on it. */
+	float run_to_rolling_anim_lead;
+
 	float run_to_rolling_anim_ground;
 	float run_to_rolling_anim_grip;
 	float run_to_rolling_anim_stand;
@@ -109,8 +121,10 @@ typedef struct {
 	float strafe_blend_rate;
 
 	float strafe_locked_blend_rate;
-	float bow_walk_aiming_blend_rate;
+	float bow_hold_blend_rate;
+	float bow_aim_blend_rate;
 	float swim_blend_rate;
+	float climb_blend_rate;
 
 } CharacterAnimationSettings;
 
@@ -136,8 +150,15 @@ typedef struct {
 	uint8_t locomotion_node;
 	uint8_t strafe_node;
 	uint8_t strafe_locked_node;
-	uint8_t bow_walk_aiming_node;
+
+	/* Bow modes: an idle node and a 5x2 grid node each. Node 0 is the base
+	   idle clip, so 0 here means the character has no bow module. */
+	uint8_t bow_hold_idle_node;
+	uint8_t bow_hold_node;
+	uint8_t bow_aim_idle_node;
+	uint8_t bow_aim_node;
 	uint8_t swim_node;
+	uint8_t climb_node;
 
 } CharacterAnimationDef;
 
@@ -175,6 +196,7 @@ typedef struct CharacterAnimation {
 	T3DSkeleton  main;
 	T3DSkeleton *buffer;
 	T3DAnim     *clip;
+	void       **clip_data;       /* RAM copy of each open clip's .sdata, NULL when closed */
 	uint8_t     *clip_cooldown;   /* frames since the graph last touched each clip */
 	uint8_t     *node_state;
 	bool        *node_active;
@@ -191,8 +213,11 @@ typedef struct CharacterAnimation {
 	bool         strafe_turning;
 	float        strafe_blend;
 	float        strafe_locked_blend;
-	float        bow_walk_aiming_blend;
+	float        bow_hold_blend;
+	float        bow_aim_blend;
 	float        swim_blend;
+	float        climb_blend;
+	float        climb_dir;   /* last non-zero direction, held while stopped */
 
 } CharacterAnimation;
 

@@ -4,9 +4,7 @@
 
 #include "time/time.h"
 #include "sound/sound.h"
-#include "control/controller.h"
 #include "camera/camera.h"
-#include "control/camera_control.h"
 #include "viewport/viewport.h"
 
 
@@ -58,19 +56,11 @@ void viewport_init()
 	t3d_init((T3DInitParams){});
 	camera_init(&viewport.camera);
 	viewport.fb_index = 0;
-
-	/* A state can render the scene on the same frame it is entered, before its
-	   update ever runs: without this the view matrices are still zeroed. */
-	viewport_setPerspectiveCamera();
 }
 
 void viewport_clear(color_t color)
 {
 	rdpq_attach(display_get(), display_get_zbuf());
-
-	/* display_get blocks until a framebuffer frees up, which is the longest
-	   the loop ever sits still without feeding the mixer. */
-	sound_poll();
 	t3d_frame_start();
 	t3d_viewport_attach(&viewport.t3d_viewport);
 
@@ -78,9 +68,7 @@ void viewport_clear(color_t color)
 	t3d_screen_clear_depth();
 }
 
-void viewport_updateCamera(const ControllerActions *actions, Vector3 *center)
+void viewport_updateCamera(Vector3 *center)
 {
-	cameraControl_setInput(&viewport.camera, actions);
 	camera_update(&viewport.camera, center, time_get()->delta);
-	viewport_setPerspectiveCamera();
 }

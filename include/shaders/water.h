@@ -109,7 +109,7 @@ float water_surfaceHeight(const Water *water, float x, float y);
    every dynamic body inside the sensor floats against these waves. */
 void water_bindPhysics(Water *water, struct RigidBody *body, struct PhysicsWorld *world);
 
-/* Deletes every registered surface. Runs with scene_unload. */
+/* Deletes every registered surface. Runs with scene3d_unload. */
 void water_clear(void);
 
 #endif

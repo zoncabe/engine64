@@ -48,5 +48,7 @@ void collisionMesh_getTriangle(const CollisionMesh *mesh, int32_t index, Triangl
 
 void collisionMesh_queryAABB(const CollisionMesh *mesh, void *cb, PhysicsQueryCallback callback, AABB aabb);
 
+int  collisionMesh_raycast  (const CollisionMesh *mesh, const Transform *world, RaycastData *raycast);
+
 
 #endif

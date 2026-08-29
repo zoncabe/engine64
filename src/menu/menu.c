@@ -1,15 +1,11 @@
-#include <libdragon.h>
-
-#include "screen/screen.h"
 #include "menu/menu.h"
 
 
 static MenuStack menuStack;
 
 
-int8_t        menuStack_getIndex(void)    { return menuStack.index; }
-const int8_t *menuStack_getIndexPtr(void) { return &menuStack.index; }
-void          menuStack_setIndex(int8_t index) { menuStack.index = index; }
+int8_t menuStack_getIndex(void)         { return menuStack.index; }
+void   menuStack_setIndex(int8_t index) { menuStack.index = index; }
 
 int8_t menuStack_getItemCount(void)
 {
@@ -30,7 +26,7 @@ void menuStack_init(void)
 	menuStack.top   = 0;
 }
 
-void menuStack_open(Screen *screen, int8_t item_count)
+void menuStack_open(int8_t item_count)
 {
 	if (menuStack.top >= MENU_STACK_MAX) return;
 
@@ -38,7 +34,6 @@ void menuStack_open(Screen *screen, int8_t item_count)
 		menuStack.frame[menuStack.top - 1].index = menuStack.index;
 
 	menuStack.frame[menuStack.top++] = (MenuStackFrame){
-		.screen     = screen,
 		.index      = 0,
 		.item_count = item_count,
 	};
@@ -48,15 +43,9 @@ void menuStack_open(Screen *screen, int8_t item_count)
 void menuStack_back(void)
 {
 	if (menuStack.top == 0) return;
-	menuStack.top--;
-	if (menuStack.top > 0)
-		menuStack.index = menuStack.frame[menuStack.top - 1].index;
-	else
-		menuStack.index = 0;
-}
 
-Screen *menuStack_current(void)
-{
-	if (menuStack.top == 0) return NULL;
-	return menuStack.frame[menuStack.top - 1].screen;
+	menuStack.top--;
+	menuStack.index = (menuStack.top > 0)
+		? menuStack.frame[menuStack.top - 1].index
+		: 0;
 }

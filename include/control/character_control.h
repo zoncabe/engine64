@@ -8,6 +8,40 @@
 #define PLAYER_STICK_DEADZONE       6
 #define PLAYER_STICK_WALK_THRESHOLD 65
 
-void characterControl_update(Character *character, MovementCommand *cmd, const ControllerActions *actions, float camera_angle_around);
+
+/* What a body can be asked to do. A character that does not do one of these
+   leaves its button at BTN_NONE and the control reads as never pressed. */
+typedef struct CharacterControlBinding {
+
+	ButtonID jump;
+	ButtonID roll;
+	ButtonID sprint;
+	ButtonID aim;
+	ButtonID shoot;
+	ButtonID weapon_next;
+	ButtonID weapon_prev;
+
+} CharacterControlBinding;
+
+
+typedef struct CharacterControls {
+
+	bool  jump;
+	bool  jump_held;
+	bool  roll;
+	bool  sprint;
+	bool  aim;
+	bool  shoot;            /* held: the bow draws while it stays down */
+	bool  shoot_released;   /* the shot fires on this edge */
+	bool  weapon_next;
+	bool  weapon_prev;
+	float stick_x;
+	float stick_y;
+
+} CharacterControls;
+
+
+void characterControls_map(CharacterControls *controls, const Controller *pad, const CharacterControlBinding *binding);
+void characterControl_update(Character *character, MovementCommand *cmd, const CharacterControls *controls, float camera_angle_around);
 
 #endif

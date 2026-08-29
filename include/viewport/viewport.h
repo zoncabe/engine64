@@ -8,8 +8,6 @@
 #define FB_COUNT 3
 
 
-typedef struct ControllerActions ControllerActions;
-
 typedef struct Viewport {
 
 	T3DViewport t3d_viewport;
@@ -23,6 +21,10 @@ Viewport *viewport_get(void);
 
 void viewport_init(void);
 void viewport_clear(color_t color);
-void viewport_updateCamera(const ControllerActions *actions, Vector3 *center);
+void viewport_updateCamera(Vector3 *center);
+
+/* The projection is the game's call, so it picks one and keeps it fed. */
+void viewport_setPerspectiveCamera(void);
+void viewport_setIsometricCamera(void);
 
 #endif

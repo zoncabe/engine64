@@ -123,7 +123,7 @@ int physicsShape_raycast(const PhysicsShape *shape, const Transform *body_tx, Ra
 		case SHAPE_BOX:     return box_raycast    (&shape->box,     &world, raycast);
 		case SHAPE_SPHERE:  return sphere_raycast (&shape->sphere,  &world, raycast);
 		case SHAPE_CAPSULE: return capsule_raycast(&shape->capsule, &world, raycast);
-		case SHAPE_MESH:    break;   /* static-only, never on a rigid body */
+		case SHAPE_MESH:    return collisionMesh_raycast(shape->mesh, &world, raycast);
 	}
 	return 0;
 }

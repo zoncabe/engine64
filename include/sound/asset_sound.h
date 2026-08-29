@@ -3,10 +3,10 @@
 
 #include <stdint.h>
 
-#include "sound/sound_bank.h"
+#include "sound/sound.h"
 
 struct PhysicsWorld;
-struct SceneDef;
+struct Scene3DDef;
 
 /* What wakes a sound of an asset. A new trigger is a new value here, not a
    new struct shape. */
@@ -31,7 +31,7 @@ typedef struct AssetSound {
 /* At scene load: starts the ambient sounds of the placed assets, pairing
    each declaration with the entity its placement produced. The emitters
    live in this module; stop cuts them at unload. */
-void assetSound_start(const struct SceneDef *def);
+void assetSound_start(const struct Scene3DDef *def);
 void assetSound_stop(void);
 
 /* Walks the frame's new contacts and plays the collision sound of every

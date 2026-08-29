@@ -10,9 +10,9 @@ static const bool movement_updates_locomotion[MOVEMENT_STATE_COUNT] = {
 	[MOVEMENT_STATE_IDLE]     = true,
 	[MOVEMENT_STATE_WALKING]  = true,
 	[MOVEMENT_STATE_ROLLING]  = false,
-	[MOVEMENT_STATE_JUMPING]  = false,
 	[MOVEMENT_STATE_FALLING]  = false,
 	[MOVEMENT_STATE_SWIMMING] = false,
+	[MOVEMENT_STATE_CLIMBING] = false,
 };
 
 void characterMovement_setMode(CharacterMovement *movement, uint8_t new_mode)
@@ -66,8 +66,10 @@ static void characterMovement_setHorizontalVelocity(Character *character, float 
 {
 	KinematicBody *body = &character->body;
 
-	float target_vx = target_speed *  fm_sinf(deg_to_rad(yaw));
-	float target_vy = target_speed * -fm_cosf(deg_to_rad(yaw));
+	float s, c;
+	fm_sincosf(deg_to_rad(yaw), &s, &c);
+	float target_vx = target_speed *  s;
+	float target_vy = target_speed * -c;
 
 	float factor = fm_expf(-response_rate * dt);
 	body->velocity.x = body->velocity.x * factor + target_vx * (1.0f - factor);
@@ -95,6 +97,10 @@ static void characterMovement_setRotation(Character *character, float dt)
 	KinematicBody *body = &character->body;
 	CharacterMovementData *data = &character->movement.data;
 
+	/* Climbing already set the facing from the ladder, and its velocity is
+	   the pull onto the anchor: read as a heading it would spin the body. */
+	if (character->movement.current == MOVEMENT_STATE_CLIMBING) return;
+
 	bool moving = body->velocity.x != 0 || body->velocity.y != 0;
 
 	if (moving) {
@@ -104,7 +110,9 @@ static void characterMovement_setRotation(Character *character, float dt)
 
 	float facing_yaw;
 	if (data->strafe) {
-		if (!moving) return;
+		/* Holding the bow the body keeps tracking the camera even planted;
+		   the plain strafe leaves a standstill facing free. */
+		if (!moving && !data->bow_hold && !data->bow_aim) return;
 		facing_yaw = data->strafe_yaw;
 	} else {
 		if (!moving) return;
@@ -125,7 +133,7 @@ static void characterMovement_setRotation(Character *character, float dt)
 	}
 
 	uint8_t state = character->movement.current;
-	if (state == MOVEMENT_STATE_ROLLING || state == MOVEMENT_STATE_JUMPING || state == MOVEMENT_STATE_FALLING)
+	if (state == MOVEMENT_STATE_ROLLING || state == MOVEMENT_STATE_FALLING)
 		state = character->movement.locomotion;
 	float response_rate = characterMovement_rotationAccelerationRate(character, state);
 	float factor = fm_expf(-response_rate * dt);
@@ -139,7 +147,9 @@ static void characterMovement_updateBody(Character *character, float dt)
 
 	data->previous_yaw = body->rotation.z;
 
-	if (data->in_water) {
+	/* A ladder standing in water is still a ladder: the climb owns the
+	   vertical, so the buoyancy must not bob the body off its rungs. */
+	if (data->in_water && character->movement.current != MOVEMENT_STATE_CLIMBING) {
 		const CharacterMovementSettings *settings = character->movement.settings;
 
 		/* Stroking raises the equilibrium so the swim pose meets the surface. */
@@ -181,27 +191,74 @@ static void characterMovement_updateBody(Character *character, float dt)
 	characterMovement_setRotation(character, dt);
 }
 
+/* The crouch that starts a jump runs here, on the ground, over walk or idle:
+   the stick still drives the body and holding the button only brakes it. The
+   impulse and the switch to the air come together when the crouch ends, so a
+   jump is never a state of its own — the air is always a fall. */
+static void characterMovement_jumpCharge(Character *character, MovementCommand *cmd, float dt)
+{
+	KinematicBody *body = &character->body;
+	CharacterMovementData *data = &character->movement.data;
+	const CharacterMovementSettings *settings = character->movement.settings;
+
+	if (cmd->jump_triggered) {
+		data->jump_initial_velocity = body->velocity;
+		data->jump_timer    = 0.0f;
+		data->jump_force    = 0.0f;
+		cmd->jump_triggered = false;
+	}
+	else if (data->jump_timer == 0.0f) return;   /* nothing being charged */
+
+	data->jump_timer += dt;
+	if (cmd->jump_held) {
+		data->jump_force += dt;
+		vector3_scale(&body->velocity, CHARACTER_JUMP_HOLD_VELOCITY_SCALE);
+	}
+
+	if (data->jump_timer < settings->jump_timer_max) return;
+
+	/* Leaving the floor: the launch keeps a share of the run it came from. */
+	body->velocity = data->jump_initial_velocity;
+	vector3_scale(&body->velocity, CHARACTER_JUMP_LAUNCH_VELOCITY_SCALE);
+	body->velocity.z = data->jump_force * settings->jump_force_multiplier;
+	if (body->velocity.z < settings->jump_minimum_speed)
+		body->velocity.z = settings->jump_minimum_speed;
+
+	data->jump_force = 0.0f;
+	data->jump_timer = 0.0f;
+	character->movement.next = MOVEMENT_STATE_FALLING;
+}
+
 static void characterMovement_setLocomotion(Character *character, MovementCommand *cmd, float dt)
 {
 	uint8_t state = character->movement.current;
 	characterMovement_setHorizontalVelocity(character, cmd->target_yaw, characterMovement_targetSpeed(character, state) * cmd->speed_scale, characterMovement_accelerationRate(character, state), dt);
+	characterMovement_jumpCharge(character, cmd, dt);
 }
 
-static uint8_t characterMovement_rollPhase(const CharacterMovementData *data, const MovementCommand *cmd, const CharacterMovementSettings *settings)
+/* Gravity and the terminal speed that goes with it, for anything with no floor
+   under it. The collision pass clears the acceleration again on landing. */
+static void characterMovement_fall(KinematicBody *body)
 {
-	if (cmd->roll_triggered)                         return CHARACTER_ROLL_PHASE_LAUNCH;
-	if (data->roll_timer < settings->roll_grip_time) return CHARACTER_ROLL_PHASE_SPIN;
-	if (data->roll_timer < settings->roll_timer_max) return CHARACTER_ROLL_PHASE_GRIP;
+	body->acceleration.z = CHARACTER_GRAVITY;
+	if (body->velocity.z < CHARACTER_FALL_MAX_SPEED)
+		body->velocity.z = CHARACTER_FALL_MAX_SPEED;
+}
+
+static uint8_t characterMovement_rollPhase(const CharacterMovementData *data, const CharacterMovementSettings *settings)
+{
+	if (data->roll_timer < settings->roll_ground_time) return CHARACTER_ROLL_PHASE_LAUNCH;
+	if (data->roll_timer < settings->roll_grip_time)   return CHARACTER_ROLL_PHASE_SPIN;
+	if (data->roll_timer < settings->roll_timer_max)   return CHARACTER_ROLL_PHASE_GRIP;
 	return CHARACTER_ROLL_PHASE_DONE;
 }
 
-static void characterMovement_rollLaunch(Character *character, MovementCommand *cmd, const CharacterMovementSettings *settings, uint8_t locomotion, float dt)
+static void characterMovement_rollLaunch(Character *character, const CharacterMovementSettings *settings, uint8_t locomotion, float dt)
 {
 	(void)locomotion;
 	CharacterMovementData *data = &character->movement.data;
 	characterMovement_setHorizontalVelocity(character, data->roll_yaw, settings->roll_target_speed, settings->roll_launch_response_rate, dt);
 	data->roll_timer += dt;
-	if (data->roll_timer >= settings->roll_ground_time) cmd->roll_triggered = false;
 }
 
 static void characterMovement_rollSpin(Character *character, const CharacterMovementSettings *settings, float dt)
@@ -218,9 +275,12 @@ static void characterMovement_rollGrip(Character *character, MovementCommand *cm
 	data->roll_timer += dt;
 }
 
+/* Out to idle, not to the locomotion state held from before the roll: the
+   control runs first next frame and the stick raises it to walk if it is
+   asking for one, the same way the floor probe turns it into a fall. */
 static void characterMovement_rollDone(Character *character)
 {
-	character->movement.next = character->movement.locomotion;
+	character->movement.next = MOVEMENT_STATE_IDLE;
 	character->movement.data.roll_timer = 0;
 }
 
@@ -230,87 +290,24 @@ static void characterMovement_setRolling(Character *character, MovementCommand *
 	const CharacterMovementSettings *settings = character->movement.settings;
 	uint8_t locomotion = character->movement.locomotion;
 
-	/* the stick yaw is taken once on entry and held until grip */
-	if (data->roll_timer == 0.0f) data->roll_yaw = cmd->target_yaw;
-
-	switch (characterMovement_rollPhase(data, cmd, settings)) {
-		case CHARACTER_ROLL_PHASE_LAUNCH: characterMovement_rollLaunch(character, cmd, settings, locomotion, dt); break;
-		case CHARACTER_ROLL_PHASE_SPIN:   characterMovement_rollSpin(character, settings, dt);                    break;
-		case CHARACTER_ROLL_PHASE_GRIP:   characterMovement_rollGrip(character, cmd, settings, dt);               break;
-		case CHARACTER_ROLL_PHASE_DONE:   characterMovement_rollDone(character);                                  break;
-	}
-}
-
-static uint8_t characterMovement_jumpPhase(const CharacterMovementData *data, const KinematicBody *body, const CharacterMovementSettings *settings)
-{
-	if (data->jump_timer < settings->jump_timer_max) return CHARACTER_JUMP_PHASE_CHARGING;
-	if (data->jump_force > 0)               return CHARACTER_JUMP_PHASE_LAUNCH;
-	if (body->velocity.z > 0)               return CHARACTER_JUMP_PHASE_RISING;
-	return CHARACTER_JUMP_PHASE_DONE;
-}
-
-static void characterMovement_jumpCharging(Character *character, MovementCommand *cmd, float dt)
-{
-	KinematicBody *body = &character->body;
-	CharacterMovementData *data = &character->movement.data;
-
-	data->jump_timer += dt;
-	if (cmd->jump_held) {
-		data->jump_force += dt;
-		vector3_scale(&body->velocity, CHARACTER_JUMP_HOLD_VELOCITY_SCALE);
-	}
-}
-
-static void characterMovement_jumpLaunch(Character *character, float dt)
-{
-	KinematicBody *body = &character->body;
-	CharacterMovementData *data = &character->movement.data;
-	const CharacterMovementSettings *settings = character->movement.settings;
-
-	data->jump_timer += dt;
-	body->velocity = data->jump_initial_velocity;
-	vector3_scale(&body->velocity, CHARACTER_JUMP_LAUNCH_VELOCITY_SCALE);
-	body->velocity.z = data->jump_force * settings->jump_force_multiplier;
-	if (body->velocity.z < settings->jump_minimum_speed)
-		body->velocity.z = settings->jump_minimum_speed;
-	data->jump_force = 0;
-}
-
-static void characterMovement_jumpRising(Character *character, float dt)
-{
-	CharacterMovementData *data = &character->movement.data;
-
-	data->jump_timer += dt;
-	character->body.acceleration.z = CHARACTER_GRAVITY;
-}
-
-static void characterMovement_jumpDone(Character *character)
-{
-	character->body.acceleration.z = CHARACTER_GRAVITY;
-	character->movement.data.jump_timer = 0;
-	character->movement.next = MOVEMENT_STATE_FALLING;
-}
-
-static void characterMovement_setJump(Character *character, MovementCommand *cmd, float dt)
-{
-	KinematicBody *body = &character->body;
-	CharacterMovementData *data = &character->movement.data;
-	const CharacterMovementSettings *settings = character->movement.settings;
-
-	if (cmd->jump_triggered) {
-		data->jump_initial_velocity = body->velocity;
-		data->jump_timer = 0;
-		data->jump_force = 0;
-		cmd->jump_triggered = false;
+	/* The trigger is the entry mark and is consumed here: the stick yaw is
+	   taken once and held until grip, and the timer starts from zero however
+	   the previous roll ended — a ledge can end one before its own last phase. */
+	if (cmd->roll_triggered) {
+		data->roll_yaw      = cmd->target_yaw;
+		data->roll_timer    = 0.0f;
+		cmd->roll_triggered = false;
 	}
 
-	characterMovement_setHorizontalVelocity(character, cmd->target_yaw, data->horizontal_speed, settings->jump_response_rate, dt);
+	/* Rolling off a ledge drops: the state is what holds to the end of the
+	   clip, not the ground. */
+	if (!data->is_grounded) characterMovement_fall(&character->body);
 
-	switch (characterMovement_jumpPhase(data, body, settings)) {
-		case CHARACTER_JUMP_PHASE_CHARGING: characterMovement_jumpCharging(character, cmd, dt); break;
-		case CHARACTER_JUMP_PHASE_LAUNCH:   characterMovement_jumpLaunch(character, dt);        break;
-		case CHARACTER_JUMP_PHASE_RISING:   characterMovement_jumpRising(character, dt);        break;
-		case CHARACTER_JUMP_PHASE_DONE:     characterMovement_jumpDone(character);              break;
+	switch (characterMovement_rollPhase(data, settings)) {
+		case CHARACTER_ROLL_PHASE_LAUNCH: characterMovement_rollLaunch(character, settings, locomotion, dt); break;
+		case CHARACTER_ROLL_PHASE_SPIN:   characterMovement_rollSpin(character, settings, dt);               break;
+		case CHARACTER_ROLL_PHASE_GRIP:   characterMovement_rollGrip(character, cmd, settings, dt);          break;
+		case CHARACTER_ROLL_PHASE_DONE:   characterMovement_rollDone(character);                             break;
 	}
 }
 
@@ -321,10 +318,11 @@ static void characterMovement_setFalling(Character *character, MovementCommand *
 	const CharacterMovementSettings *settings = character->movement.settings;
 
 	data->is_grounded = 0;
+	/* A crouch cut short by the ground disappearing is not a jump: left half
+	   done it would finish on landing and take off on its own. */
+	data->jump_timer = 0.0f;
 	characterMovement_setHorizontalVelocity(character, cmd->target_yaw, data->horizontal_speed, settings->jump_response_rate, dt);
-	body->acceleration.z = CHARACTER_GRAVITY;
-	if (body->velocity.z < CHARACTER_FALL_MAX_SPEED)
-		body->velocity.z = CHARACTER_FALL_MAX_SPEED;
+	characterMovement_fall(body);
 }
 
 /* The vertical is not touched here: the fake buoyancy in updateBody floats,
@@ -347,6 +345,110 @@ static void characterMovement_setSwimming(Character *character, MovementCommand 
 	body->acceleration.z = 0.0f;
 }
 
+/* On a ladder the state owns the body outright: no gravity, and the stick
+   drives the vertical instead of a run. The horizontal is spent entirely on
+   pulling the body onto the anchor the probe wrote, so an approach from the
+   side slides into the ladder's centre line rather than climbing thin air. */
+static void characterMovement_setClimbing(Character *character, MovementCommand *cmd, float dt)
+{
+	KinematicBody *body = &character->body;
+	CharacterMovementData *data = &character->movement.data;
+	const CharacterMovementSettings *settings = character->movement.settings;
+
+	body->acceleration.z = 0.0f;
+
+	float target = cmd->climb * settings->climb_speed * cmd->speed_scale;
+	float factor = fm_expf(-settings->climb_response_rate * dt);
+	body->velocity.z = body->velocity.z * factor + target * (1.0f - factor);
+
+	/* The anchor is a position, not a target speed: the pull is written as
+	   the velocity that closes the gap left this frame, so it dies out on
+	   arrival instead of circling it. */
+	float pull = (1.0f - fm_expf(-CHARACTER_LADDER_ANCHOR_RATE * dt)) / dt;
+	body->velocity.x = (data->ladder_anchor_x - body->position.x) * pull;
+	body->velocity.y = (data->ladder_anchor_y - body->position.y) * pull;
+
+	data->horizontal_speed = 0.0f;
+	data->is_grounded = 0;
+
+	/* The rungs are what the body faces, whatever it faced walking in. */
+	body->rotation.z   = data->ladder_yaw;
+	data->rotation_mode = CHARACTER_ROTATION_MODE_SNAP;
+}
+
+/* Ladder entry and exit, from the climbable probe of the physics pass.
+   Entering asks the stick to be pushing at the rungs, so walking past a
+   ladder never snatches the body onto it.
+
+   Every exit but the release is a loss of contact: the volume is what says
+   where climbing is possible, and running off its top while still climbing
+   is the body cresting the ladder. That exit gets a push toward the rungs so
+   it lands on the ledge instead of peeling back off the face. */
+static void characterMovement_evaluateLadder(Character *character, MovementCommand *cmd)
+{
+	CharacterMovement *movement = &character->movement;
+	CharacterMovementData *data = &movement->data;
+	KinematicBody *body = &character->body;
+
+	if (movement->current != MOVEMENT_STATE_CLIMBING) {
+		if (!data->on_ladder || cmd->climb <= 0.0f) return;
+		if (movement->next != MOVEMENT_STATE_NONE) return;
+
+		/* Swimming counts: a ladder in a pool is how the body gets out. */
+		if (!characterMovement_isLocomotion(movement->current)
+		 && movement->current != MOVEMENT_STATE_FALLING
+		 && movement->current != MOVEMENT_STATE_SWIMMING) return;
+
+		/* Not from the crest: standing on top of the ladder leaves the feet
+		   right at the volume's ceiling, and without this margin the climb
+		   that just ended there grabs straight back on. */
+		if (body->position.z > data->ladder_top - CHARACTER_LADDER_ENTER_MARGIN) return;
+
+		/* Grabbing on kills whatever vertical the body arrived with: a fall
+		   caught by a ladder would otherwise ride its own speed down past
+		   the rungs while the climb slowly talks it out of it. */
+		body->velocity.z = 0.0f;
+		movement->next   = MOVEMENT_STATE_CLIMBING;
+		return;
+	}
+
+	if (cmd->climb_release) {
+		movement->next = MOVEMENT_STATE_FALLING;
+		return;
+	}
+
+	if (!data->on_ladder) {
+		/* Off the top with the stick still climbing: step onto the landing.
+		   The push is horizontal and the fall carries it from there, so the
+		   body arrives with the landing clip it already has.
+
+		   The heading is commandeered along with the velocity. The fall
+		   steers toward whatever the stick last asked for, and on a ladder
+		   the stick means up, not a direction — left to itself the body
+		   would crest the top and immediately walk off wherever the camera
+		   happened to be pointing, which mostly means back into the rungs
+		   it just left. It holds this heading until the stick is moved. */
+		if (cmd->climb > 0.0f) {
+			float s, c;
+			fm_sincosf(deg_to_rad(-data->ladder_yaw), &s, &c);
+			body->velocity.x = CHARACTER_LADDER_EXIT_SPEED *  s;
+			body->velocity.y = CHARACTER_LADDER_EXIT_SPEED * -c;
+			body->velocity.z = 0.0f;
+			data->horizontal_speed = CHARACTER_LADDER_EXIT_SPEED;
+			cmd->target_yaw        = -data->ladder_yaw;
+		}
+		movement->next = MOVEMENT_STATE_FALLING;
+		return;
+	}
+
+	/* Back at the foot with the stick pushing down: the ground itself is
+	   what says so, not the volume — its floor sits below the stair's, so
+	   that someone standing at the bottom is inside it to begin with. */
+	if (cmd->climb < 0.0f && data->floor_distance >= 0.0f
+	 && data->floor_distance <= CHARACTER_LADDER_GROUND_REACH)
+		movement->next = movement->locomotion;
+}
+
 /* Swim entry and exit, from the water probe of the physics pass. Entering
    needs the chest under the surface; leaving needs footing and shallower
    water than that, so the waves cannot flicker the state at the border. */
@@ -359,7 +461,7 @@ static void characterMovement_evaluateWater(Character *character)
 	if (current != MOVEMENT_STATE_SWIMMING) {
 		bool can_enter = characterMovement_isLocomotion(current)
 		              || current == MOVEMENT_STATE_FALLING
-		              || current == MOVEMENT_STATE_JUMPING;
+		              || current == MOVEMENT_STATE_ROLLING;
 
 		if (can_enter && data->in_water && data->submerged_fraction >= CHARACTER_WATER_SWIM_ENTER)
 			movement->next = MOVEMENT_STATE_SWIMMING;
@@ -376,9 +478,9 @@ static void (*characterMovement_handler[MOVEMENT_STATE_COUNT])(Character *, Move
 	[MOVEMENT_STATE_IDLE]     = characterMovement_setLocomotion,
 	[MOVEMENT_STATE_WALKING]  = characterMovement_setLocomotion,
 	[MOVEMENT_STATE_ROLLING]  = characterMovement_setRolling,
-	[MOVEMENT_STATE_JUMPING]  = characterMovement_setJump,
 	[MOVEMENT_STATE_FALLING]  = characterMovement_setFalling,
 	[MOVEMENT_STATE_SWIMMING] = characterMovement_setSwimming,
+	[MOVEMENT_STATE_CLIMBING] = characterMovement_setClimbing,
 };
 
 _Static_assert(sizeof(characterMovement_handler) / sizeof(characterMovement_handler[0]) == MOVEMENT_STATE_COUNT, "characterMovement_handler must have one entry per character state");
@@ -397,6 +499,8 @@ void character_updateMovement(Character *character, MovementCommand *cmd, float 
 	character->movement.data.strafe        = cmd->strafe;
 	character->movement.data.strafe_locked = cmd->strafe_locked;
 	character->movement.data.strafe_yaw    = cmd->strafe_yaw;
+	character->movement.data.bow_hold      = cmd->bow_hold;
+	character->movement.data.bow_aim       = cmd->bow_aim;
 
 	/* A scaled-down command locks the top gait away: the character stays on
 	   the previous one until the scale is back at full. */
@@ -409,5 +513,6 @@ void character_updateMovement(Character *character, MovementCommand *cmd, float 
 	characterMovement_handler[character->movement.current](character, cmd, dt);
 	characterMovement_updateBody(character, dt);
 	characterMovement_evaluateWater(character);
+	characterMovement_evaluateLadder(character, cmd);
 	characterMovement_evaluateTransitions(character);
 }

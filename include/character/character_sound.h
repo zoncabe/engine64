@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "sound/sound_bank.h"
+#include "sound/sound.h"
 
 typedef struct Character Character;
 
@@ -98,7 +98,6 @@ typedef struct CharacterSound {
 	float previous_cycle;
 
 	float previous_roll_timer;
-	float previous_jump_timer;
 
 	/* The collision zeroes the fall before this system runs, so the speed of
 	   the impact is the one the previous frame carried. */

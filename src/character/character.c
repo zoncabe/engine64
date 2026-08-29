@@ -36,6 +36,7 @@ Character *character_create(const CharacterDef *def, Entity *entity)
 		.movement  = (CharacterMovement){ .settings = def->movement_settings, .data.is_grounded = true, .current = MOVEMENT_STATE_IDLE },
 		.animation = (CharacterAnimation){ .def = def->animation_def },
 		.weapons   = (CharacterWeapons){ .def = def->weapons_def, .drawn = CHARACTER_WEAPON_DRAWN_NONE },
+		.aim       = (CharacterAim){ .def = def->aim_def },
 		/* No previous frame to compare against yet: a cycle of -1 crosses
 		   nothing, and the body starts standing on the floor. */
 		.sound     = (CharacterSound){ .def = def->sound_def, .previous_cycle = -1.0f, .previous_grounded = true },
@@ -46,8 +47,18 @@ Character *character_create(const CharacterDef *def, Entity *entity)
 		(def->collider_settings->height - 2.0f * def->collider_settings->radius) * 0.5f);
 	characterCollider_setVertical(&character->collider, &character->body.position);
 
-	characterAnimation_initGraph(character, def->animation_def);
-	entity->mesh->skeleton = &character->animation.main;
+	/* A def without animations (a vehicle) skips the whole graph: the mesh
+	   keeps a NULL skeleton and draws through the model object path. */
+	if (def->animation_def) {
+		characterAnimation_initGraph(character, def->animation_def);
+		entity->mesh->skeleton = &character->animation.main;
+	}
+
+	/* Aim before the weapons: the bow has to follow a spine already bent. */
+	if (def->aim_def) {
+		characterAim_init(character);
+		skeletonModifiers_add(&character->skeleton_modifiers, characterAim_apply, character);
+	}
 
 	skeletonModifiers_add(&character->skeleton_modifiers, character_weaponModifier, character);
 
@@ -74,9 +85,17 @@ Character *character_create(const CharacterDef *def, Entity *entity)
 	}
 
 	/* Part 0 = body, parts 1..N = one per weapon object, def order.
-	   Only the body starts visible; equipping turns weapon bits on. */
-	mesh_recordParts(entity->mesh, def->weapons_def->mesh, def->weapons_def->mesh_count,
-		(const T3DMat4FP *)t3d_segment_placeholder(T3D_SEGMENT_SKELETON));
+	   Only the body starts visible; equipping turns weapon bits on.
+	   No weapons: the whole model is the single skinned part. No skeleton
+	   either: per-object blocks, exactly what a prop gets. */
+	if (def->weapons_def)
+		mesh_recordParts(entity->mesh, def->weapons_def->mesh, def->weapons_def->mesh_count,
+			(const T3DMat4FP *)t3d_segment_placeholder(T3D_SEGMENT_SKELETON));
+	else if (def->animation_def)
+		mesh_recordParts(entity->mesh, NULL, 0,
+			(const T3DMat4FP *)t3d_segment_placeholder(T3D_SEGMENT_SKELETON));
+	else
+		mesh_recordObjects(entity->mesh);
 
 	return character;
 }
@@ -152,13 +171,18 @@ void character_delete(Character *character)
 {
 	CharacterAnimation *animation = &character->animation;
 
-	for (int i = 0; i < animation->def->clip_count; i++)
-		t3d_anim_destroy(&animation->clip[i]);
-	for (int i = 0; i < animation->def->buffer_count; i++)
-		t3d_skeleton_destroy(&animation->buffer[i]);
-	t3d_skeleton_destroy(&animation->main);
+	if (animation->def) {
+		for (int i = 0; i < animation->def->clip_count; i++) {
+			t3d_anim_destroy(&animation->clip[i]);
+			if (animation->clip_data[i]) free(animation->clip_data[i]);
+		}
+		for (int i = 0; i < animation->def->buffer_count; i++)
+			t3d_skeleton_destroy(&animation->buffer[i]);
+		t3d_skeleton_destroy(&animation->main);
+	}
 
 	free(animation->clip);
+	free(animation->clip_data);
 	free(animation->clip_cooldown);
 	free(animation->buffer);
 	free(animation->node_state);

@@ -3,7 +3,9 @@
 
 #include <libdragon.h>
 #include "physics/math/vector3.h"
-#include "sound/sound_bank.h"
+
+/* Index into the bank the game hands to sound_init. */
+typedef uint8_t SoundID;
 
 #define SOUND_MAX_EMITTERS 12
 
@@ -46,11 +48,9 @@ typedef struct SoundDef {
 
 } SoundDef;
 
-/* Filled in by the bank. */
-extern const SoundDef sound_bank[SOUND_COUNT];
-
-
-void sound_init(void);
+/* Hands the engine the game's sound bank and brings the mixer up. Runs
+   once, before any scene loads. */
+void sound_init(const SoundDef *bank, uint8_t count);
 void sound_close(void);
 
 /* Where the world is heard from. Position decides attenuation, right decides

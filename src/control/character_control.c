@@ -5,14 +5,16 @@
 #include "control/character_control.h"
 
 
-static void characterControl_setJump(Character *character, MovementCommand *cmd, const ControllerActions *actions)
+static void characterControl_setJump(Character *character, MovementCommand *cmd, const CharacterControls *actions)
 {
 	CharacterMovement *movement = &character->movement;
 
-	if (actions->jump && characterMovement_isLocomotion(movement->current)) {
+	/* The button never changes the state: it only asks for a jump. The crouch
+	   runs on the ground and the movement switches to the air on the impulse. */
+	if (actions->jump && characterMovement_isLocomotion(movement->current)
+	    && movement->data.jump_timer == 0.0f) {
 		cmd->jump_held      = true;
 		cmd->jump_triggered = true;
-		characterMovement_setMode(movement, MOVEMENT_STATE_JUMPING);
 	} else if (actions->jump_held) {
 		return;
 	} else {
@@ -20,17 +22,34 @@ static void characterControl_setJump(Character *character, MovementCommand *cmd,
 	}
 }
 
-static void characterControl_setRoll(Character *character, MovementCommand *cmd, const ControllerActions *actions)
+static void characterControl_setRoll(Character *character, MovementCommand *cmd, const CharacterControls *actions)
 {
 	CharacterMovement *movement = &character->movement;
 
-	if (actions->roll && characterMovement_isLocomotion(movement->current) && movement->current != MOVEMENT_STATE_IDLE) {
+	/* Not while a jump is being charged: the crouch owns the body until it
+	   takes off. */
+	if (actions->roll && characterMovement_isLocomotion(movement->current)
+	    && movement->current != MOVEMENT_STATE_IDLE
+	    && movement->data.jump_timer == 0.0f) {
 		cmd->roll_triggered = true;
 		characterMovement_setMode(movement, MOVEMENT_STATE_ROLLING);
 	}
 }
 
-static void characterControl_setLocomotionWithStick(Character *character, MovementCommand *cmd, const ControllerActions *actions, float camera_angle_around)
+/* Only with both feet in ordinary locomotion: never mid-air, mid-roll, in
+   the water or on a ladder, and not while a jump crouch owns the body. */
+static void characterControl_setWeaponSwitch(Character *character, const CharacterControls *actions)
+{
+	CharacterMovement *movement = &character->movement;
+
+	if (!characterMovement_isLocomotion(movement->current)
+	    || movement->data.jump_timer != 0.0f) return;
+
+	if (actions->weapon_next) character_cycleWeapon(character, +1);
+	if (actions->weapon_prev) character_cycleWeapon(character, -1);
+}
+
+static void characterControl_setLocomotionWithStick(Character *character, MovementCommand *cmd, const CharacterControls *actions, float camera_angle_around)
 {
 	CharacterMovement *movement = &character->movement;
 	float stick_magnitude = 0;
@@ -49,36 +68,117 @@ static void characterControl_setLocomotionWithStick(Character *character, Moveme
 		return;
 	}
 
-	if (!characterMovement_isLocomotion(movement->current)) return;
+	uint8_t mode = (stick_magnitude == 0) ? MOVEMENT_STATE_IDLE : MOVEMENT_STATE_WALKING;
 
-	if (stick_magnitude == 0) {
-		characterMovement_setMode(movement, MOVEMENT_STATE_IDLE);
+	/* An action owns the current state and its gait until it ends: the stick
+	   only picks the state it goes back to. */
+	if (!characterMovement_isLocomotion(movement->current)) {
+		movement->locomotion = mode;
 		return;
 	}
+
+	characterMovement_setMode(movement, mode);
+	if (mode == MOVEMENT_STATE_IDLE) return;
 
 	const CharacterMovementSettings *settings = movement->settings;
 	uint8_t last_gait = settings->gait_count - 1;
 
-	characterMovement_setMode(movement, MOVEMENT_STATE_WALKING);
-
 	if (stick_magnitude <= PLAYER_STICK_WALK_THRESHOLD)
 		cmd->gait = 0;
-	else if (actions->sprint && !actions->camera_aim)
+	else if (actions->sprint && !actions->aim)
 		cmd->gait = last_gait;
 	else
 		cmd->gait = (last_gait > 1) ? 1 : last_gait;
 }
 
-static void characterControl_setStrafe(Character *character, MovementCommand *cmd, const ControllerActions *actions, float camera_angle_around)
+/* Z with the bow in hand carries it at the ready; the shoot button on top
+   draws the string. The release edge already travels in the actions, left
+   for the shot once the arrow exists. */
+static void characterControl_setBow(Character *character, MovementCommand *cmd, const CharacterControls *actions)
 {
-	cmd->strafe     = actions->camera_aim && characterMovement_isLocomotion(character->movement.current);
+	const WeaponDef *drawn = character_drawnWeapon(character);
+	bool bow = drawn && drawn->type == WEAPON_TYPE_BALLISTIC;
+
+	cmd->bow_hold = bow && actions->aim
+		&& characterMovement_isLocomotion(character->movement.current);
+	cmd->bow_aim  = cmd->bow_hold && actions->shoot;
+}
+
+static void characterControl_setStrafe(Character *character, MovementCommand *cmd, const CharacterControls *actions, float camera_angle_around)
+{
+	cmd->strafe     = actions->aim && characterMovement_isLocomotion(character->movement.current);
 	cmd->strafe_yaw = angle_wrap(camera_angle_around + 180.0f + CHARACTER_STRAFE_YAW_OFFSET);
 }
 
-void characterControl_update(Character *character, MovementCommand *cmd, const ControllerActions *actions, float camera_angle_around)
+/* A ladder is asked for with the stick, never a button: pushing at the rungs
+   climbs and pulling away from them descends. Both are read against the
+   ladder's own facing, so which one the stick means never depends on where
+   the camera happens to be. Only the release is a button, and it is the one
+   that jumps everywhere else. */
+static void characterControl_setClimb(Character *character, MovementCommand *cmd, const CharacterControls *actions)
 {
+	CharacterMovement *movement = &character->movement;
+
+	cmd->climb         = 0.0f;
+	cmd->climb_release = false;
+
+	bool climbing = movement->current == MOVEMENT_STATE_CLIMBING;
+	if (!climbing && !movement->data.on_ladder) return;
+
+	if (climbing && actions->jump) {
+		cmd->climb_release = true;
+		return;
+	}
+
+	/* Already on it: the stick is read raw, up climbs and down descends. A
+	   ladder is the one place the camera must not get a vote — it swings
+	   around the body as it rises, and a heading built off it would turn
+	   the same push into a climb or a drop depending on where it ended up. */
+	if (climbing) {
+		if (actions->stick_y >=  PLAYER_STICK_DEADZONE) cmd->climb =  1.0f;
+		if (actions->stick_y <= -PLAYER_STICK_DEADZONE) cmd->climb = -1.0f;
+		return;
+	}
+
+	if (fabsf(actions->stick_x) < PLAYER_STICK_DEADZONE
+	 && fabsf(actions->stick_y) < PLAYER_STICK_DEADZONE) return;
+
+	/* Grabbing on is the opposite case: walking at a ladder is what asks
+	   for it, so the entry is the camera-relative heading measured against
+	   the ladder's facing. target_yaw is the stick already in world space
+	   and a body's rotation is the negative of the heading it walks, which
+	   is what brings the two into one frame to be compared. */
+	float alignment = fm_cosf(deg_to_rad(cmd->target_yaw + movement->data.ladder_yaw));
+
+	if (alignment >= fm_cosf(deg_to_rad(CHARACTER_LADDER_ENTER_ANGLE))) cmd->climb = 1.0f;
+}
+
+void characterControls_map(CharacterControls *controls, const Controller *pad, const CharacterControlBinding *binding)
+{
+	*controls = (CharacterControls){
+		.jump       = button_getPressed(pad, &pad->pressed, binding->jump),
+		.jump_held  = button_getPressed(pad, &pad->held,    binding->jump),
+		.roll       = button_getPressed(pad, &pad->pressed, binding->roll),
+		.sprint     = button_getPressed(pad, &pad->held,    binding->sprint),
+		.aim        = button_getPressed(pad, &pad->held,    binding->aim),
+		.shoot          = button_getPressed(pad, &pad->held,     binding->shoot),
+		.shoot_released = button_getPressed(pad, &pad->released, binding->shoot),
+		.weapon_next    = button_getPressed(pad, &pad->pressed,  binding->weapon_next),
+		.weapon_prev    = button_getPressed(pad, &pad->pressed,  binding->weapon_prev),
+		.stick_x = pad->input.stick_x,
+		.stick_y = pad->input.stick_y,
+	};
+}
+
+void characterControl_update(Character *character, MovementCommand *cmd, const CharacterControls *actions, float camera_angle_around)
+{
+	characterControl_setWeaponSwitch(character, actions);
 	characterControl_setRoll(character, cmd, actions);
 	characterControl_setJump(character, cmd, actions);
 	characterControl_setStrafe(character, cmd, actions, camera_angle_around);
+	characterControl_setBow(character, cmd, actions);
 	characterControl_setLocomotionWithStick(character, cmd, actions, camera_angle_around);
+
+	/* After the stick: the climb is read off the heading it just wrote. */
+	characterControl_setClimb(character, cmd, actions);
 }

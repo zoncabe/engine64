@@ -9,7 +9,7 @@
 #include "character/character_animation.h"
 #include "player/player.h"
 #include "physics/math/math_functions.h"
-#include "scene/scene.h"
+#include "scene3d/scene3d.h"
 #include "time/time.h"
 
 
@@ -25,16 +25,22 @@ void player_init(void)
 
 void player_setCharacter(Player *player, Character *character)
 {
+	/* The aim pitch is the spring arm's own field, read in place; only the
+	   driven body holds the wire. */
+	if (player->character) player->character->aim.pitch = NULL;
+
 	player->character = character;
 	player->entity = character ? character->entity : NULL;
 	if (player->entity && player->entity->mesh)
 		t3d_matrix_set(player->entity->mesh->matrix_buffer, true);
+
+	if (character) character->aim.pitch = &viewport_get()->camera.spring_arm.data.pitch;
 }
 
 /* Cycles the player through the scene's characters, in either direction. */
 void player_switchCharacter(Player *player, int8_t direction)
 {
-	Scene *scene = scene_get();
+	Scene3D *scene = scene3d_get();
 	if (scene->character_count < 2) return;
 
 	uint8_t current = 0;
@@ -42,15 +48,7 @@ void player_switchCharacter(Player *player, int8_t direction)
 		if (scene->character[i] == player->character) { current = i; break; }
 
 	uint8_t next = (uint8_t)((current + scene->character_count + direction) % scene->character_count);
-	Character *character = scene->character[next];
-
-	/* Glide the camera over from the body being left behind instead of cutting
-	   to the new one. */
-	camera_setViewTarget(
-		&viewport_get()->camera,
-		&player->entity->transform.position,
-		CAMERA_VIEW_TARGET_BLEND_TIME
-	);
+	Character *character = scene->character[next]; 
 
 	player_setCharacter(player, character);
 
@@ -70,10 +68,10 @@ void player_update(void)
 		characterSound_update(player[i].character);
 	}
 
-	/* Scene characters nobody drives run on an empty command, so they idle
+	/* Scene3D characters nobody drives run on an empty command, so they idle
 	   instead of freezing mid pose when the player switches away. */
 	static MovementCommand idle_cmd;
-	Scene *scene = scene_get();
+	Scene3D *scene = scene3d_get();
 	for (int i = 0; i < scene->character_count; i++) {
 		Character *character = scene->character[i];
 
@@ -86,10 +84,10 @@ void player_update(void)
 		   released stick idles it through the control's own rule (treading
 		   water if it was swimming), and idling never drains, so a body
 		   left behind rests and refills on its own. */
-		static const ControllerActions no_actions;
+		static const CharacterControls no_controls;
 
 		idle_cmd.target_yaw = character->body.rotation.z;
-		characterControl_update(character, &idle_cmd, &no_actions, 0.0f);
+		characterControl_update(character, &idle_cmd, &no_controls, 0.0f);
 		characterStats_update(character, &idle_cmd, dt);
 		character_updateMovement(character, &idle_cmd, dt);
 		character_setAnimation(character);

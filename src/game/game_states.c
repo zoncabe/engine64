@@ -1,249 +1,49 @@
+/*
+	State machinery only: the table itself is the game's, handed over at
+	game_start. The engine loads, unloads and switches whatever it is given.
+*/
+#include <assert.h>
+#include <libdragon.h>
+
 #include "resources/resources.h"
 #include "time/time.h"
-#include "scene/scene.h"
-#include "scene/demo_scene.h"
-#include "render/render.h"
-#include "cutscene/intro.h"
-#include "screen/screen.h"
-#include "screen/screen_animation.h"
-#include "ui/main_menu_ui.h"
-#include "ui/pause_ui.h"
-#include "ui/gameplay_ui.h"
-#include "ui/credits_ui.h"
-#include "menu/menu.h"
-#include "particles/particles.h"
-#include "shaders/water.h"
+#include "scene3d/scene3d.h"
+#include "scene2d/scene2d.h"
 #include "player/player.h"
-#include "control/player_control.h"
-#include "sound/sound.h"
 #include "game/game.h"
-#include "viewport/viewport.h"
 #include "game/game_states.h"
 
 
-typedef struct {
+static const GameStateDef *game_state;
+static uint8_t             game_state_count;
 
-	void (*update)(GameContext *);
-	void (*setDescriptor)(const GameContext *, GameRenderDescriptor *);
-	void (*bindCharacter)(void);
-	void (*onEnter)(void);
-	void (*onExit)(void);
 
-	/* The scene this state runs on; NULL for the ones that live on screens. */
-	SceneDef          *scene;
-
-	/* The state this one rides on top of; GAME_STATE_COUNT for none.
-	   Switching between an overlay and its base leaves the base untouched. */
-	GameState          overlay_of;
-
-} GameStateDef;
-
-static void gameState_bindGameplayCharacter(void)
+const GameStateDef *gameState_get(GameState id)
 {
-	player_setCharacter(&player_get()[0], scene_getCharacter(0));
+	assert(id < game_state_count);
+	return &game_state[id];
 }
-
-static void gameState_updateIntro(GameContext *ctx)
-{
-	screenAnimationPlayer_update(&intro_animation_player, time_get()->delta);
-	if (!intro_animation_player.is_active)
-		game_setState(ctx->game, GAME_STATE_MAIN_MENU);
-}
-
-static void gameState_updateMainMenu(GameContext *ctx)
-{
-	(void)ctx;
-	main_menu_ui_update();
-}
-
-static void gameState_updateCredits(GameContext *ctx)
-{
-	(void)ctx;
-	credits_ui_update();
-}
-
-static void gameState_updateGameplay(GameContext *ctx)
-{
-	Game *game = ctx->game;
-
-	Controller *control = controller_get();
-	for (int i = 0; i < PLAYER_COUNT; i++)
-		player_setCharacterControl(&ctx->player[i], &control[i].actions, ctx->viewport);
-	player_update();
-
-	Scene *scene = scene_get();
-	uint8_t fb_index = ctx->viewport->fb_index;
-
-	physics_update(scene_getPhysics(), time_get()->delta);
-	assetSound_update(scene_getPhysics());
-	water_update(time_get()->delta);
-
-	for (int i = 0; i < scene->character_count; i++) {
-		Character *character = scene->character[i];
-		characterPhysics_collide(character, scene_getPhysics());
-		characterPhysics_syncBody(character);
-		entity_setTransform(character->entity, &character->body);
-		entity_setMatrix(character->entity, fb_index);
-	}
-
-	/* Simulated props are placed by the solver, so their matrix comes from the
-	   body. Static ones keep the one scene_load wrote. */
-	for (int i = 0; i < scene->entity_count; i++)
-		entity_setMatrixFromBody(scene->entity[i], fb_index);
-
-	particles_update(ctx, fb_index);
-
-	viewport_updateCamera(&control[0].actions, &ctx->player[0].entity->transform.position);
-	gameplay_ui_update();
-	(void)game;
-}
-
-static void gameState_updatePause(GameContext *ctx)
-{
-	(void)ctx;
-	Scene *scene = scene_get();
-	/* Matrices are per framebuffer and gameplay only writes the current one, so
-	   the three hold three different instants. Frozen, that reads as a shake:
-	   everything that moves has to fill all three. */
-	for (int i = 0; i < scene->entity_count; i++) {
-		Entity *entity = scene->entity[i];
-
-		for (int fb = 0; fb < FB_COUNT; fb++) {
-			if (entity->type == ENTITY_CHARACTER) entity_setMatrix(entity, fb);
-			entity_setMatrixFromBody(entity, fb);
-		}
-	}
-
-	pause_ui_update();
-}
-
-static void gameState_updateGameOver(GameContext *ctx)
-{
-	(void)ctx;
-}
-
-static void gameState_setIntroDescriptor(const GameContext *ctx, GameRenderDescriptor *descriptor)
-{
-	(void)ctx;
-	descriptor->scene  = NULL;
-	descriptor->screen = &intro_screen;
-}
-
-static void gameState_setMainMenuDescriptor(const GameContext *ctx, GameRenderDescriptor *descriptor)
-{
-	(void)ctx;
-	descriptor->scene  = NULL;
-	descriptor->screen = &main_menu_screen;
-}
-
-static void gameState_setCreditsDescriptor(const GameContext *ctx, GameRenderDescriptor *descriptor)
-{
-	(void)ctx;
-	descriptor->scene  = NULL;
-	descriptor->screen = &credits_screen;
-}
-
-static void gameState_setGameplayDescriptor(const GameContext *ctx, GameRenderDescriptor *descriptor)
-{
-	descriptor->scene  = ctx->scene;
-	descriptor->screen = &gameplay_screen;
-}
-
-static void gameState_setPauseDescriptor(const GameContext *ctx, GameRenderDescriptor *descriptor)
-{
-	descriptor->scene  = ctx->scene;
-	descriptor->screen = &pause_screen;
-}
-
-static void gameState_setGameOverDescriptor(const GameContext *ctx, GameRenderDescriptor *descriptor)
-{
-	(void)ctx;
-	descriptor->scene  = NULL;
-	descriptor->screen = NULL;
-}
-
-static const GameStateDef game_state[GAME_STATE_COUNT] = {
-
-	[GAME_STATE_INTRO] = {
-		.update        = gameState_updateIntro,
-		.setDescriptor = gameState_setIntroDescriptor,
-		.bindCharacter     = NULL,
-		.onEnter       = intro_init,
-		.onExit        = NULL,
-		.scene         = NULL,
-		.overlay_of    = GAME_STATE_COUNT,
-	},
-
-	[GAME_STATE_MAIN_MENU] = {
-		.update        = gameState_updateMainMenu,
-		.setDescriptor = gameState_setMainMenuDescriptor,
-		.bindCharacter     = NULL,
-		.onEnter       = main_menu_ui_startEnter,
-		.onExit        = NULL,
-		.scene         = NULL,
-		.overlay_of    = GAME_STATE_COUNT,
-	},
-
-	[GAME_STATE_CREDITS] = {
-		.update        = gameState_updateCredits,
-		.setDescriptor = gameState_setCreditsDescriptor,
-		.bindCharacter     = NULL,
-		.onEnter       = credits_ui_startEnter,
-		.onExit        = NULL,
-		.scene         = NULL,
-		.overlay_of    = GAME_STATE_COUNT,
-	},
-
-	[GAME_STATE_GAMEPLAY] = {
-		.update        = gameState_updateGameplay,
-		.setDescriptor = gameState_setGameplayDescriptor,
-		.bindCharacter     = gameState_bindGameplayCharacter,
-		.onEnter       = gameplay_ui_startEnter,
-		.onExit        = gameplay_ui_exit,
-		.scene         = &demo_scene,
-		.overlay_of    = GAME_STATE_COUNT,
-	},
-
-	[GAME_STATE_PAUSE] = {
-		.update        = gameState_updatePause,
-		.setDescriptor = gameState_setPauseDescriptor,
-		.bindCharacter     = NULL,
-		.onEnter       = pause_ui_startEnter,
-		.onExit        = NULL,
-		.scene         = NULL,
-		.overlay_of    = GAME_STATE_GAMEPLAY,
-	},
-
-	[GAME_STATE_GAME_OVER] = {
-		.update        = gameState_updateGameOver,
-		.setDescriptor = gameState_setGameOverDescriptor,
-		.bindCharacter     = NULL,
-		.onEnter       = NULL,
-		.onExit        = NULL,
-		.scene         = NULL,
-		.overlay_of    = GAME_STATE_COUNT,
-	},
-
-};
 
 static void gameState_load(GameState id)
 {
-	resources_load(resources_forState(id));
-	if (game_state[id].scene) {
-		scene_load(game_state[id].scene);
+	resources_load(&game_state[id].resources);
+	if (game_state[id].scene3d) {
+		scene3d_load(game_state[id].scene3d);
 		if (game_state[id].bindCharacter) game_state[id].bindCharacter();
 	}
+	if (game_state[id].scene2d) scene2d_load(game_state[id].scene2d);
 	if (game_state[id].onEnter) game_state[id].onEnter();
 }
 
 static void gameState_unload(GameState id)
 {
 	if (game_state[id].onExit) game_state[id].onExit();
-	if (game_state[id].scene) {
+	if (game_state[id].scene2d) scene2d_unload();
+	if (game_state[id].scene3d) {
 		player_init();
-		scene_unload();
+		scene3d_unload();
 	}
-	resources_unload(resources_forState(id));
+	resources_unload(&game_state[id].resources);
 }
 
 static bool gameState_isOverlayPair(GameState prev, GameState next)
@@ -251,16 +51,30 @@ static bool gameState_isOverlayPair(GameState prev, GameState next)
 	return game_state[next].overlay_of == prev || game_state[prev].overlay_of == next;
 }
 
+/* Asking to leave is not leaving: the state names where it goes, and the
+   switch happens as soon as it lets go. */
 void game_setState(Game *game, GameState new_state)
 {
-	if (game->state == new_state) return;
+	assert(new_state < game_state_count);
+	game->next = new_state;
+}
 
-	GameState prev = game->state;
+static void gameState_settle(Game *game)
+{
+	if (game->next == game->state) return;
 
-	/* An overlay rides its base: switching between the two touches no
-	   memory at all, and dropping back does not re-enter the base. */
+	const GameStateDef *leaving = &game_state[game->state];
+	if (leaving->canLeave && !leaving->canLeave()) return;
+
+	GameState prev      = game->state;
+	GameState new_state = game->next;
+
+	/* An overlay rides its base: the 3D world stays untouched and dropping
+	   back does not re-enter the base. Only the 2D scene changes hands, and
+	   it comes back the way its definition declares it. */
 	if (gameState_isOverlayPair(prev, new_state)) {
 		game->state = new_state;
+		if (game_state[new_state].scene2d) scene2d_load(game_state[new_state].scene2d);
 		if (game_state[new_state].overlay_of == prev && game_state[new_state].onEnter)
 			game_state[new_state].onEnter();
 		return;
@@ -269,7 +83,7 @@ void game_setState(Game *game, GameState new_state)
 	rspq_wait();
 	gameState_unload(prev);
 	/* An abandoned overlay takes its base state down with it. */
-	if (game_state[prev].overlay_of != GAME_STATE_COUNT)
+	if (game_state[prev].overlay_of != GAME_STATE_NONE)
 		gameState_unload(game_state[prev].overlay_of);
 	game->state = new_state;
 	gameState_load(new_state);
@@ -279,20 +93,37 @@ void game_setState(Game *game, GameState new_state)
 	time_reset();
 }
 
-void game_loadInitialState(void)
+void game_start(const GameStateDef *states, uint8_t count, GameState initial)
 {
-	gameState_load(GAME_INITIAL_STATE);
+	assert(states && initial < count);
+
+	game_state       = states;
+	game_state_count = count;
+
+	Game *game = game_get();
+	game->state = initial;
+	game->next  = initial;
+
+	gameState_load(initial);
 	time_reset();
 }
 
 void game_updateState(GameContext *ctx)
 {
 	game_state[ctx->game->state].update(ctx);
+	gameState_settle(ctx->game);
 }
 
+/* What the state draws: its own scenes. An overlay draws the 3D world of
+   the state it rides on, which is the one still loaded. */
 GameRenderDescriptor game_getRenderDescriptor(const GameContext *ctx)
 {
-	GameRenderDescriptor descriptor = {0};
-	game_state[ctx->game->state].setDescriptor(ctx, &descriptor);
-	return descriptor;
+	const GameStateDef *def = &game_state[ctx->game->state];
+
+	bool on_3d = def->scene3d || def->overlay_of != GAME_STATE_NONE;
+
+	return (GameRenderDescriptor){
+		.scene3d = on_3d ? ctx->scene3d : NULL,
+		.scene2d = def->scene2d ? scene2d_get() : NULL,
+	};
 }

@@ -24,6 +24,7 @@
 #define CHARACTER_MIN_CONTACT_DEPTH      (CHARACTER_RECOVERY_MARGIN * 0.05f)  /* Godot: TEST_MOTION_MIN_CONTACT_DEPTH_FACTOR */
 #define CHARACTER_RECOVERY_FACTOR        0.4f    /* Godot: fraction of the depth recovered per pass */
 #define CHARACTER_FLOOR_SNAP_LENGTH      0.15f    /* downward probe, metres */
+#define CHARACTER_FALL_PROBE_LENGTH      6.0f     /* how far down the landing is looked for */
 #define CHARACTER_FLOOR_MAX_SLOPE        50.0f   /* degrees */
 #define CHARACTER_FLOOR_ANGLE_THRESHOLD  0.01f   /* radians, Godot: FLOOR_ANGLE_THRESHOLD */
 
@@ -108,6 +109,9 @@ typedef struct CharacterCollisionState {
 	float   wall_depth;
 } CharacterCollisionState;
 
+/* Only mesh and count are set up before a query: count gates the triangle
+   array, whose entries are written before they are read. Zeroing the whole
+   struct would cost a memset of the array on every call. */
 typedef struct TriangleQuery {
 	const CollisionMesh *mesh;
 	int32_t triangle[CHARACTER_MAX_TRIANGLES];
@@ -154,14 +158,19 @@ static int characterPhysics_collectMeshContacts(const CharacterCollider *collide
 	AABB aabb;
 	capsule_computeAABB(&collider->shape, &local, &aabb);
 
-	TriangleQuery query = { .mesh = mesh };
+	TriangleQuery query;
+	query.mesh  = mesh;
+	query.count = 0;
 	collisionMesh_queryAABB(mesh, &query, characterPhysics_collectTriangle, aabb);
 
 	for (int i = 0; i < query.count; i++) {
 		Triangle triangle;
 		collisionMesh_getTriangle(mesh, query.triangle[i], &triangle);
 
-		ContactManifold m = {0};
+		/* contact_count gates the manifold: normal and contacts[0] are written
+		   by the collision function whenever it sets a contact. */
+		ContactManifold m;
+		m.contact_count = 0;
 		capsuleToTriangle(&m, &collider->shape, &local, &triangle);
 		if (!m.contact_count) continue;
 
@@ -203,7 +212,8 @@ static int characterPhysics_collectContacts(const CharacterCollider *collider,
 			if (shape->sensor) continue;   /* volumes (water), not obstacles */
 
 			Transform tx = transform_product(&body->tx, &shape->local);
-			ContactManifold m = {0};
+			ContactManifold m;
+			m.contact_count = 0;
 
 			switch (shape->type) {
 				case SHAPE_MESH:
@@ -420,7 +430,8 @@ static void floorProbe_consider(FloorProbe *probe, const Vector3 *center, float 
 
 static void characterPhysics_probeFloor(const PhysicsWorld *world, const Vector3 *center, float radius, FloorProbe *probe)
 {
-	*probe = (FloorProbe){0};
+	/* found gates every other field: they are written together on a hit. */
+	probe->found = 0;
 
 	for (const RigidBody *body = world->body_list; body; body = body->next) {
 	if (!(body->flags & BODY_FLAG_STATIC)) continue;
@@ -439,7 +450,9 @@ static void characterPhysics_probeFloor(const PhysicsWorld *world, const Vector3
 					{ local_center.x + radius, local_center.y + radius, local_center.z + radius },
 				};
 
-				TriangleQuery query = { .mesh = shape->mesh };
+				TriangleQuery query;
+				query.mesh  = shape->mesh;
+				query.count = 0;
 				collisionMesh_queryAABB(shape->mesh, &query, characterPhysics_collectTriangle, aabb);
 
 				for (int t = 0; t < query.count; t++) {
@@ -485,6 +498,34 @@ static void characterPhysics_probeFloor(const PhysicsWorld *world, const Vector3
 	}
 }
 
+/* How far the floor is straight below the feet, so the animation can start the
+   landing exactly one clip-to-contact away from it. Negative with nothing
+   within reach. Sensors are skipped: the water is not a floor to land on. */
+static float characterPhysics_floorDistance(const Character *character, const PhysicsWorld *world)
+{
+	Vector3 down = { 0.0f, 0.0f, -1.0f };
+
+	RaycastData ray;
+	raycast_set(&ray, &character->body.position, &down, CHARACTER_FALL_PROBE_LENGTH);
+
+	float distance = -1.0f;
+
+	for (const RigidBody *body = world->body_list; body; body = body->next) {
+		if (!(body->flags & BODY_FLAG_STATIC)) continue;
+
+		for (const PhysicsShape *shape = body->shapes; shape; shape = shape->next) {
+			if (shape->sensor) continue;
+			if (!physicsShape_raycast(shape, &body->tx, &ray)) continue;
+
+			/* Closest wins: the ray is shortened so the rest is behind it. */
+			distance = ray.toi;
+			ray.t    = ray.toi;
+		}
+	}
+
+	return distance;
+}
+
 static void characterPhysics_findFloor(const Character *character, const PhysicsWorld *world, FloorProbe *probe)
 {
 	float radius = character->collider.shape.radius;
@@ -510,6 +551,61 @@ static void characterPhysics_snapToFloor(Character *character, const FloorProbe 
 
 	characterCollider_setVertical(&character->collider, &character->body.position);
 	characterCollision_setGroundResponse(character);
+}
+
+/* Ladder probe: the climbable volume the feet are inside, resolved into the
+   frame the climb needs — where to hold on, which way to face, where the
+   bottom is.
+
+   The volume's local Y is the face normal and its local X runs along the
+   rungs, so the hold is the body brought onto the centre plane (local X at
+   zero) and pushed back out to the distance the climb clip grips at. Boxes
+   only — the frame is the point of the volume, and a sphere has no face to
+   climb. */
+static void characterPhysics_probeLadder(Character *character, const PhysicsWorld *world)
+{
+	CharacterMovementData *data = &character->movement.data;
+
+	data->on_ladder = false;
+
+	const Vector3 *feet = &character->body.position;
+
+	for (const RigidBody *body = world->body_list; body; body = body->next) {
+		if (!(body->flags & BODY_FLAG_STATIC)) continue;
+
+		for (const PhysicsShape *shape = body->shapes; shape; shape = shape->next) {
+			if (shape->sensor != SENSOR_CLIMBABLE) continue;
+			if (shape->type   != SHAPE_BOX)        continue;
+			if (!physicsShape_testPoint(shape, &body->tx, feet)) continue;
+
+			Transform tx    = transform_product(&body->tx, &shape->local);
+			Vector3   local = transform_mulVectorTransposed(&tx, feet);
+
+			/* Only the -Y face is climbable; the back of a ladder is its
+			   back. Turn the placement 180 to serve the other side. */
+			if (local.y > 0.0f) continue;
+
+			Vector3 hold   = { 0.0f, -CHARACTER_LADDER_STAND_DISTANCE, local.z };
+			Vector3 anchor = transform_mulVector(&tx, &hold);
+
+			/* ex/ey/ez are the local axes in world space, so ey is the face
+			   normal. The heading is built the way the movement reads one off
+			   a velocity, so the conventions cannot drift apart. */
+			Vector3 into = tx.rotation.ey;
+
+			/* The ceiling, for the entry margin to measure down from. Only
+			   yaw ever turns a ladder, so the box's local up is the world's
+			   and its half-height is the whole distance. */
+			Vector3 ceiling = { 0.0f, 0.0f, shape->box.e.z };
+
+			data->on_ladder       = true;
+			data->ladder_anchor_x = anchor.x;
+			data->ladder_anchor_y = anchor.y;
+			data->ladder_yaw      = rad_to_deg(atan2f(-into.x, -into.y));
+			data->ladder_top      = transform_mulVector(&tx, &ceiling).z;
+			return;
+		}
+	}
 }
 
 /* Water probe: fraction of the capsule under the surface, from the world's
@@ -556,6 +652,19 @@ void characterPhysics_collide(Character *character, const PhysicsWorld *world)
 	characterCollider_setVertical(&character->collider, &character->body.position);
 
 	characterPhysics_probeWater(character, world);
+	characterPhysics_probeLadder(character, world);
+
+	/* Climbing owns the body: the hands grip closer than the capsule radius,
+	   so a recovery pass would shove it off the rungs it is holding, and a
+	   floor snap would stand it on the first one it passes. The climb state
+	   is bounded by its own volume instead.
+
+	   The one thing still worth measuring is how far the ground is, which is
+	   what tells a descent it has arrived. */
+	if (character->movement.current == MOVEMENT_STATE_CLIMBING) {
+		data->floor_distance = characterPhysics_floorDistance(character, world);
+		return;
+	}
 
 	CharacterCollisionState state = { .wall_depth = -1.0f };
 	characterPhysics_recover(character, world, &state);
@@ -570,7 +679,16 @@ void characterPhysics_collide(Character *character, const PhysicsWorld *world)
 	   A contact already classified as floor outranks the probe: pressed against
 	   a wall the probe can miss the floor it is standing on, and falling on that
 	   alone puts the character back on the ground the next frame, one frame at a
-	   time, forever. */
+	   time, forever.
+
+	   Only locomotion falls: a roll runs to the end of its own clip, ground
+	   under it or not. */
 	if (!floor.found && !data->is_grounded && characterMovement_isLocomotion(character->movement.current))
 		characterMovement_setMode(&character->movement, MOVEMENT_STATE_FALLING);
+
+	/* Only worth measuring off the ground, and only on the way down: it feeds
+	   the landing, and a rising body has nothing to time yet. */
+	data->floor_distance = (!data->is_grounded && character->body.velocity.z < 0.0f)
+		? characterPhysics_floorDistance(character, world)
+		: -1.0f;
 }

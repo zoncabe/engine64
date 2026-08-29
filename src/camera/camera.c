@@ -11,13 +11,13 @@ static void (*camera_handler[CAMERA_TYPE_COUNT])(Camera *, Vector3 *, float) = {
 
 void camera_init(Camera *camera)
 {
+	/* Lens and placement come from the scene's CameraDef; position and target
+	   are one unit apart so the view matrix is not degenerate before the first
+	   update places them. */
 	*camera = (Camera){
-		.position      = { 0.0f, 1.0f, 0.0f },
-		.target        = { 0.0f, 0.0f, 0.0f },
-		.field_of_view = 60.0f,
-		.near_clipping = 50.0f,
-		.far_clipping  = 5000.0f,
-		.type          = CAMERA_TYPE_NONE,
+		.position = { 0.0f, 1.0f, 0.0f },
+		.target   = { 0.0f, 0.0f, 0.0f },
+		.type     = CAMERA_TYPE_NONE,
 	};
 }
 

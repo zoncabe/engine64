@@ -8,15 +8,20 @@
 #include "player/player.h"
 
 
-typedef struct Scene         Scene;
+typedef struct Scene3D         Scene3D;
 typedef struct RenderContext RenderContext;
-typedef struct Screen        Screen;
+typedef struct Scene2D        Scene2D;
 typedef struct Viewport      Viewport;
 
 
 typedef struct Game {
 
 	GameState state;
+
+	/* Where it is heading. A state that asks to leave sets this and plays
+	   its way out; the switch happens once the screen is done. Equal to
+	   state while there is nowhere to go. */
+	GameState next;
 
 } Game;
 
@@ -25,7 +30,7 @@ typedef struct GameContext {
 
 	Game          *game;
 	Viewport      *viewport;
-	Scene         *scene;
+	Scene3D         *scene3d;
 	Player        *player;
 	Controller   **controller;
 
@@ -33,8 +38,8 @@ typedef struct GameContext {
 
 typedef struct GameRenderDescriptor {
 
-	const Scene  *scene;
-	const Screen *screen;
+	const Scene3D *scene3d;
+	const Scene2D *scene2d;
 
 } GameRenderDescriptor;
 

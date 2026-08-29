@@ -3,6 +3,8 @@
 #include <fmath.h>
 #include <malloc.h>
 #include <string.h>
+#include <stdio.h>
+#include <libdragon.h>
 #include "time/time.h"
 #include "entity/entity.h"
 #include "viewport/viewport.h"
@@ -11,6 +13,11 @@
 
 void characterAnimation_addLayer(CharacterAnimationBuffer *buffer, const T3DSkeleton *skel, float weight)
 {
+	/* Never write past the stack: a dropped layer is a pose glitch, an
+	   overflow is garbage quaternions frames later. */
+	assert(buffer->count < ANIMATION_MAX_LAYERS);
+	if (buffer->count >= ANIMATION_MAX_LAYERS) return;
+
 	buffer->layer[buffer->count] = skel;
 	buffer->weight[buffer->count] = weight;
 	buffer->count++;
@@ -37,11 +44,11 @@ static uint8_t characterAnimation_blendSegment(float weight, uint8_t count, floa
 static void characterAnimation_syncGridClips(const CharacterAnimationParamCtx *ctx, const CharacterAnimationNode *node, float cols_value, float rows_value);
 static T3DSkeleton *characterAnimation_clipBuffer(const CharacterAnimationDef *def, CharacterAnimation *animation, uint8_t clip);
 
-/* Streamed clips: every open T3DAnim keeps its .sdata file open, and libc caps
-   the files a program may hold open at once (64-lock pool). Clips open on
-   first use and close after a while untouched, so only the graph's working
-   set holds files. The delay keeps blend-boundary flicker from churning
-   open/close, and the hard cap bounds the open set no matter the input. */
+/* Open clips hold a FILE, and libc caps those at 64 (lock pool) — fmemopen
+   streams included, they take a lock like any file. Clips open on first use
+   and close after a while untouched, so only the graph's working set holds
+   files. The delay keeps blend-boundary flicker from churning open/close,
+   and the hard cap bounds the open set no matter the input. */
 #define ANIMATION_CLIP_CLOSE_DELAY 60   /* frames untouched before closing */
 #define ANIMATION_CLIP_MAX_OPEN    24   /* per character */
 
@@ -49,6 +56,44 @@ static void characterAnimation_closeClip(CharacterAnimation *animation, uint8_t 
 {
 	t3d_anim_destroy(&animation->clip[index]);
 	memset(&animation->clip[index], 0, sizeof(animation->clip[index]));
+
+	/* RAM-resident keyframes: destroy already closed the memory stream. */
+	if (animation->clip_data[index]) {
+		free(animation->clip_data[index]);
+		animation->clip_data[index] = NULL;
+	}
+}
+
+static void characterAnimation_openClip(CharacterAnimation *animation, uint8_t index)
+{
+	T3DAnim *clip = &animation->clip[index];
+	const CharacterAnimationClipDef *clip_def = &animation->def->clip[index];
+
+	*clip = t3d_anim_create(animation->model, clip_def->name);
+
+	/* RAM-resident keyframes: load the whole .sdata once and swap the clip's
+	   stream for a memory one. t3d keeps fread()ing as always, just without
+	   the cartridge DMA underneath; rewinds on loop become free. Remove this
+	   block (and the frees in closeClip / character_delete) to fall back to
+	   cartridge streaming. */
+	{
+		int size = 0;
+		void *data = asset_load(clip->animRef->filePath, &size);
+		FILE *mem  = data ? fmemopen(data, (size_t)size, "rb") : NULL;
+		if (mem) {
+			long pos = ftell(clip->file);
+			fclose(clip->file);
+			fseek(mem, pos, SEEK_SET);
+			clip->file = mem;
+			animation->clip_data[index] = data;
+		} else if (data) {
+			free(data);
+		}
+	}
+
+	t3d_anim_attach(clip, characterAnimation_clipBuffer(animation->def, animation, index));
+	t3d_anim_set_looping(clip, clip_def->is_looping);
+	t3d_anim_set_playing(clip, clip_def->is_looping);
 }
 
 static T3DAnim *characterAnimation_clip(CharacterAnimation *animation, uint8_t index)
@@ -69,12 +114,7 @@ static T3DAnim *characterAnimation_clip(CharacterAnimation *animation, uint8_t i
 	if (open >= ANIMATION_CLIP_MAX_OPEN && evict >= 0 && animation->clip_cooldown[evict] > 0)
 		characterAnimation_closeClip(animation, (uint8_t)evict);
 
-	const CharacterAnimationClipDef *clip_def = &animation->def->clip[index];
-
-	*clip = t3d_anim_create(animation->model, clip_def->name);
-	t3d_anim_attach(clip, characterAnimation_clipBuffer(animation->def, animation, index));
-	t3d_anim_set_looping(clip, clip_def->is_looping);
-	t3d_anim_set_playing(clip, clip_def->is_looping);
+	characterAnimation_openClip(animation, index);
 
 	return clip;
 }
@@ -125,20 +165,30 @@ static float characterAnimation_getLocomotionPhase(const CharacterAnimationSetti
 	float left  = settings->footing_left;
 	float right = settings->footing_right;
 
+	/* rises left plant -> right plant, and falls at ONE rate across the wrap
+	   back to the left plant: no anchor at the cycle seam, so asymmetric
+	   plants keep the wave speed continuous */
 	float phase = clip_time / clip_length;
 	float f;
-	if      (phase <= left)  f = 0.5f * (1.0f - phase / left);
+	if      (phase <= left)  f = (left - phase) / (1.0f - right + left);
 	else if (phase <= right) f = (phase - left) / (right - left);
-	else                     f = 1.0f - 0.5f * (phase - right) / (1.0f - right);
+	else                     f = 1.0f - (phase - right) / (1.0f - right + left);
 	if (f > 0.9999999f) f = 0.9999999f;
 	if (f < 0.0000001f) f = 0.0000001f;
 	return f;
 }
 
+/* In the air, or about to be: the crouch that starts a jump runs on the ground
+   but already belongs to the air layer. */
+static bool characterAnimation_isAerial(const CharacterAnimationParamCtx *ctx)
+{
+	return ctx->character->movement.current == MOVEMENT_STATE_FALLING
+	    || ctx->character->movement.data.jump_timer > 0.0f;
+}
+
 static void characterAnimation_setJumpFootingSpeed(const CharacterAnimationParamCtx *ctx)
 {
-	uint8_t cur = ctx->character->movement.current;
-	if (cur != MOVEMENT_STATE_JUMPING && cur != MOVEMENT_STATE_FALLING) return;
+	if (!characterAnimation_isAerial(ctx)) return;
 
 	float jump   = ctx->animation->param[ANIMATION_PARAM_JUMP_L] + ctx->animation->param[ANIMATION_PARAM_JUMP_R];
 	float factor = ctx->settings->jump_footing_speed * (1.0f - jump);
@@ -189,8 +239,11 @@ static void characterAnimation_snapRollToLocomotion(const CharacterAnimationPara
 	const CharacterAnimationNode *node = &ctx->def->node[ctx->def->locomotion_node];
 
 	/* the plant phases are where the footing wave peaks: footing_left is
-	   footing 0, footing_right is footing 1 */
+	   footing 0, footing_right is footing 1. The exit lands short of the
+	   plant so the leg is still reaching for it. */
 	float phase = left ? ctx->settings->footing_right : ctx->settings->footing_left;
+	phase -= ctx->settings->run_to_rolling_anim_lead;
+	if (phase < 0.0f) phase += 1.0f;
 
 	for (int i = 0; i < node->cols * node->rows; i++) {
 		T3DAnim *clip = characterAnimation_clip(ctx->animation, node->animation[i]);
@@ -244,6 +297,13 @@ static float characterAnimation_getTurningAvg(CharacterAnimation *animation, con
 	return r * settings->turn_max_weight;
 }
 
+/* Weight the roll sheds per second on its way out: the exit ramp runs from the
+   stand pose to the end of the clip. */
+static float characterAnimation_rollExitRate(const CharacterAnimationSettings *r)
+{
+	return 1.0f / (r->run_to_rolling_anim_length - r->run_to_rolling_anim_stand);
+}
+
 static void characterAnimation_setRollParam(const CharacterAnimationParamCtx *ctx)
 {
 	uint8_t  cur = ctx->character->movement.current;
@@ -251,8 +311,18 @@ static void characterAnimation_setRollParam(const CharacterAnimationParamCtx *ct
 
 	if (cur != MOVEMENT_STATE_ROLLING) {
 		if (*as == MOVEMENT_STATE_ROLLING) *as = cur;
-		ctx->animation->param[ANIMATION_PARAM_ROLL_RUN] = 0.0f;
-		ctx->animation->param[ANIMATION_PARAM_ROLL_DIR] = 0.0f;
+
+		/* Cut short by a ledge: the clip never reached its own exit ramp, so
+		   the weight is drained here at that same rate instead of dropping
+		   the pose in one frame. */
+		float ratio = ctx->animation->param[ANIMATION_PARAM_ROLL_RUN];
+		if (ratio > 0.0f) {
+			ratio -= ctx->delta * characterAnimation_rollExitRate(ctx->settings);
+			if (ratio < 0.0f) ratio = 0.0f;
+		}
+
+		ctx->animation->param[ANIMATION_PARAM_ROLL_RUN] = ratio;
+		if (ratio == 0.0f) ctx->animation->param[ANIMATION_PARAM_ROLL_DIR] = 0.0f;
 		return;
 	}
 
@@ -285,7 +355,7 @@ static void characterAnimation_setRollParam(const CharacterAnimationParamCtx *ct
 		ratio += ctx->delta / r->run_to_rolling_anim_ground;
 
 	if (roll_time > r->run_to_rolling_anim_stand && ratio > 0.0f)
-		ratio -= ctx->delta / (r->run_to_rolling_anim_length - r->run_to_rolling_anim_stand);
+		ratio -= ctx->delta * characterAnimation_rollExitRate(r);
 
 	if (ratio > 1.0f) {
 		ratio = 1.0f;
@@ -328,15 +398,18 @@ static void characterAnimation_snapToJump(const CharacterAnimationParamCtx *ctx)
 
 	t3d_anim_set_playing(jump_l, true);
 	t3d_anim_set_playing(jump_r, true);
-	
+
 	t3d_anim_set_time(fall_l, 0.0f);
 	t3d_anim_set_time(fall_r, 0.0f);
 
+	/* Jumping straight out of a landing: the take-off starts at the crouch
+	   depth the landing is already holding, so the pose does not jump. With no
+	   landing running there is nothing to match and it starts from the top. */
 	if (land_animation->isPlaying) {
+		characterAnimation_syncLandToJump(ctx);
+	} else {
 		t3d_anim_set_time(jump_l, 0.0f);
 		t3d_anim_set_time(jump_r, 0.0f);
-	} else {
-		characterAnimation_syncLandToJump(ctx);
 	}
 
 	ctx->animation->param[ANIMATION_PARAM_JUMP_L] = 0.0f;
@@ -355,6 +428,22 @@ static void characterAnimation_snapToLand(const CharacterAnimationParamCtx *ctx)
 	ctx->animation->param[ANIMATION_PARAM_LAND_R] = 0.0f;
 }
 
+/* Falling with no crouch behind it — off a ledge, or a roll that ran out of
+   ground. The take-off clip never played, so the sequence is sent straight to
+   the falling one by marking it done. */
+static void characterAnimation_snapToFall(const CharacterAnimationParamCtx *ctx)
+{
+	T3DAnim *jump_l = characterAnimation_clip(ctx->animation, ctx->def->jump_animation);
+	T3DAnim *jump_r = characterAnimation_clip(ctx->animation, ctx->def->jump_animation + 1);
+	T3DAnim *fall_l = characterAnimation_clip(ctx->animation, ctx->def->fall_animation);
+	T3DAnim *fall_r = characterAnimation_clip(ctx->animation, ctx->def->fall_animation + 1);
+
+	t3d_anim_set_playing(jump_l, false);
+	t3d_anim_set_playing(jump_r, false);
+	t3d_anim_set_time(fall_l, 0.0f);
+	t3d_anim_set_time(fall_r, 0.0f);
+}
+
 static void characterAnimation_setJumpParams(const CharacterAnimationParamCtx *ctx)
 {
 	const CharacterAnimationSettings *j   = ctx->settings;
@@ -367,29 +456,42 @@ static void characterAnimation_setJumpParams(const CharacterAnimationParamCtx *c
 	float jump = ctx->animation->param[ANIMATION_PARAM_JUMP_L] + ctx->animation->param[ANIMATION_PARAM_JUMP_R];
 	float land = ctx->animation->param[ANIMATION_PARAM_LAND_L] + ctx->animation->param[ANIMATION_PARAM_LAND_R];
 
-	if (cur == MOVEMENT_STATE_JUMPING && *as != MOVEMENT_STATE_JUMPING) {
-		characterAnimation_snapToJump(ctx);
-		jump = 0.0f;
-		*as  = MOVEMENT_STATE_JUMPING;
-	}
+	/* One owner for the air layer: the crouch on the ground opens it and the
+	   fall keeps it. Entering with a crouch plays the take-off clip; entering
+	   without one starts on the falling clip. */
+	bool aerial = characterAnimation_isAerial(ctx);
 
-	if (cur == MOVEMENT_STATE_FALLING && *as != MOVEMENT_STATE_FALLING) {
-		characterAnimation_snapToLand(ctx);
-		land = 0.0f;
+	if (aerial && *as != MOVEMENT_STATE_FALLING) {
+		if (ctx->character->movement.data.jump_timer > 0.0f)
+			characterAnimation_snapToJump(ctx);
+		else
+			characterAnimation_snapToFall(ctx);
+
+		jump = 0.0f;
 		*as  = MOVEMENT_STATE_FALLING;
 	}
 
-	if ((*as == MOVEMENT_STATE_JUMPING || *as == MOVEMENT_STATE_FALLING) && cur != MOVEMENT_STATE_JUMPING && cur != MOVEMENT_STATE_FALLING)
+	if (*as == MOVEMENT_STATE_FALLING && !aerial)
 		*as = cur;
 
-	if (land_animation->isPlaying) {
-		float crouch_rate = j->jump_max_blending_ratio * delta / j->land_anim_crouch;
+	/* The landing starts one clip-to-contact away from the floor, measured by
+	   the fall probe: the foot meets the ground on the frame the clip has it
+	   touching, whatever the drop was. */
+	float floor_distance = ctx->character->movement.data.floor_distance;
+	float fall_speed     = -ctx->character->body.velocity.z;
 
+	if (aerial && !land_animation->isPlaying && floor_distance >= 0.0f && fall_speed > 0.0f
+	    && floor_distance <= fall_speed * j->land_anim_ground) {
+		characterAnimation_snapToLand(ctx);
+		land = 0.0f;
+	}
+
+	float crouch_rate = j->jump_max_blending_ratio * delta / j->land_anim_crouch;
+
+	if (land_animation->isPlaying) {
 		if (land_animation->time < j->land_anim_crouch) {
-			if (ctx->character->body.position.z < LAND_ANIMATION_STARTING_HEIGHT) {
-				land += crouch_rate;
-				if (land > j->jump_max_blending_ratio) land = j->jump_max_blending_ratio;
-			}
+			land += crouch_rate;
+			if (land > j->jump_max_blending_ratio) land = j->jump_max_blending_ratio;
 		} else {
 			float stand_rate = j->jump_max_blending_ratio * delta / (j->land_anim_length - j->land_anim_crouch);
 			land -= stand_rate;
@@ -400,13 +502,18 @@ static void characterAnimation_setJumpParams(const CharacterAnimationParamCtx *c
 			}
 		}
 
-		jump -= crouch_rate;
-		if (jump < 0.0f) jump = 0.0f;
 	}
 
-	if (cur == MOVEMENT_STATE_JUMPING && jump < j->jump_max_blending_ratio) {
+	if (aerial) {
 		jump += j->jump_max_blending_ratio * delta / j->jump_anim_crouch;
 		if (jump > j->jump_max_blending_ratio) jump = j->jump_max_blending_ratio;
+	}
+	/* Back on the ground the air layer drains on its own. Tied to the landing
+	   clip it left a remnant, because that clip had already run most of its
+	   length during the drop and ended before the weight was gone. */
+	else if (jump > 0.0f) {
+		jump -= crouch_rate;
+		if (jump < 0.0f) jump = 0.0f;
 	}
 
 	ctx->animation->param[ANIMATION_PARAM_JUMP_L] = jump * (1.0f - footing);
@@ -565,7 +672,11 @@ static void characterAnimation_setStrafeParams(const CharacterAnimationParamCtx 
 	const CharacterMovementData *data = &ctx->character->movement.data;
 	const CharacterMovementSettings *movement = ctx->character->movement.settings;
 
+	/* The bow owns the pose while either of its flags is up: the free strafe
+	   bows out entirely, so its exit can never hand the locomotion a phase
+	   gone stale while its grid sat frozen under the bow. */
 	bool strafing = data->strafe
+		&& !data->bow_hold && !data->bow_aim
 		&& characterMovement_isLocomotion(ctx->character->movement.current)
 		&& data->horizontal_speed > 0.0f;
 
@@ -615,13 +726,15 @@ static void characterAnimation_setStrafeParams(const CharacterAnimationParamCtx 
 	animation->param[ANIMATION_PARAM_WALK] = weight * (1.0f - blend);
 }
 
-/* axis: back 0 | left 1/4 | fwd 2/4 | right 3/4 | back 1 */
-static float characterAnimation_getStrafeLockedDirectionWeight(const CharacterAnimationParamCtx *ctx)
+/* axis: back 0 | left 1/4 | fwd 2/4 | right 3/4 | back 1
+   Shared by every camera-locked grid; at a standstill the direction holds
+   whatever its param last carried. */
+static float characterAnimation_getLockedDirectionWeight(const CharacterAnimationParamCtx *ctx, uint8_t dir_param)
 {
 	const KinematicBody *body = &ctx->character->body;
 
 	if (body->velocity.x == 0.0f && body->velocity.y == 0.0f)
-		return ctx->animation->param[ANIMATION_PARAM_STRAFE_LOCKED_DIR];
+		return ctx->animation->param[dir_param];
 
 	float velocity_yaw = rad_to_deg(fm_atan2f(-body->velocity.x, -body->velocity.y));
 	float rel = angle_wrap_relative(velocity_yaw, body->rotation.z) - body->rotation.z;
@@ -629,11 +742,12 @@ static float characterAnimation_getStrafeLockedDirectionWeight(const CharacterAn
 	return (rel + 180.0f) / 360.0f;
 }
 
-static void characterAnimation_snapStrafeLockedEntry(const CharacterAnimationParamCtx *ctx)
+/* carries a clip's phase into every clip of a grid */
+static void characterAnimation_snapGridFromClip(const CharacterAnimationParamCtx *ctx, uint8_t src_clip, uint8_t dst_node_idx)
 {
-	const CharacterAnimationNode *node = &ctx->def->node[ctx->def->strafe_locked_node];
+	const CharacterAnimationNode *node = &ctx->def->node[dst_node_idx];
 
-	T3DAnim *src = characterAnimation_clip(ctx->animation, ctx->def->walk_animation);
+	T3DAnim *src = characterAnimation_clip(ctx->animation, src_clip);
 	float src_length = t3d_anim_get_length(src);
 	if (src_length <= 0.0f) return;
 	float phase = src->time / src_length;
@@ -644,13 +758,13 @@ static void characterAnimation_snapStrafeLockedEntry(const CharacterAnimationPar
 	}
 }
 
-static void characterAnimation_snapStrafeLockedExit(const CharacterAnimationParamCtx *ctx)
+/* hands a grid's phase back to the locomotion clips on the way out */
+static void characterAnimation_snapLocomotionFromGrid(const CharacterAnimationParamCtx *ctx, uint8_t src_node_idx, float src_dir)
 {
-	const CharacterAnimationNode *node = &ctx->def->node[ctx->def->strafe_locked_node];
+	const CharacterAnimationNode *node = &ctx->def->node[src_node_idx];
 
 	/* source: the walk-row clip closest to the current weight */
-	float out = ctx->animation->param[ANIMATION_PARAM_STRAFE_LOCKED_DIR];
-	uint8_t src_col = (uint8_t)(out * (node->cols - 1) + 0.5f);
+	uint8_t src_col = (uint8_t)(src_dir * (node->cols - 1) + 0.5f);
 	if (src_col > node->cols - 1) src_col = node->cols - 1;
 
 	T3DAnim *src = characterAnimation_clip(ctx->animation, node->animation[src_col]);
@@ -668,6 +782,19 @@ static void characterAnimation_snapStrafeLockedExit(const CharacterAnimationPara
 	for (unsigned t = 0; t < sizeof(target); t++) {
 		T3DAnim *dst = characterAnimation_clip(ctx->animation, target[t]);
 		t3d_anim_set_time(dst, phase * t3d_anim_get_length(dst));
+	}
+}
+
+/* walk row rides the walk clip's speed, run row the run clip's */
+static void characterAnimation_setGridRowSpeeds(const CharacterAnimationParamCtx *ctx, const CharacterAnimationNode *node)
+{
+	float walk_speed = characterAnimation_clip(ctx->animation, ctx->def->walk_animation)->speed;
+	float run_speed  = characterAnimation_clip(ctx->animation, ctx->def->run_animation)->speed;
+
+	for (uint8_t r = 0; r < node->rows; r++) {
+		float row_speed = (r == 0) ? walk_speed : run_speed;
+		for (uint8_t c = 0; c < node->cols; c++)
+			t3d_anim_set_speed(characterAnimation_clip(ctx->animation, node->animation[r * node->cols + c]), row_speed);
 	}
 }
 
@@ -708,25 +835,21 @@ static void characterAnimation_setStrafeLockedParams(const CharacterAnimationPar
 	if (blend < 0.001f) blend = 0.0f;
 
 	if (blend == 0.0f) {
-		if (prev_blend > 0.0f) characterAnimation_snapStrafeLockedExit(ctx);
+		if (prev_blend > 0.0f)
+			characterAnimation_snapLocomotionFromGrid(ctx, ctx->def->strafe_locked_node,
+			                                          animation->param[ANIMATION_PARAM_STRAFE_LOCKED_DIR]);
 		animation->strafe_locked_blend = 0.0f;
 		animation->param[ANIMATION_PARAM_STRAFE_LOCKED] = 0.0f;
 		return;
 	}
 
 	if (prev_blend == 0.0f)
-		characterAnimation_snapStrafeLockedEntry(ctx);
+		characterAnimation_snapGridFromClip(ctx, ctx->def->walk_animation, ctx->def->strafe_locked_node);
 
 	const CharacterAnimationNode *node = &ctx->def->node[ctx->def->strafe_locked_node];
-	float walk_speed = characterAnimation_clip(animation, ctx->def->walk_animation)->speed;
-	float run_speed  = characterAnimation_clip(animation, ctx->def->run_animation)->speed;
-	for (uint8_t r = 0; r < node->rows; r++) {
-		float row_speed = (r == 0) ? walk_speed : run_speed;
-		for (uint8_t c = 0; c < node->cols; c++)
-			t3d_anim_set_speed(characterAnimation_clip(animation, node->animation[r * node->cols + c]), row_speed);
-	}
+	characterAnimation_setGridRowSpeeds(ctx, node);
 
-	float dir = characterAnimation_getStrafeLockedDirectionWeight(ctx);
+	float dir = characterAnimation_getLockedDirectionWeight(ctx, ANIMATION_PARAM_STRAFE_LOCKED_DIR);
 
 	float gait = (data->horizontal_speed - movement->gait[0].target_speed)
 	           / (movement->gait[1].target_speed - movement->gait[0].target_speed);
@@ -744,6 +867,123 @@ static void characterAnimation_setStrafeLockedParams(const CharacterAnimationPar
 
 	animation->param[ANIMATION_PARAM_WALK]   *= (1.0f - blend);
 	animation->param[ANIMATION_PARAM_STRAFE] *= (1.0f - blend);
+}
+
+/* Bow modes: the locked grid twice over, plus an idle of their own per
+   mode, so a standstill keeps the bow pose instead of dropping to the bare
+   idle. Aim owns the pose while both flags are on: the hold fades under it
+   and comes back when the string is let go.
+
+   Entering from plain locomotion the grids inherit the walk cycle's phase;
+   hopping between the modes they hand it to each other, and the way out
+   returns it, so the feet never skip. */
+static void characterAnimation_setBowParams(const CharacterAnimationParamCtx *ctx)
+{
+	CharacterAnimation *animation = ctx->animation;
+	const CharacterAnimationDef *def = ctx->def;
+	const CharacterMovementData *data = &ctx->character->movement.data;
+	const CharacterMovementSettings *movement = ctx->character->movement.settings;
+
+	/* Node 0 is the base idle clip: a def without the module leaves these
+	   fields zeroed and the whole thing stays out of the graph. */
+	if (def->bow_hold_node == 0) return;
+
+	bool locomotion = characterMovement_isLocomotion(ctx->character->movement.current);
+	bool aim  = data->bow_aim  && locomotion;
+	bool hold = data->bow_hold && locomotion && !aim;
+
+	float prev_hold = animation->bow_hold_blend;
+	float prev_aim  = animation->bow_aim_blend;
+
+	float factor = fm_expf(-ctx->settings->bow_hold_blend_rate * ctx->delta);
+	float hold_blend = hold ? 1.0f - (1.0f - prev_hold) * factor : prev_hold * factor;
+	factor = fm_expf(-ctx->settings->bow_aim_blend_rate * ctx->delta);
+	float aim_blend = aim ? 1.0f - (1.0f - prev_aim) * factor : prev_aim * factor;
+
+	if (hold_blend > 0.999f) hold_blend = 1.0f;
+	if (hold_blend < 0.001f) hold_blend = 0.0f;
+	if (aim_blend  > 0.999f) aim_blend  = 1.0f;
+	if (aim_blend  < 0.001f) aim_blend  = 0.0f;
+
+	animation->bow_hold_blend = hold_blend;
+	animation->bow_aim_blend  = aim_blend;
+
+	if (hold_blend == 0.0f && aim_blend == 0.0f) {
+		animation->param[ANIMATION_PARAM_BOW_HOLD]      = 0.0f;
+		animation->param[ANIMATION_PARAM_BOW_HOLD_IDLE] = 0.0f;
+		animation->param[ANIMATION_PARAM_BOW_AIM]       = 0.0f;
+		animation->param[ANIMATION_PARAM_BOW_AIM_IDLE]  = 0.0f;
+		return;
+	}
+
+	/* Entries: the cycle comes from whoever carried it last, and the idle
+	   restarts so it never wakes mid-breath. */
+	if (prev_hold == 0.0f && hold_blend > 0.0f) {
+		if (prev_aim > 0.0f)
+			characterAnimation_snapGridFromGrid(ctx, def->bow_aim_node,
+				animation->param[ANIMATION_PARAM_BOW_AIM_DIR], def->bow_hold_node);
+		else
+			characterAnimation_snapGridFromClip(ctx, def->walk_animation, def->bow_hold_node);
+		t3d_anim_set_time(characterAnimation_clip(animation, def->node[def->bow_hold_idle_node].animation[0]), 0.0f);
+	}
+	if (prev_aim == 0.0f && aim_blend > 0.0f) {
+		if (prev_hold > 0.0f)
+			characterAnimation_snapGridFromGrid(ctx, def->bow_hold_node,
+				animation->param[ANIMATION_PARAM_BOW_HOLD_DIR], def->bow_aim_node);
+		else
+			characterAnimation_snapGridFromClip(ctx, def->walk_animation, def->bow_aim_node);
+		t3d_anim_set_time(characterAnimation_clip(animation, def->node[def->bow_aim_idle_node].animation[0]), 0.0f);
+	}
+
+	float gait = (data->horizontal_speed - movement->gait[0].target_speed)
+	           / (movement->gait[1].target_speed - movement->gait[0].target_speed);
+	if (gait < 0.0f) gait = 0.0f;
+	if (gait > 1.0f) gait = 1.0f;
+
+	/* Splits each mode between its grid and its idle; only the grids of a
+	   mode that weighs something get touched, so the other one's clips can
+	   close behind it. */
+	float weight = characterAnimation_getWalkWeight(data->horizontal_speed, movement);
+
+	if (hold_blend > 0.0f) {
+		const CharacterAnimationNode *node = &def->node[def->bow_hold_node];
+		float dir = characterAnimation_getLockedDirectionWeight(ctx, ANIMATION_PARAM_BOW_HOLD_DIR);
+		characterAnimation_setGridRowSpeeds(ctx, node);
+		characterAnimation_syncGridClips(ctx, node, dir, gait);
+		animation->param[ANIMATION_PARAM_BOW_HOLD]      = weight * hold_blend;
+		animation->param[ANIMATION_PARAM_BOW_HOLD_IDLE] = (1.0f - weight) * hold_blend;
+		animation->param[ANIMATION_PARAM_BOW_HOLD_DIR]  = dir;
+		animation->param[ANIMATION_PARAM_BOW_HOLD_GAIT] = gait;
+	} else {
+		animation->param[ANIMATION_PARAM_BOW_HOLD]      = 0.0f;
+		animation->param[ANIMATION_PARAM_BOW_HOLD_IDLE] = 0.0f;
+	}
+
+	if (aim_blend > 0.0f) {
+		const CharacterAnimationNode *node = &def->node[def->bow_aim_node];
+		float dir = characterAnimation_getLockedDirectionWeight(ctx, ANIMATION_PARAM_BOW_AIM_DIR);
+		characterAnimation_setGridRowSpeeds(ctx, node);
+		characterAnimation_syncGridClips(ctx, node, dir, gait);
+		animation->param[ANIMATION_PARAM_BOW_AIM]      = weight * aim_blend;
+		animation->param[ANIMATION_PARAM_BOW_AIM_IDLE] = (1.0f - weight) * aim_blend;
+		animation->param[ANIMATION_PARAM_BOW_AIM_DIR]  = dir;
+		animation->param[ANIMATION_PARAM_BOW_AIM_GAIT] = gait;
+	} else {
+		animation->param[ANIMATION_PARAM_BOW_AIM]      = 0.0f;
+		animation->param[ANIMATION_PARAM_BOW_AIM_IDLE] = 0.0f;
+	}
+
+	/* No hand-fading the layers underneath: the stack already dilutes them,
+	   and fading twice opens a hole the base idle bleeds through. */
+
+	/* The locomotion underneath stays chained to the bow's cycle the whole
+	   time, not just on the way out: it revives mid-fade when the mode
+	   drops, and a phase matched every frame gives the crossfade two
+	   identical cycles and the exit nothing to correct. */
+	bool from_aim = aim_blend >= hold_blend;
+	characterAnimation_snapLocomotionFromGrid(ctx,
+		from_aim ? def->bow_aim_node : def->bow_hold_node,
+		animation->param[from_aim ? ANIMATION_PARAM_BOW_AIM_DIR : ANIMATION_PARAM_BOW_HOLD_DIR]);
 }
 
 /* The swim clips run at their own native lengths; blending two strokes of
@@ -821,6 +1061,86 @@ static void characterAnimation_setSwimParams(const CharacterAnimationParamCtx *c
 	animation->param[ANIMATION_PARAM_WALK]          *= (1.0f - blend);
 	animation->param[ANIMATION_PARAM_STRAFE]        *= (1.0f - blend);
 	animation->param[ANIMATION_PARAM_STRAFE_LOCKED] *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_BOW_HOLD]      *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_BOW_HOLD_IDLE] *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_BOW_AIM]       *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_BOW_AIM_IDLE]  *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_JUMP_L]        *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_JUMP_R]        *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_LAND_L]        *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_LAND_R]        *= (1.0f - blend);
+}
+
+/* Climb layer: same timed ramp as the swim, gated by the CLIMBING state.
+
+   The cycle is timed against distance, not the clock — the hands only land
+   on the rungs if one cycle of the clip lasts exactly one rung spacing, so
+   the clip speed is the climb speed measured in cycles-worth-of-height per
+   second. Stopped on the ladder that speed is zero and the pose freezes
+   mid-grip, which is what hanging there looks like.
+
+   The direction only picks which clip the select plays and holds its last
+   non-zero value: at a standstill the arms must stay where the last move
+   left them rather than snap to a default. */
+static void characterAnimation_setClimbParams(const CharacterAnimationParamCtx *ctx)
+{
+	CharacterAnimation *animation = ctx->animation;
+	const CharacterMovementSettings *movement = ctx->character->movement.settings;
+
+	bool climbing = ctx->character->movement.current == MOVEMENT_STATE_CLIMBING;
+
+	float prev_blend = animation->climb_blend;
+	float factor = fm_expf(-ctx->settings->climb_blend_rate * ctx->delta);
+	float blend  = climbing ? 1.0f - (1.0f - prev_blend) * factor : prev_blend * factor;
+	if (blend > 0.999f) blend = 1.0f;
+	if (blend < 0.001f) blend = 0.0f;
+
+	animation->climb_blend = blend;
+
+	/* The direction gates the select as well as picking its clip: zeroed off
+	   the ladder, the pair stops being stepped every frame for a layer that
+	   is contributing nothing. The held direction lives outside the param. */
+	if (blend == 0.0f) {
+		animation->param[ANIMATION_PARAM_CLIMB]     = 0.0f;
+		animation->param[ANIMATION_PARAM_CLIMB_DIR] = 0.0f;
+		return;
+	}
+
+	const CharacterAnimationNode *node = &ctx->def->node[ctx->def->climb_node];
+
+	float velocity = ctx->character->body.velocity.z;
+
+	if (velocity >  LOCOMOTION_MIN_SPEED) animation->climb_dir =  1.0f;
+	if (velocity < -LOCOMOTION_MIN_SPEED) animation->climb_dir = -1.0f;
+	if (animation->climb_dir == 0.0f)     animation->climb_dir =  1.0f;
+
+	/* The cycle runs on how fast the body is actually moving as a fraction
+	   of the speed the climb tops out at: full tilt lands on the clip's own
+	   pace and nothing plays it faster, while accelerating into the climb
+	   and easing out of it slow the cycle to match. Stopped on the ladder
+	   it is zero and the pose holds mid-grip, which is what hanging there
+	   looks like.
+
+	   Both clips share the slot, so the one that is not playing has to be
+	   kept fed with the same speed: the select hands the time over on a
+	   direction change and a stale speed would jump the cycle. */
+	float speed = (movement->climb_speed > 0.0f)
+		? fabsf(velocity) / movement->climb_speed : 0.0f;
+
+	for (uint8_t i = 0; i < node->cols * node->rows; i++)
+		t3d_anim_set_speed(characterAnimation_clip(animation, node->animation[i]), speed);
+
+	animation->param[ANIMATION_PARAM_CLIMB]     = blend;
+	animation->param[ANIMATION_PARAM_CLIMB_DIR] = animation->climb_dir;
+
+	animation->param[ANIMATION_PARAM_WALK]          *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_STRAFE]        *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_STRAFE_LOCKED] *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_BOW_HOLD]      *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_BOW_HOLD_IDLE] *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_BOW_AIM]       *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_BOW_AIM_IDLE]  *= (1.0f - blend);
+	animation->param[ANIMATION_PARAM_SWIM]          *= (1.0f - blend);
 	animation->param[ANIMATION_PARAM_JUMP_L]        *= (1.0f - blend);
 	animation->param[ANIMATION_PARAM_JUMP_R]        *= (1.0f - blend);
 	animation->param[ANIMATION_PARAM_LAND_L]        *= (1.0f - blend);
@@ -857,13 +1177,34 @@ void characterAnimation_setParams(Character *character, const CharacterAnimation
 		.delta = time_get()->delta,
 	};
 
-	ctx.gait_param = characterAnimation_getGaitParam(speed, movement);
+	/* The gait axis freezes while the idle takes over: braking would sweep the
+	   raw value through every gait with the grid still visible. On resuming the
+	   walk it lerps back to the live value at the gait's own response rate. */
+	float raw_gait  = characterAnimation_getGaitParam(speed, movement);
+	float prev_gait = animation->param[ANIMATION_PARAM_WALK_GAIT];
+
+	uint8_t state = character->movement.current;
+	if (!characterMovement_isLocomotion(state)) state = character->movement.locomotion;
+
+	if (characterAnimation_getWalkWeight(speed, movement) == 0.0f)
+		ctx.gait_param = raw_gait;
+	else if (state == MOVEMENT_STATE_IDLE)
+		ctx.gait_param = prev_gait;
+	else {
+		uint8_t gait = character->movement.data.gait;
+		if (gait >= movement->gait_count) gait = movement->gait_count - 1;
+		float factor = fm_expf(-movement->gait[gait].response_rate * ctx.delta);
+		ctx.gait_param = prev_gait * factor + raw_gait * (1.0f - factor);
+	}
 
 	/* the footing is read from the clip that is actually running: the center
-	   column of the row the gait sits on */
+	   column of the row the gait sits on. The row comes from the previous
+	   frame's value, because the clips of a row the axis just reached are only
+	   brought into phase further down — read now they still hold the time they
+	   were left at, and the footing jumps for one frame. */
 	const CharacterAnimationNode *locomotion = &def->node[def->locomotion_node];
 	float row_t;
-	uint8_t row = characterAnimation_blendSegment(ctx.gait_param, locomotion->rows, &row_t);
+	uint8_t row = characterAnimation_blendSegment(prev_gait, locomotion->rows, &row_t);
 	if (row_t > 0.5f) row++;
 
 	T3DAnim *base = characterAnimation_clip(animation, locomotion->animation[row * locomotion->cols + locomotion->cols / 2]);
@@ -879,7 +1220,9 @@ void characterAnimation_setParams(Character *character, const CharacterAnimation
 	characterAnimation_setRollParam (&ctx);
 	characterAnimation_setStrafeParams (&ctx);
 	characterAnimation_setStrafeLockedParams (&ctx);
+	characterAnimation_setBowParams (&ctx);
 	characterAnimation_setSwimParams (&ctx);
+	characterAnimation_setClimbParams (&ctx);
 	characterAnimation_setActiveNodes (&ctx);
 }
 
@@ -909,7 +1252,10 @@ void characterAnimation_initGraph(Character *character, const CharacterAnimation
 	animation->strafe_turning = false;
 	animation->strafe_blend = 0.0f;
 	animation->strafe_locked_blend = 0.0f;
-	animation->bow_walk_aiming_blend = 0.0f;
+	animation->bow_hold_blend = 0.0f;
+	animation->bow_aim_blend = 0.0f;
+	animation->climb_blend = 0.0f;
+	animation->climb_dir   = 0.0f;
 
 	/* Clips open on demand through characterAnimation_clip: a zeroed slot
 	   (animRef NULL) is a closed clip. */
@@ -918,6 +1264,8 @@ void characterAnimation_initGraph(Character *character, const CharacterAnimation
 	assert(animation->clip_cooldown);
 	memset(animation->clip_cooldown, 0, def->clip_count);
 	memset(animation->clip, 0, def->clip_count * sizeof(T3DAnim));
+	animation->clip_data = calloc(def->clip_count, sizeof(void *));
+	assert(animation->clip_data);
 }
 
 static T3DSkeleton *characterAnimation_clipBuffer(const CharacterAnimationDef *def, CharacterAnimation *animation, uint8_t clip)
@@ -1092,6 +1440,8 @@ void characterAnimation_evaluateGraph(const CharacterAnimationDef *def, Characte
 
 void character_setAnimation(Character *character)
 {
+	if (!character->animation.def) return;
+
 	characterAnimation_setParams(character, character->animation.def);
 	characterAnimation_evaluateGraph(character->animation.def, &character->animation, time_get()->delta);
 	characterAnimation_closeIdleClips(&character->animation);

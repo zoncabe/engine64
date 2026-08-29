@@ -63,6 +63,33 @@ void character_unequipWeapon(Character *character, uint8_t slot_id)
 	*slot = (WeaponSlot){0};
 }
 
+const WeaponDef *character_drawnWeapon(const Character *character)
+{
+	const CharacterWeapons *weapons = &character->weapons;
+	if (weapons->drawn == CHARACTER_WEAPON_DRAWN_NONE) return NULL;
+	return weapons->slot[weapons->drawn].weapon;
+}
+
+/* The ring is: unarmed, then every occupied slot in order. Empty slots are
+   stepped over, so with one weapon carried both directions just toggle it
+   in and out of the hand. */
+void character_cycleWeapon(Character *character, int8_t dir)
+{
+	CharacterWeapons *weapons = &character->weapons;
+
+	int8_t pos = (weapons->drawn == CHARACTER_WEAPON_DRAWN_NONE) ? -1 : (int8_t)weapons->drawn;
+
+	for (int i = 0; i < WEAPON_SLOT_COUNT + 1; i++) {
+		pos += dir;
+		if (pos > WEAPON_SLOT_COUNT - 1) pos = -1;
+		if (pos < -1)                    pos = WEAPON_SLOT_COUNT - 1;
+		if (pos == -1) break;
+		if (weapons->slot[pos].weapon) break;
+	}
+
+	weapons->drawn = (pos < 0) ? CHARACTER_WEAPON_DRAWN_NONE : (uint8_t)pos;
+}
+
 void characterWeapon_setBones(Character *character)
 {
 	CharacterWeapons *weapons = &character->weapons;

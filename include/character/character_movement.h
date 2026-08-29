@@ -22,11 +22,6 @@ typedef struct Character Character;
 #define CHARACTER_ROLL_PHASE_GRIP   2
 #define CHARACTER_ROLL_PHASE_DONE   3
 
-#define CHARACTER_JUMP_PHASE_CHARGING 0
-#define CHARACTER_JUMP_PHASE_LAUNCH   1
-#define CHARACTER_JUMP_PHASE_RISING   2
-#define CHARACTER_JUMP_PHASE_DONE     3
-
 #define CHARACTER_JUMP_HOLD_VELOCITY_SCALE 0.96f
 #define CHARACTER_JUMP_LAUNCH_VELOCITY_SCALE 0.8f
 
@@ -39,8 +34,42 @@ typedef struct Character Character;
 
 /* Swim state thresholds on the submerged fraction, with hysteresis so the
    waves cannot flicker the state at the boundary. Exit also needs footing. */
-#define CHARACTER_WATER_SWIM_ENTER     0.45f
-#define CHARACTER_WATER_SWIM_EXIT      0.44f
+#define CHARACTER_WATER_SWIM_ENTER     0.55f
+#define CHARACTER_WATER_SWIM_EXIT      0.50f
+
+/* Where the body sits while climbing. The clip grips 0.26 m ahead of the
+   origin, but holding at that distance buries a capsule of 0.35 radius nine
+   centimetres into the rungs, and a body sunk into the ladder reads worse
+   than hands closing just short of it. Stand at the radius: the capsule
+   comes to rest against the plane of the rungs, where a climber belongs.
+   Lower it toward 0.26 to close the hands, raise it to pull clear. */
+#define CHARACTER_LADDER_STAND_DISTANCE 0.35f
+
+/* How hard the body is pulled onto the ladder's centre line and holding
+   distance, per second. Fast enough that the entry snap reads as a grab. */
+#define CHARACTER_LADDER_ANCHOR_RATE    12.0f
+
+/* How close the ground has to be for a descent to end on it. */
+#define CHARACTER_LADDER_GROUND_REACH   0.15f
+
+/* Hysteresis on the top of the volume, the same trick the swim thresholds
+   use. Leaving happens on losing the volume, so without it the two edges
+   are one line: a body standing on the crest has its feet exactly at the
+   boundary, and a stick still asking to climb re-grabs the ladder the frame
+   after it let go, over and over. Grabbing on has to happen this far below
+   the top, which is out of reach of anything already standing on it. Only
+   the top edge moves — the foot of the ladder is nowhere near it. */
+#define CHARACTER_LADDER_ENTER_MARGIN   0.50f
+
+/* Widest angle between the stick and the ladder's facing that still counts
+   as asking to climb. Past it the stick is walking past the ladder. */
+#define CHARACTER_LADDER_ENTER_ANGLE    70.0f
+
+/* Push toward the rungs when the climb runs off the top of the volume, so
+   the body steps onto the landing instead of sliding back down the face it
+   was hugging. The climbable volume is what decides where the top is: the
+   climb ends where the volume does. */
+#define CHARACTER_LADDER_EXIT_SPEED     1.6f
 
 enum {
 	CHARACTER_SWIM_GAIT_IDLE = 0,
@@ -49,13 +78,15 @@ enum {
 };
 
 
+/* No jumping state: the crouch that starts a jump runs on the ground, over
+   locomotion, and the air is always a fall. */
 typedef enum {
 	MOVEMENT_STATE_IDLE,
 	MOVEMENT_STATE_WALKING,
 	MOVEMENT_STATE_ROLLING,
-	MOVEMENT_STATE_JUMPING,
 	MOVEMENT_STATE_FALLING,
 	MOVEMENT_STATE_SWIMMING,
+	MOVEMENT_STATE_CLIMBING,
 	MOVEMENT_STATE_COUNT,
 	MOVEMENT_STATE_NONE
 } MovementState;
@@ -94,6 +125,12 @@ typedef struct {
 	float swim_fast_speed;
 	float swim_response_rate;
 
+	/* Vertical speed on a ladder and how fast it is reached. The climb clip
+	   is timed against the first of them: at full speed it plays at its own
+	   pace, and slower while the second is still ramping up to it. */
+	float climb_speed;
+	float climb_response_rate;
+
 	/* Fake buoyancy: submerged fraction of the capsule where the scaled
 	   gravity flips sign. The equilibrium follows the pose the clips are
 	   authored at: treading water holds the head at the capsule top,
@@ -113,12 +150,27 @@ typedef struct {
 	float jump_timer;
 	float roll_yaw;
 	bool is_grounded;
+	/* Straight down from the feet, written by the collision pass. Negative
+	   with no floor within reach: the animation times the landing on it. */
+	float floor_distance;
 	bool in_water;
 	float submerged_fraction;   /* 0..1 of the capsule under the surface */
+
+	/* Written by the ladder probe of the collision pass. The anchor is where
+	   the body has to stand to reach the rungs: the ladder's centre line,
+	   pulled out to the clip's holding distance on the side the body is on. */
+	bool  on_ladder;
+	float ladder_yaw;      /* body rotation.z that faces the rungs */
+	float ladder_anchor_x;
+	float ladder_anchor_y;
+	float ladder_top;      /* world z of the climbable volume's ceiling */
+
 	uint8_t rotation_mode;
 	bool strafe;
 	bool strafe_locked;
 	float strafe_yaw;
+	bool bow_hold;   /* bow in hand under the camera aim: carry pose */
+	bool bow_aim;    /* shoot button on top: drawn-string pose */
 	uint8_t gait;
 } CharacterMovementData;
 
@@ -130,9 +182,17 @@ typedef struct {
 	bool strafe;
 	bool strafe_locked;
 	float strafe_yaw;
+	bool bow_hold;
+	bool bow_aim;
 	uint8_t gait;
 	uint8_t swim_gait;   /* CHARACTER_SWIM_GAIT_*, from the stick while swimming */
 	float speed_scale;   /* 1.0 normal, tired_speed_scale while tired */
+
+	/* Stick along the ladder: +1 climbs, -1 descends, 0 holds. The stick is
+	   read in the ladder's own frame, so pushing at the rungs always climbs
+	   whichever way the camera happens to look. */
+	float climb;
+	bool  climb_release;   /* jump button: let go and drop */
 } MovementCommand;
 
 typedef struct CharacterMovement {

@@ -5,22 +5,19 @@
 #include <t3d/t3dmath.h>
 #include <t3d/t3dskeleton.h>
 
-#include "scene/lighting.h"
-#include "scene/fog.h"
+#include "scene3d/lighting.h"
+#include "scene3d/fog.h"
 #include "viewport/viewport.h"
 #include "graphics/font.h"
 #include "graphics/sprites.h"
 #include "graphics/shapes.h"
 #include "particles/particles.h"
-#include "ui/stamina_wheel.h"
 #include "render/render.h"
-#include "screen/screen.h"
+#include "scene2d/scene2d.h"
 #include "time/time.h"
-#include "scene/scene.h"
+#include "scene3d/scene3d.h"
 
 #include "game/game.h"
-
-#define DEBUG true
 
 
 void renderTransform_init(RenderTransform *t)
@@ -34,7 +31,11 @@ void renderTransform_init(RenderTransform *t)
 
 void render_initContext(RenderContext *ctx)
 {
-	*ctx = (RenderContext){0};
+	/* Only the counts matter: entries are fully written before being read,
+	   and zeroing the whole struct wipes the entire 8 KB dcache. */
+	ctx->element_count = 0;
+	ctx->section_count = 0;
+	ctx->object_count  = 0;
 }
 
 
@@ -52,10 +53,6 @@ static void render_endSection(RenderContext *ctx, RenderSection *section)
 	section->element_count = ctx->element_count - section->element_start;
 }
 
-static void render_pushElement(RenderContext *ctx, DrawElement element)
-{
-	ctx->element[ctx->element_count++] = element;
-}
 
 
 /* Bound and frustum are both in world space and both already built: the mesh
@@ -66,7 +63,7 @@ static bool render_isBoundVisible(const MeshBound *bound, const T3DViewport *vie
 	return t3d_frustum_vs_aabb(&viewport->viewFrustum, &bound->min, &bound->max);
 }
 
-static void render_setSceneContext(RenderContext *ctx, const Scene *s, uint8_t fb_index)
+static void render_setScene3DContext(RenderContext *ctx, const Scene3D *s, uint8_t fb_index)
 {
 	const T3DViewport *viewport = &viewport_get()->t3d_viewport;
 
@@ -109,33 +106,22 @@ static void render_setSceneContext(RenderContext *ctx, const Scene *s, uint8_t f
 	}
 }
 
-static void render_setDebugContext(RenderContext *ctx)
+/* One section per layer: the elements come from the live scene, the scissor
+   from the definition that built it. */
+static void render_setScene2DContext(RenderContext *ctx, const Scene2D *scene2d)
 {
-#if DEBUG
-	static char fps_buf[8];
-	snprintf(fps_buf, sizeof(fps_buf), "%.1f", time_get()->rate);
-	RenderSection *section = render_beginSection(ctx);
-	render_pushElement(ctx, (DrawElement){
-		.type     = DRAW_TEXT,
-		.position = { 272.0f, 20.0f },
-		.text     = { DROID_SANS, 0, fps_buf, NULL }
-	});
-	render_endSection(ctx, section);
-#else
-	(void)ctx;
-#endif
-}
+	if (!scene2d->def) return;
 
-static void render_setScreenContext(RenderContext *ctx, const Screen *screen)
-{
-	for (int i = 0; i < screen->section_count; i++) {
-		const ScreenSection *src = &screen->section[i];
+	for (int i = 0; i < scene2d->def->layer_count; i++) {
+		const Scene2DLayer *src = &scene2d->def->layer[i];
+
 		RenderSection *dst = render_beginSection(ctx);
 		memcpy(ctx->element + ctx->element_count,
-			   src->element,
+			   scene2d->element + scene2d->layer_start[i],
 			   src->element_count * sizeof(DrawElement));
 		ctx->element_count += src->element_count;
 		render_endSection(ctx, dst);
+
 		dst->has_scissor = src->has_scissor;
 		dst->scissor_x   = src->scissor_x;
 		dst->scissor_y   = src->scissor_y;
@@ -144,12 +130,11 @@ static void render_setScreenContext(RenderContext *ctx, const Screen *screen)
 	}
 }
 
-void render_setContext(RenderContext *ctx, const Scene *scene, uint8_t fb_index, const Screen *screen)
+void render_setContext(RenderContext *ctx, const Scene3D *scene3d, uint8_t fb_index, const Scene2D *scene2d)
 {
 	render_initContext(ctx);
-	if (scene)  render_setSceneContext(ctx, scene, fb_index);
-	if (screen) render_setScreenContext(ctx, screen);
-	render_setDebugContext(ctx);
+	if (scene3d) render_setScene3DContext(ctx, scene3d, fb_index);
+	if (scene2d) render_setScene2DContext(ctx, scene2d);
 }
 
 static void render_start(int *fb_index)
@@ -164,6 +149,17 @@ static void render_start(int *fb_index)
 static void render_end(void)
 {
 	rdpq_detach_show();
+}
+
+/* Uniform fade for textured elements, the stamina wheel way: env alpha
+   modulates only the alpha channel while RGB passes TEX0 untouched, so
+   prim color stays free for tinting. */
+static void render_setTransparency(const DrawElement *element)
+{
+	if (element->transparency == 0) return;
+
+	rdpq_set_env_color(RGBA32(0, 0, 0, 255 - element->transparency));
+	rdpq_mode_combiner(RDPQ_COMBINER1((0,0,0,TEX0), (TEX0,0,ENV,0)));
 }
 
 void render(RenderContext *ctx, int *fb_index)
@@ -242,9 +238,10 @@ void render(RenderContext *ctx, int *fb_index)
 			DrawElement *element = &ctx->element[section->element_start + i];
 			if (element->is_hidden) continue;
 			switch (element->type) {
-				case DRAW_RECTANGLE: shape_drawRectangle(&element->rectangle, element->position, element->scale);                       break;
-				case DRAW_TEXT:      text_draw(&element->text, element->position);                                                      break;
-				case DRAW_SPRITE:    sprite_setMode(); sprite_draw(&element->sprite, element->position, element->scale, element->rotation); break;
+				case DRAW_RECTANGLE:    shape_drawRectangle(&element->rectangle, element->position, element->scale);                          break;
+				case DRAW_TEXT:         text_draw(&element->text, element->position);                                                         break;
+				case DRAW_SPRITE:       sprite_setMode(); render_setTransparency(element); sprite_draw(&element->sprite, element->position, element->scale, element->rotation); break;
+				case DRAW_TILED_SPRITE: sprite_setMode(); render_setTransparency(element); sprite_drawTiled(&element->sprite, element->position, element->scale);               break;
 			}
 		}
 

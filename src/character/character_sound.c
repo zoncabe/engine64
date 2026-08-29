@@ -92,10 +92,12 @@ static void characterSound_updateRoll(Character *character, const CharacterSound
 
 	float start = settings->roll_ground_time + def->roll_delay;
 
-	/* The timer is reset on the way out, so a zero behind a running one is
-	   the frame the roll started: the foot pushing off. Dropped when a
-	   footstep just played, or the two land too close together. */
-	if (def->footstep_count && previous == 0.0f && timer > 0.0f
+	/* The timer is zeroed on entry and grows by one frame at a time, so it can
+	   only be worth a single frame on the first one: that is the foot pushing
+	   off. Dropped when a footstep just played, or the two land too close.
+	   Reading the value instead of the edge keeps it working however the
+	   previous roll ended — a ledge can leave the timer part way through. */
+	if (def->footstep_count && timer > 0.0f && timer <= time_get()->delta
 	    && time_get()->counter - character->sound.last_footstep >= def->roll_launch_gap)
 		sound_play(characterSound_pick(def->footstep, def->footstep_count),
 			&character->entity->transform.position,
@@ -124,13 +126,12 @@ static void characterSound_updateRoll(Character *character, const CharacterSound
 static void characterSound_updateJump(Character *character, const CharacterSoundDef *def)
 {
 	if (!def->jump_count) return;
-	if (character->movement.current != MOVEMENT_STATE_JUMPING) return;
 
 	float timer = character->movement.data.jump_timer;
 
-	/* The timer is reset on entry, so a zero behind a running one is the frame
-	   the crouch started. */
-	if (character->sound.previous_jump_timer != 0.0f || timer <= 0.0f) return;
+	/* Same as the roll: the timer starts at zero and grows a frame at a time,
+	   so a single frame's worth of it is the frame the crouch started. */
+	if (timer <= 0.0f || timer > time_get()->delta) return;
 
 	/* The jump set is the footstep samples: taking off mid stride right
 	   after a step would flam two of them, same case as the roll launch. */
@@ -234,7 +235,6 @@ void characterSound_update(Character *character)
 
 	character->sound.previous_cycle      = character->animation.locomotion_cycle;
 	character->sound.previous_roll_timer = character->movement.data.roll_timer;
-	character->sound.previous_jump_timer = character->movement.data.jump_timer;
 	character->sound.previous_grounded   = character->movement.data.is_grounded;
 	character->sound.previous_in_water   = character->movement.data.in_water;
 

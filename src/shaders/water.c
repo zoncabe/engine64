@@ -131,8 +131,8 @@ static void water_waves(Water *water)
 			float phase = (wave->direction_x * rest->x + wave->direction_y * rest->y)
 			            * wave->frequency + water->time * wave->speed;
 
-			float s = fm_sinf(phase);
-			float c = fm_cosf(phase);
+			float s, c;
+			fm_sincosf(phase, &s, &c);
 
 			height  += wave->amplitude * s;
 			slope_x += wave->amplitude * wave->frequency * wave->direction_x * c;

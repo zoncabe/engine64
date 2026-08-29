@@ -4,7 +4,7 @@
 #include "sound/asset_sound.h"
 #include "sound/sound.h"
 #include "entity/entity.h"
-#include "scene/scene.h"
+#include "scene3d/scene3d.h"
 #include "physics/collision/contact.h"
 #include "physics/body/rigid_body.h"
 #include "physics/world/physics_world.h"
@@ -28,7 +28,7 @@
 
 /* The loaded scene's placements: the one registry that knows both the
    asset (what sounds) and the entity it produced (where it is). */
-static const SceneDef *scene_def;
+static const Scene3DDef *scene_def;
 
 /* Ambient emitters, partitioned once at start: the ones on a moving body
    first, so the per-frame follow walks only 0..mover_count and a static
@@ -61,12 +61,12 @@ static void assetSound_ambient(const Entity *entity, const AssetSound *sound)
 	ambient_count++;
 }
 
-void assetSound_start(const SceneDef *def)
+void assetSound_start(const Scene3DDef *def)
 {
 	scene_def = def;
 
 	for (uint8_t i = 0; i < def->asset_count; i++) {
-		const SceneAsset *placed = &def->asset[i];
+		const Scene3DAsset *placed = &def->asset[i];
 
 		for (uint8_t s = 0; s < placed->asset->sound_count; s++) {
 			if (placed->asset->sound[s].trigger != ASSET_SOUND_AMBIENT) continue;

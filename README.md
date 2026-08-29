@@ -28,11 +28,14 @@ Blend tree based animation system: clip playback, selection, sequencing, 1D and 
 A port of [SpringBoneSimulator3D](https://github.com/godotengine/godot/blob/master/scene/3d/spring_bone_simulator_3d.cpp) from Godot Engine as a skeleton modifier: one Verlet tail per joint, chains resolved root to tip, simulated in character space with per set stiffness, drag and gravity. Sphere, capsule and plane colliders hung from bones, with per joint radii.<br/>
 World motion damping and teleport thresholds from [AnimNode_KawaiiPhysicsSimulation](https://github.com/pafuhana1213/KawaiiPhysics/blob/master/Plugins/KawaiiPhysics/Source/KawaiiPhysics/Private/AnimNode_KawaiiPhysicsSimulation.cpp), part of Kawaii Physics by pafuhana1213.
 
-**Screen system**<br/>
-2D screen system with a track based animation engine: rectangles, sprites and text grouped in scissor sections, with easing curves, timed visibility windows and state driven lookups.
-
-**Scenes**<br/>
+**3D scenes**<br/>
 Data driven scene definitions: lighting, fog, camera setup, wind, and sound emitters. Loading resolves a definition into the physics world, character instances, cloth bindings and active emitters.
+
+**2D scenes**<br/>
+Rectangles, sprites and text grouped in layers, each under its own scissor. Definition and instance as on the 3D side: loading resolves a definition into the live scene drawn over the world.
+
+**UI**<br/>
+Track based animation engine over the loaded 2D scene: easing curves, staggered delays, timed visibility windows and state driven lookups, with tracks addressing an element field by index instead of by pointer and reverse playback mirroring the curves.
 
 **Sound**<br/>
 Positional sound system on top of the Libdragon mixer. Per sample volume, min and max distance with inverse falloff, priority based channel allocation and out of range culling. Constant power panning from listener position and camera orientation, damped at close range. Distance and panning applied on independent mixer paths with RSP driven ramps. Playback rate scaling to fit a sample to a requested duration.<br/>
@@ -43,13 +46,17 @@ Spring arm third person camera: exponential convergence on yaw and pitch with ve
 
 ### Building
 
+The engine never builds on its own: it is always compiled from the project that uses it, into that project's build directory. What there is to build here are the examples.
+
 1. Install the Libdragon toolchain following their [installation guide](https://github.com/DragonMinded/libdragon/wiki/Installing-libdragon).
 2. Build and install [Tiny3D](https://github.com/HailToDodongo/tiny3d/blob/main/README.md#usage).
 3. From the project root run:
 
 ```
-make
+./build.sh
 ```
+
+That rebuilds every example. To build a single one, run `make` inside its folder.
 
 Download the latest build on the [itch.io](https://zoncabe.itch.io/engine64) page.<br/>
 

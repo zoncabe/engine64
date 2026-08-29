@@ -6,13 +6,6 @@
 #include "physics/math/vector3.h"
 
 
-typedef enum {
-
-	CAMERA_SPRING_ARM_DEFAULT,
-	CAMERA_SPRING_ARM_AIMING,
-
-} CameraSpringArmState;
-
 typedef struct Camera Camera;
 
 typedef struct CameraSpringArmSettings {
@@ -22,26 +15,21 @@ typedef struct CameraSpringArmSettings {
 	Vector2 direction;
 
 	float zoom_response_rate;
-	float offset_response_rate;
 
-	float arm_length_default;
-	float arm_length_aim;
-
-	float field_of_view_default;
-	float field_of_view_aim;
-
-	float shoulder_offset_default;
-	float shoulder_offset_aim;
+	float distance_speed;
+	float fov_speed;
 
 	float max_pitch;
+	float min_pitch;
 
 } CameraSpringArmSettings;
 
 
+/* Where the arm is right now: seeded from the def, moved by the engine. */
 typedef struct CameraSpringArmData {
 
 	float arm_length;
-	float shoulder_offset;
+	float side_offset;
 
 	float yaw;
 	float pitch;
@@ -54,7 +42,21 @@ typedef struct CameraSpringArmData {
 } CameraSpringArmData;
 
 
-void cameraSpringArm_init(Camera *camera, const CameraSpringArmData *data);
+typedef struct CameraSpringArmDef {
+
+	float arm_length;
+	float side_offset;
+
+	float yaw;
+	float pitch;
+	float pivot_height;
+
+	CameraSpringArmSettings settings;
+
+} CameraSpringArmDef;
+
+
+void cameraSpringArm_init(Camera *camera, const CameraSpringArmDef *def);
 void cameraSpringArm_update(Camera *camera, Vector3 *center, float dt);
 
 #endif

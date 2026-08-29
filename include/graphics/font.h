@@ -4,17 +4,21 @@
 #include <libdragon.h>
 #include "physics/math/vector2.h"
 
-#define DROID_SANS    1
-#define XOLONIUM_10   2
-#define XOLONIUM_14   3
-#define XOLONIUM_20   4
-#define XOLONIUM_40   5
-#define XOLONIUM_60   6
 
-#define MENU_STYLE_NORMAL   1
-#define MENU_STYLE_SELECTED 2
-#define TEXT_STYLE_RED      3
+typedef struct {
 
+	uint8_t          id;      /* rdpq style id */
+	rdpq_fontstyle_t style;   /* color, outline color, custom callback */
+
+} FontStyle;
+
+typedef struct {
+
+	const char      *path;   /* NULL = unused slot (0 is: rdpq font ids start at 1) */
+	const FontStyle *style;
+	uint8_t          style_count;
+
+} FontDef;
 
 typedef struct {
 	uint8_t                  font;
@@ -23,6 +27,10 @@ typedef struct {
 	const rdpq_textparms_t  *parms;
 } Text;
 
+
+/* Hands the engine the game's font table, indexed by font id. Runs once,
+   before any state loads resources. */
+void font_init(const FontDef *fonts, uint8_t count);
 
 void font_loadAsset(uint8_t id);
 void font_unloadAsset(uint8_t id);

@@ -1,7 +1,8 @@
 #include <math.h>
+#include <malloc.h>
+#include <assert.h>
 
 #include "sound/sound.h"
-#include "sound/sound_bank.h"
 #include "time/time.h"
 #include "player/player.h"
 #include "viewport/viewport.h"
@@ -46,7 +47,11 @@ typedef struct {
 } SoundEmitterState;
 
 
-static wav64_t *sound_wave[SOUND_COUNT];
+/* The game's bank, handed over at sound_init. */
+static const SoundDef *sound_bank;
+static uint8_t         sound_count;
+
+static wav64_t **sound_wave;
 static SoundEmitterState sound_emitter[SOUND_MAX_EMITTERS];
 static SoundListener sound_listener;
 
@@ -201,15 +206,21 @@ static void sound_releaseEmitter(SoundEmitterState *emitter)
 }
 
 
-void sound_init(void)
+void sound_init(const SoundDef *bank, uint8_t count)
 {
+	sound_bank  = bank;
+	sound_count = count;
+
+	sound_wave = calloc(count, sizeof(wav64_t *));
+	assert(sound_wave);
+
 	audio_init(SOUND_OUTPUT_RATE, AUDIO_DEFAULT_LATENCY);
 	mixer_init(SOUND_MIXER_CHANNELS);
 	mixer_set_vol(SOUND_MASTER_VOLUME);
 
 	sound_listener.right = vector3_create(0.0f, -1.0f, 0.0f);
 
-	for (int i = 0; i < SOUND_COUNT; i++) {
+	for (int i = 0; i < sound_count; i++) {
 		const SoundDef *def = &sound_bank[i];
 
 		wav64_loadparms_t parms = {
@@ -235,7 +246,7 @@ void sound_close(void)
 {
 	sound_stopAll();
 
-	for (int i = 0; i < SOUND_COUNT; i++) {
+	for (int i = 0; i < sound_count; i++) {
 		if (!sound_wave[i]) continue;
 
 		wav64_close(sound_wave[i]);
@@ -249,7 +260,7 @@ void sound_close(void)
 
 SoundEmitter sound_play(SoundID id, const Vector3 *position, float volume_scale, float duration)
 {
-	if (id >= SOUND_COUNT || !sound_wave[id]) return SOUND_NO_EMITTER;
+	if (id >= sound_count || !sound_wave[id]) return SOUND_NO_EMITTER;
 
 	for (int i = 0; i < SOUND_MAX_EMITTERS; i++) {
 		SoundEmitterState *emitter = &sound_emitter[i];

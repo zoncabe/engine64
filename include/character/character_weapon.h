@@ -84,6 +84,13 @@ typedef struct CharacterWeapons {
 void character_equipWeapon  (Character *character, uint8_t slot, const WeaponDef *weapon);
 void character_unequipWeapon(Character *character, uint8_t slot);
 
+/* Steps the drawn weapon through the occupied slots, unarmed included as a
+   stop of its own. dir +1 / -1. */
+void character_cycleWeapon(Character *character, int8_t dir);
+
+/* What the hand carries right now; NULL when everything is holstered. */
+const WeaponDef *character_drawnWeapon(const Character *character);
+
 /* Poses the weapon bones (holster or hand). Runs before the skeleton update. */
 void characterWeapon_setBones(Character *character);
 

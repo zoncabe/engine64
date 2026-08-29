@@ -15,6 +15,7 @@
 #include "character/character_stats.h"
 #include "character/character_animation.h"
 #include "character/character_weapon.h"
+#include "character/character_aim.h"
 #include "character/character_skeleton.h"
 #include "character/character_spring_bone.h"
 #include "character/character_sound.h"
@@ -28,6 +29,7 @@ typedef struct CharacterDef {
 	const CharacterColliderSettings *collider_settings;
 	const CharacterWeaponsDef *weapons_def;
 	const SpringBonesDef *spring_bones;   /* optional: array of sets, one tuning each, count 0 terminates */
+	const CharacterAimDef *aim_def;       /* optional: spine chain for the camera-pitch bend */
 	const CharacterSoundDef *sound_def;
 	const CharacterStatsSettings *stats_settings;
 
@@ -41,6 +43,7 @@ typedef struct Character {
 	CharacterMovement   movement;
 	CharacterAnimation  animation;
 	CharacterWeapons    weapons;
+	CharacterAim        aim;
 	CharacterSound      sound;
 	SkeletonModifiers   skeleton_modifiers;
 	CharacterStats      stats;

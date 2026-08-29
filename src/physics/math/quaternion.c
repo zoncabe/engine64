@@ -18,11 +18,12 @@ Quaternion quaternion_identity(void)
 void quaternion_setAxisAngle(Quaternion *q, const Vector3 *axis, float radians)
 {
 	float halfAngle = 0.5f * radians;
-	float s = fm_sinf(halfAngle);
+	float s, c;
+	fm_sincosf(halfAngle, &s, &c);
 	q->x = s * axis->x;
 	q->y = s * axis->y;
 	q->z = s * axis->z;
-	q->w = fm_cosf(halfAngle);
+	q->w = c;
 }
 
 Quaternion quaternion_fromAxisAngle(const Vector3 *axis, float radians)

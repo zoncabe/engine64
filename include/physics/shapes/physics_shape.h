@@ -35,6 +35,17 @@ typedef enum ShapeType {
 } ShapeType;
 
 
+/* What a sensor shape is a sensor *for*. Every value but NONE is truthy, so
+   the code that only asks whether a shape collides keeps reading `sensor` as
+   the flag it always was; the ones that consume a specific kind of volume
+   match on the value. */
+typedef enum SensorType {
+	SENSOR_NONE      = 0,
+	SENSOR_VOLUME    = 1,   /* plain overlap volume: water, triggers */
+	SENSOR_CLIMBABLE = 2,   /* ladder: the character probe reads its frame */
+} SensorType;
+
+
 typedef struct MassData {
 	Matrix3 inertia;
 	Vector3 center;

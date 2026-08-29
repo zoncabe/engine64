@@ -43,8 +43,8 @@ Matrix3 matrix3_diagonal(float x, float y, float z)
 
 Matrix3 matrix3_fromAxisAngle(const Vector3 *axis, float angle)
 {
-	float s = fm_sinf(angle);
-	float c = fm_cosf(angle);
+	float s, c;
+	fm_sincosf(angle, &s, &c);
 	float x = axis->x, y = axis->y, z = axis->z;
 	float xy = x * y, yz = y * z, zx = z * x;
 	float t = 1.0f - c;

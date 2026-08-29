@@ -16,11 +16,11 @@
 #define RENDER_MAX_DRAW_ELEMENT  128
 /* One entry per visible mesh part, not per entity: a skinned character alone
    contributes several, so this has to clear the scene's entity budget. */
-#define RENDER_MAX_T3D_OBJECT     64
+#define RENDER_MAX_T3D_OBJECT    128
 #define RENDER_MAX_SECTION         8
 
-typedef struct Scene          Scene;
-typedef struct Screen         Screen;
+typedef struct Scene3D          Scene3D;
+typedef struct Scene2D         Scene2D;
 
 typedef struct RenderTransform {
 	Vector3 position;
@@ -32,6 +32,7 @@ typedef enum {
 
 	DRAW_RECTANGLE,
 	DRAW_SPRITE,
+	DRAW_TILED_SPRITE,   /* repeated sprite: position = origin, scale = size in px */
 	DRAW_TEXT,
 
 } DrawElementType;
@@ -49,8 +50,9 @@ typedef struct {
 	Vector2 scale;
 	Vector2 position;
 	float rotation;
+	uint8_t transparency;
 
-	bool is_hidden;
+	bool    is_hidden;
 
 } DrawElement;
 
@@ -94,7 +96,7 @@ typedef struct RenderContext {
 void renderTransform_init(RenderTransform *t);
 
 void render_initContext(RenderContext *ctx);
-void render_setContext(RenderContext *ctx, const Scene *scene, uint8_t fb_index, const Screen *screen);
+void render_setContext(RenderContext *ctx, const Scene3D *scene3d, uint8_t fb_index, const Scene2D *scene2d);
 void render(RenderContext *ctx, int *fb_index);
 
 

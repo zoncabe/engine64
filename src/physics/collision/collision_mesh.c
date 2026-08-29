@@ -110,3 +110,44 @@ void collisionMesh_queryAABB(const CollisionMesh *mesh, void *cb, PhysicsQueryCa
 {
 	dynamicAABBTree_queryAABB(&mesh->tree, cb, callback, aabb);
 }
+
+
+typedef struct MeshRaycast {
+	const CollisionMesh *mesh;
+	RaycastData         *ray;
+	int                  hit;
+} MeshRaycast;
+
+/* Every leaf the ray crosses is a triangle. Shortening the ray on each hit
+   leaves the closest one and lets the tree prune what is behind it. */
+static int collisionMesh_raycastLeaf(void *cb, int32_t id)
+{
+	MeshRaycast *query = cb;
+
+	Triangle triangle;
+	collisionMesh_getTriangle(query->mesh, (int32_t)(intptr_t)dynamicAABBTree_getUserData(&query->mesh->tree, id), &triangle);
+
+	if (triangle_raycast(&triangle, query->ray)) {
+		query->ray->t = query->ray->toi;
+		query->hit    = 1;
+	}
+	return 1;
+}
+
+/* The tree lives in mesh-local space, so the ray is shifted by -origin. A mesh
+   only ever hangs off a static body and is never rotated, same assumption the
+   rest of the mesh code makes. */
+int collisionMesh_raycast(const CollisionMesh *mesh, const Transform *world, RaycastData *raycast)
+{
+	RaycastData local = *raycast;
+	local.start = vector3_difference(&raycast->start, &world->position);
+
+	MeshRaycast query = { .mesh = mesh, .ray = &local, .hit = 0 };
+	dynamicAABBTree_queryRay(&mesh->tree, &query, collisionMesh_raycastLeaf, &local);
+
+	if (!query.hit) return 0;
+
+	raycast->toi    = local.toi;
+	raycast->normal = local.normal;
+	return 1;
+}
