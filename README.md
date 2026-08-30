@@ -46,8 +46,6 @@ Spring arm third person camera: exponential convergence on yaw and pitch with ve
 
 ### Building
 
-The engine never builds on its own: it is always compiled from the project that uses it, into that project's build directory. What there is to build here are the examples.
-
 1. Install the Libdragon toolchain following their [installation guide](https://github.com/DragonMinded/libdragon/wiki/Installing-libdragon).
 2. Build and install [Tiny3D](https://github.com/HailToDodongo/tiny3d/blob/main/README.md#usage).
 3. From the project root run:
