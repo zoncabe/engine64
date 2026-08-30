@@ -9,8 +9,8 @@
 #define PLAYER_STICK_WALK_THRESHOLD 65
 
 
-/* What a body can be asked to do. A character that does not do one of these
-   leaves its button at BTN_NONE and the control reads as never pressed. */
+/* What a body can be asked to do. What a character does not do is left out:
+   an unwritten button is BTN_NONE and reads as never pressed. */
 typedef struct CharacterControlBinding {
 
 	ButtonID jump;
@@ -41,7 +41,10 @@ typedef struct CharacterControls {
 } CharacterControls;
 
 
-void characterControls_map(CharacterControls *controls, const Controller *pad, const CharacterControlBinding *binding);
+/* This frame's state of the buttons the binding names, off that player's pad.
+   The binding is the mapping and is written once; this only reads what those
+   buttons are doing now. */
+void characterControls_read(CharacterControls *controls, const CharacterControlBinding *binding, PlayerID player);
 void characterControl_update(Character *character, MovementCommand *cmd, const CharacterControls *controls, float camera_angle_around);
 
 #endif

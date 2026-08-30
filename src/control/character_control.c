@@ -153,8 +153,10 @@ static void characterControl_setClimb(Character *character, MovementCommand *cmd
 	if (alignment >= fm_cosf(deg_to_rad(CHARACTER_LADDER_ENTER_ANGLE))) cmd->climb = 1.0f;
 }
 
-void characterControls_map(CharacterControls *controls, const Controller *pad, const CharacterControlBinding *binding)
+void characterControls_read(CharacterControls *controls, const CharacterControlBinding *binding, PlayerID player)
 {
+	const Controller *pad = &controller_get()[player];
+
 	*controls = (CharacterControls){
 		.jump       = button_getPressed(pad, &pad->pressed, binding->jump),
 		.jump_held  = button_getPressed(pad, &pad->held,    binding->jump),

@@ -1,10 +1,11 @@
 #include <assert.h>
 #include <stdlib.h>
 
-#include "sound/asset_sound.h"
+#include "sound/prefab_sound.h"
 #include "sound/sound.h"
 #include "entity/entity.h"
 #include "scene3d/scene3d.h"
+#include "shaders/water.h"
 #include "physics/collision/contact.h"
 #include "physics/body/rigid_body.h"
 #include "physics/world/physics_world.h"
@@ -13,21 +14,21 @@
 /* The measure of a hit is the impulse the solver spent stopping it, over the
    body's mass: the speed it killed, in m/s — one scale for every weight.
    Below the floor it is resting jitter and stays silent. */
-#define ASSET_SOUND_HIT_SPEED_MIN  0.4f
-#define ASSET_SOUND_HIT_SPEED_MAX  3.0f
-#define ASSET_SOUND_HIT_VOLUME_MIN 0.1f
-#define ASSET_SOUND_HIT_VOLUME_MAX 1.0
+#define PREFAB_SOUND_HIT_SPEED_MIN  0.4f
+#define PREFAB_SOUND_HIT_SPEED_MAX  3.0f
+#define PREFAB_SOUND_HIT_VOLUME_MIN 0.1f
+#define PREFAB_SOUND_HIT_VOLUME_MAX 1.0
 
 /* The plunge is the vertical speed on the frame the body meets the water:
    rolling in barely whispers, a fall from the deck slaps. No cutoff floor —
    entering slowly still wets. */
-#define ASSET_SOUND_PLUNGE_SPEED_MIN  0.5f
-#define ASSET_SOUND_PLUNGE_SPEED_MAX  6.0f
-#define ASSET_SOUND_PLUNGE_VOLUME_MIN 0.1f
-#define ASSET_SOUND_PLUNGE_VOLUME_MAX 0.4f
+#define PREFAB_SOUND_PLUNGE_SPEED_MIN  0.5f
+#define PREFAB_SOUND_PLUNGE_SPEED_MAX  6.0f
+#define PREFAB_SOUND_PLUNGE_VOLUME_MIN 0.1f
+#define PREFAB_SOUND_PLUNGE_VOLUME_MAX 0.4f
 
 /* The loaded scene's placements: the one registry that knows both the
-   asset (what sounds) and the entity it produced (where it is). */
+   prefab (what sounds) and the entity it produced (where it is). */
 static const Scene3DDef *scene_def;
 
 /* Ambient emitters, partitioned once at start: the ones on a moving body
@@ -41,7 +42,7 @@ static uint8_t ambient_count;
 static uint8_t mover_count;
 
 
-static void assetSound_ambient(const Entity *entity, const AssetSound *sound)
+static void prefabSound_ambient(const Entity *entity, const PrefabSound *sound)
 {
 	assert(ambient_count < SCENE_MAX_ENTITIES);
 
@@ -61,21 +62,21 @@ static void assetSound_ambient(const Entity *entity, const AssetSound *sound)
 	ambient_count++;
 }
 
-void assetSound_start(const Scene3DDef *def)
+void prefabSound_start(const Scene3DDef *def)
 {
 	scene_def = def;
 
-	for (uint8_t i = 0; i < def->asset_count; i++) {
-		const Scene3DAsset *placed = &def->asset[i];
+	for (uint8_t i = 0; i < def->prefab_count; i++) {
+		const Scene3DPrefab *placed = &def->prefab[i];
 
-		for (uint8_t s = 0; s < placed->asset->sound_count; s++) {
-			if (placed->asset->sound[s].trigger != ASSET_SOUND_AMBIENT) continue;
-			assetSound_ambient(placed->entity, &placed->asset->sound[s]);
+		for (uint8_t s = 0; s < placed->prefab->sound_count; s++) {
+			if (placed->prefab->sound[s].trigger != PREFAB_SOUND_AMBIENT) continue;
+			prefabSound_ambient(placed->entity, &placed->prefab->sound[s]);
 		}
 	}
 }
 
-void assetSound_stop(void)
+void prefabSound_stop(void)
 {
 	for (uint8_t i = 0; i < ambient_count; i++)
 		sound_stop(ambient[i].emitter);
@@ -84,77 +85,72 @@ void assetSound_stop(void)
 	scene_def     = NULL;
 }
 
-/* Only a placement ties a body back to what its asset declared. */
-static const Asset *assetSound_assetOf(const RigidBody *body)
+/* Only a placement ties a body back to what its prefab declared. */
+static const Prefab *prefabSound_prefabOf(const RigidBody *body)
 {
-	for (uint8_t i = 0; i < scene_def->asset_count; i++) {
-		const Entity *entity = scene_def->asset[i].entity;
-		if (entity && entity->body == body) return scene_def->asset[i].asset;
+	for (uint8_t i = 0; i < scene_def->prefab_count; i++) {
+		const Entity *entity = scene_def->prefab[i].entity;
+		if (entity && entity->body == body) return scene_def->prefab[i].prefab;
 	}
 	return NULL;
 }
 
-static bool assetSound_declares(const RigidBody *body, AssetSoundTrigger trigger)
+static bool prefabSound_declares(const RigidBody *body, PrefabSoundTrigger trigger)
 {
-	const Asset *asset = assetSound_assetOf(body);
-	if (asset == NULL) return false;
+	const Prefab *prefab = prefabSound_prefabOf(body);
+	if (prefab == NULL) return false;
 
-	for (uint8_t i = 0; i < asset->sound_count; i++)
-		if (asset->sound[i].trigger == trigger) return true;
+	for (uint8_t i = 0; i < prefab->sound_count; i++)
+		if (prefab->sound[i].trigger == trigger) return true;
 	return false;
 }
 
-static void assetSound_collision(const RigidBody *body, float impulse)
+static void prefabSound_collision(const RigidBody *body, float impulse)
 {
-	const Asset *asset = assetSound_assetOf(body);
-	if (asset == NULL || asset->sound == NULL) return;
+	const Prefab *prefab = prefabSound_prefabOf(body);
+	if (prefab == NULL || prefab->sound == NULL) return;
 
 	float speed = impulse * body->inv_mass;
-	if (speed < ASSET_SOUND_HIT_SPEED_MIN) return;
+	if (speed < PREFAB_SOUND_HIT_SPEED_MIN) return;
 
-	float t = (speed - ASSET_SOUND_HIT_SPEED_MIN)
-	        / (ASSET_SOUND_HIT_SPEED_MAX - ASSET_SOUND_HIT_SPEED_MIN);
+	float t = (speed - PREFAB_SOUND_HIT_SPEED_MIN)
+	        / (PREFAB_SOUND_HIT_SPEED_MAX - PREFAB_SOUND_HIT_SPEED_MIN);
 	if (t > 1.0f) t = 1.0f;
 
-	float volume = ASSET_SOUND_HIT_VOLUME_MIN
-	             + t * (ASSET_SOUND_HIT_VOLUME_MAX - ASSET_SOUND_HIT_VOLUME_MIN);
+	float volume = PREFAB_SOUND_HIT_VOLUME_MIN
+	             + t * (PREFAB_SOUND_HIT_VOLUME_MAX - PREFAB_SOUND_HIT_VOLUME_MIN);
 
 	/* The body lives in metres; the emitters in render units. */
 	Vector3 position = vector3_scaled(&body->tx.position, RENDER_SCALE);
 
-	for (uint8_t i = 0; i < asset->sound_count; i++) {
-		const AssetSound *sound = &asset->sound[i];
-		if (sound->trigger != ASSET_SOUND_COLLISION) continue;
+	for (uint8_t i = 0; i < prefab->sound_count; i++) {
+		const PrefabSound *sound = &prefab->sound[i];
+		if (sound->trigger != PREFAB_SOUND_COLLISION) continue;
 
 		sound_play(sound->sound[rand() % sound->count], &position, volume, 0.0f);
 	}
 }
 
-static void assetSound_waterEntry(const RigidBody *body, float plunge_speed)
+/* The sound comes from the surface, the volume from the body that entered. */
+static void prefabSound_waterEntry(const RigidBody *body, float plunge_speed, const WaterDef *water)
 {
-	const Asset *asset = assetSound_assetOf(body);
-	if (asset == NULL || asset->sound == NULL) return;
+	if (water == NULL || water->entry_sound == NULL || water->entry_sound_count == 0) return;
 
-	float t = (plunge_speed - ASSET_SOUND_PLUNGE_SPEED_MIN)
-	        / (ASSET_SOUND_PLUNGE_SPEED_MAX - ASSET_SOUND_PLUNGE_SPEED_MIN);
+	float t = (plunge_speed - PREFAB_SOUND_PLUNGE_SPEED_MIN)
+	        / (PREFAB_SOUND_PLUNGE_SPEED_MAX - PREFAB_SOUND_PLUNGE_SPEED_MIN);
 	if (t < 0.0f) t = 0.0f;
 	if (t > 1.0f) t = 1.0f;
 
-	float volume = ASSET_SOUND_PLUNGE_VOLUME_MIN
-	             + t * (ASSET_SOUND_PLUNGE_VOLUME_MAX - ASSET_SOUND_PLUNGE_VOLUME_MIN);
+	float volume = PREFAB_SOUND_PLUNGE_VOLUME_MIN
+	             + t * (PREFAB_SOUND_PLUNGE_VOLUME_MAX - PREFAB_SOUND_PLUNGE_VOLUME_MIN);
 
 	/* The body lives in metres; the emitters in render units. */
 	Vector3 position = vector3_scaled(&body->tx.position, RENDER_SCALE);
 
-	for (uint8_t i = 0; i < asset->sound_count; i++) {
-		const AssetSound *sound = &asset->sound[i];
-		if (sound->trigger != ASSET_SOUND_WATER_ENTRY) continue;
-
-		sound_play(sound->sound[rand() % sound->count], &position, volume, 0.0f);
-	}
+	sound_play(water->entry_sound[rand() % water->entry_sound_count], &position, volume, 0.0f);
 }
 
-void assetSound_update(struct PhysicsWorld *world)
+void prefabSound_update(struct PhysicsWorld *world)
 {
 	/* The ambient sound follows its body: a carried or pushed prop keeps
 	   emitting from where it is. */
@@ -171,15 +167,15 @@ void assetSound_update(struct PhysicsWorld *world)
 		if (  c->flags & CONSTRAINT_WAS_COLLIDING) continue;
 
 		if (c->manifold.sensor) {
-			/* The wet side is whichever body belongs to a water asset;
+			/* The wet side is whichever body belongs to a water prefab;
 			   the other one just fell in, at its own vertical speed. */
-			const Asset *asset_a = assetSound_assetOf(c->body_a);
-			const Asset *asset_b = assetSound_assetOf(c->body_b);
+			const Prefab *prefab_a = prefabSound_prefabOf(c->body_a);
+			const Prefab *prefab_b = prefabSound_prefabOf(c->body_b);
 
-			if (asset_a && asset_a->type == ASSET_WATER)
-				assetSound_waterEntry(c->body_b, -c->body_b->linear_velocity.z);
-			else if (asset_b && asset_b->type == ASSET_WATER)
-				assetSound_waterEntry(c->body_a, -c->body_a->linear_velocity.z);
+			if (prefab_a && prefab_a->type == PREFAB_WATER)
+				prefabSound_waterEntry(c->body_b, -c->body_b->linear_velocity.z, prefab_a->water);
+			else if (prefab_b && prefab_b->type == PREFAB_WATER)
+				prefabSound_waterEntry(c->body_a, -c->body_a->linear_velocity.z, prefab_b->water);
 			continue;
 		}
 
@@ -188,9 +184,9 @@ void assetSound_update(struct PhysicsWorld *world)
 			impulse += c->manifold.contacts[i].normal_impulse;
 
 		bool a_hits = (c->body_a->flags & BODY_FLAG_DYNAMIC)
-		           && assetSound_declares(c->body_a, ASSET_SOUND_COLLISION);
+		           && prefabSound_declares(c->body_a, PREFAB_SOUND_COLLISION);
 		bool b_hits = (c->body_b->flags & BODY_FLAG_DYNAMIC)
-		           && assetSound_declares(c->body_b, ASSET_SOUND_COLLISION);
+		           && prefabSound_declares(c->body_b, PREFAB_SOUND_COLLISION);
 
 		/* When both sides would sound, the heavier body owns the hit: one
 		   thud per contact, not two stacked. */
@@ -199,7 +195,7 @@ void assetSound_update(struct PhysicsWorld *world)
 			else                                    a_hits = false;
 		}
 
-		if (a_hits) assetSound_collision(c->body_a, impulse);
-		if (b_hits) assetSound_collision(c->body_b, impulse);
+		if (a_hits) prefabSound_collision(c->body_a, impulse);
+		if (b_hits) prefabSound_collision(c->body_b, impulse);
 	}
 }

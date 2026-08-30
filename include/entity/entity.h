@@ -9,18 +9,8 @@
 #include "graphics/mesh.h"
 #include "character/character.h"
 
-typedef enum {
-
-	ENTITY_CHARACTER,
-	ENTITY_SCENERY,
-
-} EntityType;
-
-struct Asset;
-
 typedef struct Entity {
 
-	EntityType type;
 	RenderTransform transform;
 	Mesh *mesh;
 

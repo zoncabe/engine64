@@ -7,12 +7,20 @@
 #include "game/game.h"
 
 
-void player_setCharacterControl(Player *player, const CharacterControls *controls, Viewport *viewport)
+void player_setCharacterControl(PlayerID id, Viewport *viewport)
 {
+	Player *player = &player_get()[id];
+	if (player->character == NULL || player->control == NULL) return;
+
+	/* Read where it is used: what the pad is doing this frame is worth
+	   nothing on the next one. */
+	CharacterControls controls;
+	characterControls_read(&controls, player->control, id);
+
 	characterControl_update(
 		player->character,
 		&player->cmd,
-		controls,
+		&controls,
 		camera_getAngleAround(&viewport->camera, &player->character->entity->transform.position)
 	);
 }

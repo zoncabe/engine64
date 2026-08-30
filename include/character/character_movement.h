@@ -25,7 +25,7 @@ typedef struct Character Character;
 #define CHARACTER_JUMP_HOLD_VELOCITY_SCALE 0.96f
 #define CHARACTER_JUMP_LAUNCH_VELOCITY_SCALE 0.8f
 
-#define CHARACTER_GRAVITY -18.0f
+#define CHARACTER_GRAVITY -20.0f
 #define CHARACTER_FALL_MAX_SPEED -15.0f
 
 #define CHARACTER_WATER_DRAG             4.0f    /* vertical, per second, at full submersion */
@@ -78,6 +78,16 @@ enum {
 };
 
 
+/* How the button becomes height. Charge holds the body down for as long as
+   the crouch lasts and launches with what it gathered; snap leaves the floor
+   on the press and keeps adding while the button stays down. Zero is charge,
+   which is what every character did before the choice existed. */
+typedef enum {
+	JUMP_CHARGE = 0,
+	JUMP_SNAP,
+} JumpMode;
+
+
 /* No jumping state: the crouch that starts a jump runs on the ground, over
    locomotion, and the air is always a fall. */
 typedef enum {
@@ -116,10 +126,28 @@ typedef struct {
 	float roll_grip_time;
 	float roll_timer_max;
 
+	JumpMode jump_mode;
+
 	float jump_response_rate;
+	/* What the launch is worth on its own: the whole of it under snap, the
+	   floor a short charge cannot go under. */
+	float jump_base_speed;
+
+	/* Charge only: the crouch lasts this long, and what it gathered is
+	   multiplied into the launch. */
 	float jump_force_multiplier;
-	float jump_minimum_speed;
 	float jump_timer_max;
+
+	/* Snap only: the fraction of gravity the rise pays while the button is
+	   held. Lower climbs higher; at 1.0 holding does nothing. It only ever
+	   applies on the way up, so nobody floats down. */
+	float jump_hold_gravity_scale;
+
+	/* How much of the ground's steering the air gets, 0 to 1. At zero the
+	   body keeps the heading and the speed it left with, and the stick does
+	   nothing until it lands; at one it turns and accelerates in the air
+	   exactly as it would on the floor. */
+	float air_control;
 
 	float swim_slow_speed;
 	float swim_fast_speed;

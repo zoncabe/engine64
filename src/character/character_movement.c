@@ -206,6 +206,18 @@ static void characterMovement_jumpCharge(Character *character, MovementCommand *
 		data->jump_timer    = 0.0f;
 		data->jump_force    = 0.0f;
 		cmd->jump_triggered = false;
+
+		/* Snap: no crouch at all. The floor is left on this very frame with
+		   the minimum launch, and the rest of the height is added in the air
+		   for as long as the button holds. */
+		if (settings->jump_mode == JUMP_SNAP) {
+			body->velocity = data->jump_initial_velocity;
+			vector3_scale(&body->velocity, CHARACTER_JUMP_LAUNCH_VELOCITY_SCALE);
+			body->velocity.z = settings->jump_base_speed;
+
+			character->movement.next = MOVEMENT_STATE_FALLING;
+			return;
+		}
 	}
 	else if (data->jump_timer == 0.0f) return;   /* nothing being charged */
 
@@ -221,8 +233,8 @@ static void characterMovement_jumpCharge(Character *character, MovementCommand *
 	body->velocity = data->jump_initial_velocity;
 	vector3_scale(&body->velocity, CHARACTER_JUMP_LAUNCH_VELOCITY_SCALE);
 	body->velocity.z = data->jump_force * settings->jump_force_multiplier;
-	if (body->velocity.z < settings->jump_minimum_speed)
-		body->velocity.z = settings->jump_minimum_speed;
+	if (body->velocity.z < settings->jump_base_speed)
+		body->velocity.z = settings->jump_base_speed;
 
 	data->jump_force = 0.0f;
 	data->jump_timer = 0.0f;
@@ -238,9 +250,9 @@ static void characterMovement_setLocomotion(Character *character, MovementComman
 
 /* Gravity and the terminal speed that goes with it, for anything with no floor
    under it. The collision pass clears the acceleration again on landing. */
-static void characterMovement_fall(KinematicBody *body)
+static void characterMovement_fall(KinematicBody *body, float gravity_scale)
 {
-	body->acceleration.z = CHARACTER_GRAVITY;
+	body->acceleration.z = CHARACTER_GRAVITY * gravity_scale;
 	if (body->velocity.z < CHARACTER_FALL_MAX_SPEED)
 		body->velocity.z = CHARACTER_FALL_MAX_SPEED;
 }
@@ -301,7 +313,7 @@ static void characterMovement_setRolling(Character *character, MovementCommand *
 
 	/* Rolling off a ledge drops: the state is what holds to the end of the
 	   clip, not the ground. */
-	if (!data->is_grounded) characterMovement_fall(&character->body);
+	if (!data->is_grounded) characterMovement_fall(&character->body, 1.0f);
 
 	switch (characterMovement_rollPhase(data, settings)) {
 		case CHARACTER_ROLL_PHASE_LAUNCH: characterMovement_rollLaunch(character, settings, locomotion, dt); break;
@@ -318,11 +330,34 @@ static void characterMovement_setFalling(Character *character, MovementCommand *
 	const CharacterMovementSettings *settings = character->movement.settings;
 
 	data->is_grounded = 0;
+
 	/* A crouch cut short by the ground disappearing is not a jump: left half
 	   done it would finish on landing and take off on its own. */
 	data->jump_timer = 0.0f;
-	characterMovement_setHorizontalVelocity(character, cmd->target_yaw, data->horizontal_speed, settings->jump_response_rate, dt);
-	characterMovement_fall(body);
+
+	/* Air control decides both halves at once: how far the heading can be
+	   pulled toward the stick, and how much the speed can move toward what
+	   the same stick would give on the ground. At zero neither moves and the
+	   jump keeps the run that launched it. */
+	float target_speed = data->horizontal_speed;
+	if (settings->air_control > 0.0f) {
+		float ground = character->movement.locomotion == MOVEMENT_STATE_WALKING
+		             ? characterMovement_targetSpeed(character, MOVEMENT_STATE_WALKING) * cmd->speed_scale
+		             : 0.0f;
+		target_speed += (ground - target_speed) * settings->air_control;
+	}
+
+	characterMovement_setHorizontalVelocity(character, cmd->target_yaw, target_speed,
+	                                        settings->jump_response_rate * settings->air_control, dt);
+
+	/* Snap: holding the button makes the rise cost less gravity, so how long
+	   it is held is how high it goes. Only on the way up — past the top the
+	   fall is the fall, and nobody floats down. */
+	float gravity_scale = 1.0f;
+	if (settings->jump_mode == JUMP_SNAP && cmd->jump_held && body->velocity.z > 0.0f)
+		gravity_scale = settings->jump_hold_gravity_scale;
+
+	characterMovement_fall(body, gravity_scale);
 }
 
 /* The vertical is not touched here: the fake buoyancy in updateBody floats,

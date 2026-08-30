@@ -16,13 +16,13 @@
 #include "time/time.h"
 
 
-/* --- assets ----------------------------------------------------------------
-	An asset is a model plus whatever its kind needs. Scenery with no collider
-	is pure dressing: it is drawn and nothing else.
+/* --- prefabs ---------------------------------------------------------------
+	A prefab is a model plus what its kind needs. A prop with no collider and
+	no body is only drawn.
 */
 
-static const Asset room    = { .type = ASSET_SCENERY, .model = "rom:/models/room.t3dm"    };
-static const Asset capsule = { .type = ASSET_SCENERY, .model = "rom:/models/capsule.t3dm" };
+static const Prefab room    = { .type = PREFAB_PROP, .model = "rom:/models/room.t3dm"    };
+static const Prefab capsule = { .type = PREFAB_PROP, .model = "rom:/models/capsule.t3dm" };
 
 
 /* --- the scene -------------------------------------------------------------
@@ -30,7 +30,11 @@ static const Asset capsule = { .type = ASSET_SCENERY, .model = "rom:/models/caps
 	not const because each placement receives the entity it produced.
 */
 
-static Scene3DAsset scene_assets[] = {
+/* One row per placement: which prefab, then where it stands. Declaring them
+   here is the whole job — the load builds each one in order, registers it in
+   the physics and draws it, with nothing else to call. What is left out stays
+   zero, and a zero scale means original size. */
+static Scene3DPrefab scene_prefabs[] = {
 
 	{ &room,    { 0.0f, 0.0f, 0.0f } },
 	{ &capsule, { 0.0f, 0.0f, 0.0f } },
@@ -64,12 +68,16 @@ static const CameraDef camera = {
 	},
 };
 
+/* Seven slots, shared between directional and point lights. They are read in
+   order and cut at the first empty one, so the six left over cost nothing. */
 static const LightDef light = {
 
 	.ambient_color = { 60, 60, 70, 0xFF },
-	.point = {
-		[0] = { .position = {{ 0.0f, 0.0f, 700.0f }},
-		        .color = { 255, 245, 220, 0xFF }, .size = 2500.0f },
+
+	.source = {
+		{ .type  = LIGHT_POINT,
+		  .color = { 255, 245, 220, 0xFF },
+		  .point = { .position = {{ 0.0f, 0.0f, 700.0f }}, .size = 2500.0f } },
 	},
 };
 
@@ -81,17 +89,24 @@ static Scene3DDef scene = {
 	.fog    = &fog,
 	.camera = &camera,
 
-	.asset       = scene_assets,
-	.asset_count = sizeof(scene_assets) / sizeof(scene_assets[0]),
+	.prefab       = scene_prefabs,
+	.prefab_count = sizeof(scene_prefabs) / sizeof(scene_prefabs[0]),
 };
 
 
 /* --- the state -------------------------------------------------------------
-	One state, one scene. The camera orbits the middle of the room instead of
-	following a character, since there is nobody to follow yet.
+	A state is one mode of the game: the title menu, the match, the pause,
+	the credits. One at a time. Each carries the scene it draws, the sprites
+	and fonts it needs, and the function the engine calls every frame. Leaving
+	a state frees all of that, and the next one loads its own.
+
+	This table is the whole game as far as the engine is concerned: it takes
+	it at startup and from then on the only thing it ever calls is the update
+	of the current state. That is why there is one even here, for a single
+	mode that never changes.
 */
 
-enum { EXAMPLE_SCENE_STATE, STATE_COUNT };
+enum { GAME_STATE_EXAMPLE, STATE_COUNT };
 
 static Vector3 room_center = { 0.0f, 0.0f, 100.0f };
 
@@ -99,6 +114,8 @@ static Vector3 room_center = { 0.0f, 0.0f, 100.0f };
    turns, pulls back and zooms the camera on its own. Anything left at
    BTN_NONE simply never happens. */
 static const CameraControlBinding camera_binding = {
+
+	.player = PLAYER_1,
 
 	.pan_left  = BTN_C_LEFT,
 	.pan_right = BTN_C_RIGHT,
@@ -112,7 +129,7 @@ static const CameraControlBinding camera_binding = {
 	.fov_out   = BTN_D_DOWN,
 };
 
-static void exampleGameState_update(GameContext *ctx)
+static void GameStateExample_update(GameContext *ctx)
 {
 	(void)ctx;
 
@@ -125,15 +142,15 @@ static void exampleGameState_update(GameContext *ctx)
 		for (int fb = 0; fb < FB_COUNT; fb++)
 			entity_setMatrixFromBody(scene3d->entity[i], fb);
 
-	cameraControl_update(&viewport_get()->camera, &controller_get()[0], &camera_binding, time_get()->delta);
+	cameraControl_update(&viewport_get()->camera, &camera_binding, time_get()->delta);
 	viewport_updateCamera(&room_center);
 	viewport_setPerspectiveCamera();
 }
 
 static const GameStateDef states[STATE_COUNT] = {
 
-	[EXAMPLE_SCENE_STATE] = {
-		.update     = exampleGameState_update,
+	[GAME_STATE_EXAMPLE] = {
+		.update     = GameStateExample_update,
 		.scene3d    = &scene,
 		.overlay_of = GAME_STATE_NONE,
 	},
@@ -147,7 +164,7 @@ int main()
 
 	game_init();
 
-	game_start(states, STATE_COUNT, EXAMPLE_SCENE_STATE);
+	game_start(states, STATE_COUNT, GAME_STATE_EXAMPLE);
 
 	for (;;) game_runStep();
 

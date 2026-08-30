@@ -19,6 +19,7 @@
 
 #include "physics/math/vector3.h"
 #include "physics/buoyancy/buoyancy.h"
+#include "sound/sound.h"
 
 #define WATER_MAX_WAVES    3
 #define WATER_MAX_SURFACES 2
@@ -44,8 +45,14 @@ typedef struct WaterWave {
    asset. Scroll speeds are in texels per second; wrap is the texture size in
    texels, so the offset can fold instead of growing without bound. */
 typedef struct WaterDef {
+
 	const char *mesh_path;
 
+	/* Splash of this surface, played for whatever enters it. One is picked
+	   at random; the plunge speed sets the volume. */
+	const SoundID *entry_sound;
+	uint8_t        entry_sound_count;
+	
 	WaterWave wave[WATER_MAX_WAVES];
 	uint8_t   wave_count;
 
@@ -64,6 +71,7 @@ typedef struct WaterDef {
 	float density;        /* kg/m3 */
 	float linear_drag;    /* per-second rate on the linear velocity */
 	float angular_drag;   /* per-second rate on the angular velocity */
+
 } WaterDef;
 
 

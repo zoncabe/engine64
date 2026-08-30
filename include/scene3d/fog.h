@@ -1,6 +1,9 @@
 #ifndef FOG_H
 #define FOG_H
 
+#include <stdbool.h>
+#include <libdragon.h>
+
 /* Distance fog: computed per vertex on the RSP and blended by the RDP.
    Range is in world units along the view axis, inside the camera planes. */
 

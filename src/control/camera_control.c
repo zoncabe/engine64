@@ -5,6 +5,7 @@
 #include "camera/camera.h"
 #include "camera/spring_arm.h"
 #include "control/camera_control.h"
+#include "player/player.h"
 
 
 /* x and y arrive normalized: how hard the camera is being pushed, whatever
@@ -33,8 +34,10 @@ static void cameraControl_setInput(Camera *camera, float x, float y)
 
 /* Opposite binds cancel out, so a controller that has the C stick under both
    of them hands over the axis with its own magnitude. */
-void cameraControl_update(Camera *camera, const Controller *controller, const CameraControlBinding *binding, float dt)
+void cameraControl_update(Camera *camera, const CameraControlBinding *binding, float dt)
 {
+	const Controller *controller = &controller_get()[binding->player];
+
 	float x = button_getPressed(controller, &controller->held, binding->pan_right)
 	        - button_getPressed(controller, &controller->held, binding->pan_left);
 
@@ -43,18 +46,25 @@ void cameraControl_update(Camera *camera, const Controller *controller, const Ca
 
 	cameraControl_setInput(camera, x, y);
 
-	if (camera->type != CAMERA_TYPE_SPRING_ARM) return;
+	if (camera->type == CAMERA_TYPE_SPRING_ARM) {
+		const CameraSpringArmSettings *settings = &camera->spring_arm.settings;
 
-	const CameraSpringArmSettings *settings = &camera->spring_arm.settings;
+		float distance = button_getPressed(controller, &controller->held, binding->distance_out)
+		               - button_getPressed(controller, &controller->held, binding->distance_in);
 
-	float distance = button_getPressed(controller, &controller->held, binding->distance_out)
-	               - button_getPressed(controller, &controller->held, binding->distance_in);
+		float fov = button_getPressed(controller, &controller->held, binding->fov_out)
+		          - button_getPressed(controller, &controller->held, binding->fov_in);
 
-	float fov = button_getPressed(controller, &controller->held, binding->fov_out)
-	          - button_getPressed(controller, &controller->held, binding->fov_in);
+		camera->spring_arm.data.arm_length += distance * settings->distance_speed * dt;
+		camera->field_of_view              += fov      * settings->fov_speed      * dt;
+	}
 
-	camera->spring_arm.data.arm_length += distance * settings->distance_speed * dt;
-	camera->field_of_view              += fov      * settings->fov_speed      * dt;
+	/* The binding names the player, so the camera knows what to follow on its
+	   own. A seat with nobody in it leaves the camera where it was: a game
+	   that frames something else calls viewport_updateCamera instead. */
+	const Player *player = &player_get()[binding->player];
+	if (player->entity)
+		camera_update(camera, &player->entity->transform.position, dt);
 }
 
 

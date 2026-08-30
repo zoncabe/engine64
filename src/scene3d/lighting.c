@@ -11,57 +11,42 @@
 
 static Light light;
 
-Light* light_get(void) { return &light; }
+Light *light_get(void) { return &light; }
 
 
-void light_initAmbient(color_t color)
+void light_init(const LightDef *def)
 {
-	light.ambient_color = color;
-}
+	light = *def;
 
-void light_initDirectional(DirectionalLight* light, T3DVec3 direction, color_t color) {
-
-	light->direction = direction;
-	light->color = color;
-	t3d_vec3_norm(&light->direction);
-}
-
-void light_initPoint(PointLight* light, T3DVec3 position, color_t color, float strength) {
-
-	light->position = position;
-	light->color = color;
-	light->size = strength;
-}
-
-void light_updatePoint(PointLight* light, T3DVec3 position, color_t color, float strength) {
-
-	light->position = position;
-	light->color = color;
-	light->size = strength;
-}
-
-void light_setDirectional(DirectionalLight* light)
-{
-	for (int i = 0; i < DIRECTIONAL_LIGHT_COUNT; i++){
-
-		t3d_light_set_directional(i, &light[i].color.r, &light[i].direction);
+	for (int i = 0; i < LIGHT_COUNT; i++) {
+		if (light.source[i].type == LIGHT_NONE) break;
+		if (light.source[i].type == LIGHT_DIRECTIONAL)
+			t3d_vec3_norm(&light.source[i].directional.direction);
 	}
 }
 
-void light_setPoint(PointLight* light)
+void light_set(const Light *light)
 {
-	for (int i = 0; i < POINT_LIGHT_COUNT; i++) {
+	t3d_light_set_ambient((uint8_t *)&light->ambient_color.r);
 
-		/* The slots are shared with the directionals, which took the first ones. */
-		t3d_light_set_point(DIRECTIONAL_LIGHT_COUNT + i, &light[i].color.r,
-		                    &light[i].position, light[i].size, false);
+	int count = 0;
+	for (; count < LIGHT_COUNT; count++) {
+		const LightSource *source = &light->source[count];
+
+		switch (source->type) {
+			case LIGHT_DIRECTIONAL:
+				t3d_light_set_directional(count, (uint8_t *)&source->color.r,
+				                          (T3DVec3 *)&source->directional.direction);
+				break;
+			case LIGHT_POINT:
+				t3d_light_set_point(count, (uint8_t *)&source->color.r,
+				                    (T3DVec3 *)&source->point.position,
+				                    source->point.size, false);
+				break;
+			case LIGHT_NONE:
+				goto done;
+		}
 	}
-}
-
-void light_set(Light* light)
-{
-	t3d_light_set_ambient(&light->ambient_color.r);
-	light_setDirectional(light->directional);
-	light_setPoint(light->point);
-	t3d_light_set_count(DIRECTIONAL_LIGHT_COUNT + POINT_LIGHT_COUNT);
+done:
+	t3d_light_set_count(count);
 }

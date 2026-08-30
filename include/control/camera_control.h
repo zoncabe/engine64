@@ -6,6 +6,8 @@
 
 typedef struct CameraControlBinding {
 
+	PlayerID player;
+
 	ButtonID pan_left;
 	ButtonID pan_right;
 	ButtonID tilt_up;
@@ -19,7 +21,8 @@ typedef struct CameraControlBinding {
 } CameraControlBinding;
 
 
-void cameraControl_update(Camera *camera, const Controller *controller, const CameraControlBinding *binding, float dt);
+/* Reads the pad of the player the binding names. */
+void cameraControl_update(Camera *camera, const CameraControlBinding *binding, float dt);
 void cameraControl_setDistance(Camera *camera, float distance, float dt);
 void cameraControl_setFieldOfView(Camera *camera, float field_of_view, float dt);
 

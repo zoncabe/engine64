@@ -14,7 +14,7 @@
 
 void entity_init(Entity *entity, const EntityDef *def)
 {
-	*entity = (Entity){ .type = def->character ? ENTITY_CHARACTER : ENTITY_SCENERY };
+	*entity = (Entity){0};
 	renderTransform_init(&entity->transform);
 	entity->transform.position = def->position;
 	entity->transform.rotation = def->rotation;

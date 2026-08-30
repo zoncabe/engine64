@@ -36,12 +36,8 @@ void scene3d_load(Scene3DDef *def)
 	const LightDef *light = def->light ? def->light : &unlit;
 	const FogDef   *fog   = def->fog   ? def->fog   : &clear;
 
-	light_initAmbient(light->ambient_color);
+	light_init(light);
 	fog_init(fog);
-	for (int i = 0; i < DIRECTIONAL_LIGHT_COUNT; i++)
-		light_initDirectional(&light_get()->directional[i], light->directional[i].direction, light->directional[i].color);
-	for (int i = 0; i < POINT_LIGHT_COUNT; i++)
-		light_initPoint(&light_get()->point[i], light->point[i].position, light->point[i].color, light->point[i].size);
 
 	Camera *camera = &viewport_get()->camera;
 	camera_reset(camera);
@@ -66,41 +62,37 @@ void scene3d_load(Scene3DDef *def)
 	physicsWorld_init(&g_physics, PHYSICS_TIMESTEP, gravity, PHYSICS_SOLVER_ITERATIONS);
 	physicsWorld_setWind(&g_physics, def->wind);
 
-	for (int i = 0; i < def->asset_count; i++) {
-		Scene3DAsset *placed = &def->asset[i];
-		const Asset *asset = placed->asset;
+	for (int i = 0; i < def->prefab_count; i++) {
+		Scene3DPrefab *placed = &def->prefab[i];
+		const Prefab *prefab = placed->prefab;
 
 		Vector3 scale = placed->scale;
 		if (scale.x == 0.0f && scale.y == 0.0f && scale.z == 0.0f)
 			scale = (Vector3){ 1.0f, 1.0f, 1.0f };
 
 		/* entity.c builds from a flat parameter block: filled here straight
-		   from the asset and its placement, and gone after the load. */
+		   from the prefab and its placement, and gone after the load. */
 		EntityDef entity_def = {
-			.model_path = asset->model,
+			.model_path = prefab->model,
 			.position   = placed->position,
 			.rotation   = placed->rotation,
 			.scale      = scale,
+			.collider   = prefab->collider,
 			.cull       = true,
 		};
 
-		switch (asset->type) {
-			case ASSET_CHARACTER:
-				entity_def.character = asset->character.def;
+		switch (prefab->type) {
+			case PREFAB_CHARACTER:
+				entity_def.character = prefab->character;
 				break;
-			case ASSET_SCENERY:
-				entity_def.collider = asset->scenery.collider;
+			case PREFAB_PROP:
+				entity_def.body = prefab->prop;
 				break;
-			case ASSET_PROP:
-				entity_def.collider = asset->prop.collider;
-				entity_def.body     = asset->prop.body;
+			case PREFAB_CLOTH:
+				entity_def.cloth = prefab->cloth;
 				break;
-			case ASSET_CLOTH:
-				entity_def.cloth = asset->cloth.def;
-				break;
-			case ASSET_WATER:
-				entity_def.water    = asset->water.def;
-				entity_def.collider = asset->water.sensor;
+			case PREFAB_WATER:
+				entity_def.water = prefab->water;
 				break;
 		}
 
@@ -160,7 +152,7 @@ void scene3d_load(Scene3DDef *def)
 	}
 
 	loaded_def = def;
-	assetSound_start(def);
+	prefabSound_start(def);
 }
 
 void scene3d_clear(void)
@@ -170,10 +162,10 @@ void scene3d_clear(void)
 
 void scene3d_unload(void)
 {
-	assetSound_stop();
+	prefabSound_stop();
 	if (loaded_def) {
-		for (int i = 0; i < loaded_def->asset_count; i++)
-			loaded_def->asset[i].entity = NULL;
+		for (int i = 0; i < loaded_def->prefab_count; i++)
+			loaded_def->prefab[i].entity = NULL;
 		loaded_def = NULL;
 	}
 	for (int i = 0; i < scene.character_count; i++)
@@ -183,6 +175,22 @@ void scene3d_unload(void)
 	water_clear();
 	scene3d_clear();
 	physicsWorld_shutdown(&g_physics);
+}
+
+/* The characters' half of the frame after physics_update: each one collides
+   against the world, hands the outcome to its body, and from there to what
+   draws it. Always these four, always in this order, so no game writes them
+   out. The list is the scene's, which is why it lives here. */
+void scene3d_updateCharacters(uint8_t fb_index)
+{
+	for (int i = 0; i < scene.character_count; i++) {
+		Character *character = scene.character[i];
+
+		characterPhysics_collide(character, &g_physics);
+		characterPhysics_syncBody(character);
+		entity_setTransform(character->entity, &character->body);
+		entity_setMatrix(character->entity, fb_index);
+	}
 }
 
 void scene3d_addEntity(Entity *entity)
