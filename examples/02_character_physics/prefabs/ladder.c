@@ -11,7 +11,7 @@
 	where the solid box stops the body, or the climb can never be caught.
 	It starts below the foot, so standing at the bottom is already inside.
 */
-#include "prefab/prefab.h"
+#include "prefab/e64_prefab.h"
 
 
 static const PhysicsShapeDef ladder_shapes[] = {

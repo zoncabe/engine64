@@ -1,0 +1,516 @@
+/*
+	Ported from qu3e q3Scene.cpp — altered source, not the original software.
+
+	Copyright (c) 2014 Randy Gaul http://www.randygaul.net
+
+	This software is provided 'as-is', without any express or implied
+	warranty. In no event will the authors be held liable for any damages
+	arising from the use of this software.
+
+	Permission is granted to anyone to use this software for any purpose,
+	including commercial applications, and to alter it and redistribute it
+	freely, subject to the following restrictions:
+	  1. The origin of this software must not be misrepresented; you must not
+	     claim that you wrote the original software. If you use this software
+	     in a product, an acknowledgment in the product documentation would be
+	     appreciated but is not required.
+	  2. Altered source versions must be plainly marked as such, and must not
+	     be misrepresented as being the original software.
+	  3. This notice may not be removed or altered from any source distribution.
+*/
+
+/*
+	World assembly, step, body and shape management.
+*/
+#include <assert.h>
+#include <stddef.h>
+#include <string.h>
+
+#include "physics/world/e64_physics_world.h"
+#include "physics/world/e64_physics_island.h"
+#include "physics/collision/e64_contact.h"
+#include "physics/collision/e64_contact_solver.h"
+#include "physics/collision/e64_contact_manager.h"
+#include "physics/collision/e64_collision.h"
+#include "physics/collision/e64_collision_mesh.h"
+#include "physics/broadphase/e64_broad_phase.h"
+
+
+/* Shims exposed to rigid_body.c and broad_phase.c. */
+
+void physicsWorld_allocShape(PhysicsWorld *s, PhysicsShape **out)
+{
+	*out = (PhysicsShape *)physicsPagedAllocator_allocate(&s->shape_allocator);
+}
+
+void physicsWorld_freeShape(PhysicsWorld *s, PhysicsShape *shape)
+{
+	physicsPagedAllocator_free(&s->shape_allocator, shape);
+}
+
+void physicsWorld_markNewShape(PhysicsWorld *s)
+{
+	s->new_shape = 1;
+}
+
+void broadPhase_insertShape_fromWorld(PhysicsWorld *s, PhysicsShape *shape, AABB aabb)
+{
+	broadPhase_insertShape(&s->contact_manager.broadphase, shape, aabb);
+}
+
+void broadPhase_removeShape_fromWorld(PhysicsWorld *s, const PhysicsShape *shape)
+{
+	broadPhase_removeShape(&s->contact_manager.broadphase, shape);
+}
+
+void broadPhase_updateShape(PhysicsWorld *s, int32_t index, AABB aabb)
+{
+	broadPhase_update(&s->contact_manager.broadphase, index, aabb);
+}
+
+void contactManager_removeContact_fromWorld(PhysicsWorld *s, ContactConstraint *c)
+{
+	contactManager_removeContact(&s->contact_manager, c);
+}
+
+void contactManager_removeContactsFromBody_fromWorld(PhysicsWorld *s, RigidBody *body)
+{
+	contactManager_removeContactsFromBody(&s->contact_manager, body);
+}
+
+
+void physicsWorld_init(PhysicsWorld *s, float dt, Vector3 gravity, int32_t iterations)
+{
+	physicsStack_init(&s->stack);
+	physicsHeap_init (&s->heap);
+	contactManager_init(&s->contact_manager, &s->stack);
+	physicsPagedAllocator_init(&s->shape_allocator, (int32_t)sizeof(PhysicsShape), 256);
+
+	s->body_count       = 0;
+	s->body_list        = NULL;
+	s->cloth_count      = 0;
+	s->cloth_list       = NULL;
+	s->buoyancy_count   = 0;
+	s->wind             = vector3_zero();
+	s->gravity          = gravity;
+	s->dt               = dt;
+	s->accumulator      = 0.0f;
+	s->iterations       = iterations;
+	s->new_shape        = 0;
+	s->allow_sleep      = 1;
+	s->enable_friction  = 1;
+	s->contact_listener = NULL;
+}
+
+
+void physicsWorld_removeAllBodies(PhysicsWorld *s)
+{
+	RigidBody *body = s->body_list;
+	while (body) {
+		RigidBody *next = body->next;
+		rigidBody_removeAllShapes(body);
+		physicsHeap_free(&s->heap, body);
+		body = next;
+	}
+	s->body_list  = NULL;
+	s->body_count = 0;
+}
+
+
+Cloth *physicsWorld_createCloth(PhysicsWorld *s, const ClothDef *def)
+{
+	Cloth *cloth = physicsHeap_allocate(&s->heap, sizeof(Cloth));
+	if (cloth == NULL) return NULL;
+
+	/* The mesh is scaffolding: it seeds the particles and the constraints, and
+	   nothing keeps a reference to it afterwards. */
+	CollisionMesh *mesh = collisionMesh_load(def->mesh_path);
+	bool built = cloth_create(cloth, mesh, def);
+	collisionMesh_delete(mesh);
+
+	if (!built) {
+		physicsHeap_free(&s->heap, cloth);
+		return NULL;
+	}
+
+	cloth->gravity = s->gravity;
+	cloth->wind    = s->wind;
+
+	cloth->next  = s->cloth_list;
+	s->cloth_list = cloth;
+	s->cloth_count++;
+
+	return cloth;
+}
+
+
+void physicsWorld_removeCloth(PhysicsWorld *s, Cloth *cloth)
+{
+	for (Cloth **link = &s->cloth_list; *link; link = &(*link)->next) {
+		if (*link != cloth) continue;
+
+		*link = cloth->next;
+		cloth_delete(cloth);
+		physicsHeap_free(&s->heap, cloth);
+		s->cloth_count--;
+		return;
+	}
+}
+
+
+void physicsWorld_removeAllCloths(PhysicsWorld *s)
+{
+	Cloth *cloth = s->cloth_list;
+	while (cloth) {
+		Cloth *next = cloth->next;
+		cloth_delete(cloth);
+		physicsHeap_free(&s->heap, cloth);
+		cloth = next;
+	}
+	s->cloth_list  = NULL;
+	s->cloth_count = 0;
+}
+
+
+void physicsWorld_shutdown(PhysicsWorld *s)
+{
+	physicsWorld_removeAllCloths(s);
+	physicsWorld_removeAllBodies(s);
+	physicsPagedAllocator_shutdown(&s->shape_allocator);
+	contactManager_shutdown(&s->contact_manager);
+	physicsHeap_shutdown(&s->heap);
+	physicsStack_shutdown(&s->stack);
+}
+
+
+/* One step per rendered frame, on the frame's own clock. The clamp is what
+   keeps a hiccup from becoming one huge step: past it the simulation runs in
+   slow motion for that frame instead of blowing up the solver. */
+void physics_update(PhysicsWorld *s, float delta)
+{
+	if (delta <= 0.0f) return;   /* first frame; 1/dt lives in the solver bias */
+
+	s->dt = (delta > PHYSICS_MAX_TIMESTEP) ? PHYSICS_MAX_TIMESTEP : delta;
+	physics_step(s);
+
+	/* Cloths keep the fixed step: a Verlet cloth's look is tuned to its step
+	   size, so it steps on its own clock instead of the frame's dt. Its cost
+	   per second is constant, so it cannot feed back into the frame time. */
+	s->accumulator += delta;
+
+	float ceiling = PHYSICS_TIMESTEP * PHYSICS_CLOTH_MAX_SUBSTEPS;
+	if (s->accumulator > ceiling) s->accumulator = ceiling;
+
+	/* A cloth nobody is looking at holds its pose: skipping its step leaves
+	   both Verlet slots alone, so it resumes with the velocity it had. The
+	   accumulator is the world's and drains either way, so coming back into
+	   view never owes a burst of substeps. */
+	while (s->accumulator >= PHYSICS_TIMESTEP) {
+		for (Cloth *cloth = s->cloth_list; cloth; cloth = cloth->next) {
+			if (cloth_isCulled(cloth)) continue;
+			cloth->gravity = s->gravity;
+			cloth->wind    = s->wind;
+			cloth_step(cloth, PHYSICS_TIMESTEP);
+		}
+		s->accumulator -= PHYSICS_TIMESTEP;
+	}
+
+	/* Shown state: previous and current step blended by the leftover
+	   fraction, same scheme as the dynamic bones. */
+	float t = s->accumulator / PHYSICS_TIMESTEP;
+	for (Cloth *cloth = s->cloth_list; cloth; cloth = cloth->next)
+		if (!cloth_isCulled(cloth)) cloth_blendRenderState(cloth, t);
+}
+
+
+void physics_step(PhysicsWorld *s)
+{
+	if (s->new_shape) {
+		broadPhase_updatePairs(&s->contact_manager.broadphase);
+		s->new_shape = 0;
+	}
+
+	contactManager_testCollisions(&s->contact_manager);
+
+	/* After the narrowphase, so the sensors' COLLIDING flags are fresh;
+	   before the islands, so the forces integrate in this same step. */
+	for (int32_t i = 0; i < s->buoyancy_count; i++)
+		buoyancy_apply(s, s->buoyancy[i]);
+
+	for (RigidBody *body = s->body_list; body; body = body->next) {
+		body->flags &= ~BODY_FLAG_ISLAND;
+	}
+
+	/* Reserve stack for island buffers. */
+	physicsStack_reserve(&s->stack,
+		(uint32_t)(sizeof(RigidBody *)             * s->body_count
+		         + sizeof(VelocityState)           * s->body_count
+		         + sizeof(ContactConstraint *)     * s->contact_manager.contact_count
+		         + sizeof(ContactConstraintState)  * s->contact_manager.contact_count
+		         + sizeof(RigidBody *)             * s->body_count)
+	);
+
+	PhysicsIsland island;
+	island.body_capacity    = s->body_count;
+	island.contact_capacity = s->contact_manager.contact_count;
+	island.bodies           = (RigidBody **)            physicsStack_allocate(&s->stack, (int32_t)(sizeof(RigidBody *) * s->body_count));
+	island.velocities       = (VelocityState *)         physicsStack_allocate(&s->stack, (int32_t)(sizeof(VelocityState) * s->body_count));
+	island.contacts         = (ContactConstraint **)    physicsStack_allocate(&s->stack, (int32_t)(sizeof(ContactConstraint *) * island.contact_capacity));
+	island.contact_states   = (ContactConstraintState *)physicsStack_allocate(&s->stack, (int32_t)(sizeof(ContactConstraintState) * island.contact_capacity));
+	island.allow_sleep      = s->allow_sleep;
+	island.enable_friction  = s->enable_friction;
+	island.body_count       = 0;
+	island.contact_count    = 0;
+	island.dt               = s->dt;
+	island.gravity          = s->gravity;
+	island.iterations       = s->iterations;
+
+	int32_t stack_size = s->body_count;
+	RigidBody **stack = (RigidBody **)physicsStack_allocate(&s->stack, (int32_t)(sizeof(RigidBody *) * stack_size));
+
+	for (RigidBody *seed = s->body_list; seed; seed = seed->next) {
+		if (seed->flags & BODY_FLAG_ISLAND) continue;
+		if (!(seed->flags & BODY_FLAG_AWAKE)) continue;
+		if (seed->flags & BODY_FLAG_STATIC) continue;
+
+		int32_t stack_count = 0;
+		stack[stack_count++] = seed;
+		island.body_count    = 0;
+		island.contact_count = 0;
+
+		seed->flags |= BODY_FLAG_ISLAND;
+
+		while (stack_count > 0) {
+			RigidBody *body = stack[--stack_count];
+			physicsIsland_addBody(&island, body);
+
+			rigidBody_setToAwake(body);
+
+			if (body->flags & BODY_FLAG_STATIC) continue;
+
+			ContactEdge *contacts = body->contact_list;
+			for (ContactEdge *edge = contacts; edge; edge = edge->next) {
+				ContactConstraint *contact = edge->constraint;
+
+				if (contact->flags & CONSTRAINT_ISLAND) continue;
+				if (!(contact->flags & CONSTRAINT_COLLIDING)) continue;
+				if (contact->A->sensor || contact->B->sensor) continue;
+
+				contact->flags |= CONSTRAINT_ISLAND;
+				physicsIsland_addContact(&island, contact);
+
+				RigidBody *other = edge->other;
+				if (other->flags & BODY_FLAG_ISLAND) continue;
+
+				assert(stack_count < stack_size);
+				stack[stack_count++] = other;
+				other->flags |= BODY_FLAG_ISLAND;
+			}
+		}
+
+		assert(island.body_count != 0);
+
+		physicsIsland_initialize(&island);
+		physicsIsland_solve(&island);
+
+		/* Reset static island flag so statics can participate in multiple islands. */
+		for (int32_t i = 0; i < island.body_count; ++i) {
+			RigidBody *body = island.bodies[i];
+			if (body->flags & BODY_FLAG_STATIC) body->flags &= ~BODY_FLAG_ISLAND;
+		}
+	}
+
+	physicsStack_free(&s->stack, stack);
+	physicsStack_free(&s->stack, island.contact_states);
+	physicsStack_free(&s->stack, island.contacts);
+	physicsStack_free(&s->stack, island.velocities);
+	physicsStack_free(&s->stack, island.bodies);
+
+	/* Sync broadphase AABBs. A sleeping body did not move, so its proxy is
+	   already where it belongs: re-inserting it into the tree every substep is
+	   what makes a settled scene keep costing, and settled is the normal case. */
+	for (RigidBody *body = s->body_list; body; body = body->next) {
+		if (body->flags & BODY_FLAG_STATIC) continue;
+		if (!(body->flags & BODY_FLAG_AWAKE)) continue;
+
+		rigidBody_synchronizeProxies(body);
+	}
+
+	contactManager_findNewContacts(&s->contact_manager);
+
+	for (RigidBody *body = s->body_list; body; body = body->next) {
+		body->force  = vector3_zero();
+		body->torque = vector3_zero();
+	}
+
+}
+
+
+RigidBody *physicsWorld_createBody(PhysicsWorld *s, const RigidBodyDef *def)
+{
+	RigidBody *body = (RigidBody *)physicsHeap_allocate(&s->heap, (int32_t)sizeof(RigidBody));
+
+	/* The heap is a fixed 256 KB and hands back NULL when it is full or too
+	   fragmented to fit. Writing the body through that NULL corrupts low
+	   memory and then the world walks a list holding it, which surfaces far
+	   from here as garbage floats in the solver. */
+	assert(body);
+	rigidBody_init(body, def, s);
+
+	body->prev = NULL;
+	body->next = s->body_list;
+	if (s->body_list) s->body_list->prev = body;
+	s->body_list = body;
+	++s->body_count;
+	return body;
+}
+
+
+void physicsWorld_removeBody(PhysicsWorld *s, RigidBody *body)
+{
+	assert(s->body_count > 0);
+
+	contactManager_removeContactsFromBody(&s->contact_manager, body);
+	rigidBody_removeAllShapes(body);
+
+	if (body->next) body->next->prev = body->prev;
+	if (body->prev) body->prev->next = body->next;
+	if (body == s->body_list) s->body_list = body->next;
+	--s->body_count;
+
+	physicsHeap_free(&s->heap, body);
+}
+
+
+void physicsWorld_setAllowSleep(PhysicsWorld *s, int allow_sleep)
+{
+	s->allow_sleep = allow_sleep;
+	if (!allow_sleep) {
+		for (RigidBody *body = s->body_list; body; body = body->next) rigidBody_setToAwake(body);
+	}
+}
+
+
+void physicsWorld_setIterations(PhysicsWorld *s, int32_t iterations)
+{
+	s->iterations = (iterations > 1) ? iterations : 1;
+}
+
+
+void physicsWorld_setEnableFriction(PhysicsWorld *s, int enabled)
+{
+	s->enable_friction = enabled;
+}
+
+
+Vector3 physicsWorld_getGravity(const PhysicsWorld *s)       { return s->gravity; }
+void    physicsWorld_setGravity(PhysicsWorld *s, Vector3 g)  { s->gravity = g; }
+void    physicsWorld_setWind   (PhysicsWorld *s, Vector3 w)  { s->wind = w; }
+
+void physicsWorld_addBuoyancy(PhysicsWorld *s, const BuoyancyVolume *volume)
+{
+	if (s->buoyancy_count >= PHYSICS_MAX_BUOYANCY_VOLUMES) return;
+	s->buoyancy[s->buoyancy_count++] = volume;
+}
+
+
+void physicsWorld_setContactListener(PhysicsWorld *s, ContactListener *listener)
+{
+	s->contact_listener = listener;
+	s->contact_manager.contact_listener = listener;
+}
+
+
+typedef struct QueryAABB_ctx {
+	const BroadPhase         *broadphase;
+	PhysicsWorldQueryCallback cb;
+	void                     *cb_user_data;
+	AABB                      aabb;
+} QueryAABB_ctx;
+
+static int queryAABB_cb(void *ctx_v, int32_t id)
+{
+	QueryAABB_ctx *ctx = (QueryAABB_ctx *)ctx_v;
+	PhysicsShape *shape = (PhysicsShape *)dynamicAABBTree_getUserData(&ctx->broadphase->tree, id);
+	AABB aabb;
+	Transform body_tx = rigidBody_getTransform(shape->body);
+	physicsShape_computeAABB(shape, &body_tx, &aabb);
+	if (aabb_overlaps(&ctx->aabb, &aabb)) {
+		return ctx->cb(ctx->cb_user_data, shape);
+	}
+	return 1;
+}
+
+void physicsWorld_queryAABB(const PhysicsWorld *s, void *cb_user_data, PhysicsWorldQueryCallback cb, AABB aabb)
+{
+	QueryAABB_ctx ctx;
+	ctx.broadphase   = &s->contact_manager.broadphase;
+	ctx.cb           = cb;
+	ctx.cb_user_data = cb_user_data;
+	ctx.aabb         = aabb;
+	dynamicAABBTree_queryAABB(&s->contact_manager.broadphase.tree, &ctx, queryAABB_cb, aabb);
+}
+
+
+typedef struct QueryPoint_ctx {
+	const BroadPhase         *broadphase;
+	PhysicsWorldQueryCallback cb;
+	void                     *cb_user_data;
+	Vector3                   point;
+} QueryPoint_ctx;
+
+static int queryPoint_cb(void *ctx_v, int32_t id)
+{
+	QueryPoint_ctx *ctx = (QueryPoint_ctx *)ctx_v;
+	PhysicsShape *shape = (PhysicsShape *)dynamicAABBTree_getUserData(&ctx->broadphase->tree, id);
+	Transform body_tx = rigidBody_getTransform(shape->body);
+	if (physicsShape_testPoint(shape, &body_tx, &ctx->point)) {
+		ctx->cb(ctx->cb_user_data, shape);
+	}
+	return 1;
+}
+
+void physicsWorld_queryPoint(const PhysicsWorld *s, void *cb_user_data, PhysicsWorldQueryCallback cb, Vector3 point)
+{
+	QueryPoint_ctx ctx;
+	ctx.broadphase   = &s->contact_manager.broadphase;
+	ctx.cb           = cb;
+	ctx.cb_user_data = cb_user_data;
+	ctx.point        = point;
+
+	const float k_fattener = 0.5f;
+	Vector3 v = { k_fattener, k_fattener, k_fattener };
+	AABB aabb;
+	aabb.min = vector3_difference(&point, &v);
+	aabb.max = vector3_sum(&point, &v);
+	dynamicAABBTree_queryAABB(&s->contact_manager.broadphase.tree, &ctx, queryPoint_cb, aabb);
+}
+
+
+typedef struct QueryRaycast_ctx {
+	const BroadPhase         *broadphase;
+	PhysicsWorldQueryCallback cb;
+	void                     *cb_user_data;
+	RaycastData              *raycast;
+} QueryRaycast_ctx;
+
+static int queryRaycast_cb(void *ctx_v, int32_t id)
+{
+	QueryRaycast_ctx *ctx = (QueryRaycast_ctx *)ctx_v;
+	PhysicsShape *shape = (PhysicsShape *)dynamicAABBTree_getUserData(&ctx->broadphase->tree, id);
+	Transform body_tx = rigidBody_getTransform(shape->body);
+	if (physicsShape_raycast(shape, &body_tx, ctx->raycast)) {
+		return ctx->cb(ctx->cb_user_data, shape);
+	}
+	return 1;
+}
+
+void physicsWorld_rayCast(const PhysicsWorld *s, void *cb_user_data, PhysicsWorldQueryCallback cb, RaycastData *raycast)
+{
+	QueryRaycast_ctx ctx;
+	ctx.broadphase   = &s->contact_manager.broadphase;
+	ctx.cb           = cb;
+	ctx.cb_user_data = cb_user_data;
+	ctx.raycast      = raycast;
+	dynamicAABBTree_queryRay(&s->contact_manager.broadphase.tree, &ctx, queryRaycast_cb, raycast);
+}

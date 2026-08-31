@@ -6,7 +6,7 @@
 	The mesh the waves run on is the welded collision mesh of the same plane,
 	not the model: the model is what gets drawn, deformed from those points.
 */
-#include "prefab/prefab.h"
+#include "prefab/e64_prefab.h"
 
 
 static const PhysicsShapeDef water_shapes[] = {

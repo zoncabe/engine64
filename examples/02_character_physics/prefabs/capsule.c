@@ -4,7 +4,7 @@
 	0.35 and 1.80 tall, so the segment between the two caps is 0.55 either side
 	of the middle.
 */
-#include "prefab/prefab.h"
+#include "prefab/e64_prefab.h"
 
 
 static const PhysicsShapeDef capsule_shapes[] = {

@@ -2,7 +2,7 @@
 	A one metre ball. Rounded, so the character slides off it instead of
 	standing on top: the counterpart of the cube's flat faces.
 */
-#include "prefab/prefab.h"
+#include "prefab/e64_prefab.h"
 
 
 static const PhysicsShapeDef sphere_shapes[] = {

@@ -2,7 +2,7 @@
 	A one metre cube. Physics units are metres, so the model that measures 100
 	units on screen is 1.0 here, and the box is half of that on each side.
 */
-#include "prefab/prefab.h"
+#include "prefab/e64_prefab.h"
 
 
 static const PhysicsShapeDef cube_shapes[] = {

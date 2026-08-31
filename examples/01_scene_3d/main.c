@@ -7,13 +7,13 @@
 */
 #include <libdragon.h>
 
-#include "game/game.h"
-#include "scene3d/scene3d.h"
-#include "entity/entity.h"
-#include "viewport/viewport.h"
-#include "control/controller.h"
-#include "control/camera_control.h"
-#include "time/time.h"
+#include "game/e64_game.h"
+#include "scene3d/e64_scene3d.h"
+#include "entity/e64_entity.h"
+#include "viewport/e64_viewport.h"
+#include "control/e64_controller.h"
+#include "control/e64_camera_control.h"
+#include "time/e64_time.h"
 
 
 /* --- prefabs ---------------------------------------------------------------

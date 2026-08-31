@@ -9,17 +9,17 @@
 */
 #include <libdragon.h>
 
-#include "game/game.h"
-#include "scene3d/scene3d.h"
-#include "entity/entity.h"
-#include "viewport/viewport.h"
-#include "player/player.h"
-#include "control/controller.h"
-#include "control/camera_control.h"
-#include "control/character_control.h"
-#include "control/player_control.h"
-#include "shaders/water.h"
-#include "time/time.h"
+#include "game/e64_game.h"
+#include "scene3d/e64_scene3d.h"
+#include "entity/e64_entity.h"
+#include "viewport/e64_viewport.h"
+#include "player/e64_player.h"
+#include "control/e64_controller.h"
+#include "control/e64_camera_control.h"
+#include "control/e64_character_control.h"
+#include "control/e64_player_control.h"
+#include "shaders/e64_water.h"
+#include "time/e64_time.h"
 
 
 /* --- prefabs ---------------------------------------------------------------
@@ -28,16 +28,19 @@
 */
 
 extern const Prefab room;
+
 extern const Prefab water;
 extern const Prefab ladder;
+
 extern const Prefab capsule;
 extern const Prefab cube;
 extern const Prefab sphere;
+
 extern const Prefab character;
 
-extern const CameraDef example_camera;
-extern const LightDef  example_light;
-extern const FogDef    example_fog;
+extern const CameraDef camera;
+extern const LightDef  light;
+extern const FogDef    fog;
 
 
 /* --- the scene -------------------------------------------------------------
@@ -52,13 +55,7 @@ extern const FogDef    example_fog;
    zero, and a zero scale means original size. */
 static Scene3DPrefab scene_prefabs[] = {
 
-	{ &room },
-
-	/* Halfway along the platform's east face, facing the mound, 500 tall,
-	   which is exactly the climb. Stood off the wall on purpose: flush
-	   against it the body meets the platform before it can reach the volume
-	   it grabs, and the climb never starts. */
-	{ &ladder, { -480.0f, -1000.0f, 0.0f }, { 0.0f, 0.0f, -90.0f } },
+	{ &character, { 2000.0f, -2000.0f, 0.0f }, { 0.0f, 0.0f, 135.0f } },
 
 	/* Three still bodies in a row, parallel to the water's edge. The cube and
 	   the ball are modelled around their middle, so at double size they sit
@@ -67,8 +64,14 @@ static Scene3DPrefab scene_prefabs[] = {
 	{ &capsule, {     0.0f, 0.0f,   0.0f } },
 	{ &cube,    { -1000.0f, 0.0f, 100.0f }, {0}, { 2.0f, 2.0f, 2.0f } },
 	{ &sphere,  {  1000.0f, 0.0f, 100.0f }, {0}, { 2.0f, 2.0f, 2.0f } },
+	
+	/* Halfway along the platform's east face, facing the mound, 500 tall,
+	   which is exactly the climb. Stood off the wall on purpose: flush
+	   against it the body meets the platform before it can reach the volume
+	   it grabs, and the climb never starts. */
+	{ &ladder, { -480.0f, -1000.0f, 0.0f }, { 0.0f, 0.0f, -90.0f } },
 
-	{ &character, { 2000.0f, -2000.0f, 0.0f }, { 0.0f, 0.0f, 135.0f } },
+	{ &room },
 
 	/* Last on purpose: the water is transparent, so it has to blend over
 	   everything already drawn. */
@@ -77,9 +80,9 @@ static Scene3DPrefab scene_prefabs[] = {
 
 static Scene3DDef scene = {
 
-	.light  = &example_light,
-	.fog    = &example_fog,
-	.camera = &example_camera,
+	.light  = &light,
+	.fog    = &fog,
+	.camera = &camera,
 
 	.prefab       = scene_prefabs,
 	.prefab_count = sizeof(scene_prefabs) / sizeof(scene_prefabs[0]),
@@ -111,6 +114,8 @@ static const CameraControlBinding camera_binding = {
 
 static const CharacterControlBinding character_binding = {
 
+	.player = PLAYER_1,
+
 	.jump   = BTN_A,
 	.roll   = BTN_B,
 	.sprint = BTN_Z,
@@ -120,7 +125,7 @@ static const CharacterControlBinding character_binding = {
    so the player takes the first, with the buttons above. */
 static void GameStateExample_bindCharacter(void)
 {
-	player_setCharacter(PLAYER_1, scene3d_getCharacter(0), &character_binding);
+	player_setCharacter(scene3d_getCharacter(0), &character_binding);
 }
 
 static void GameStateExample_update(GameContext *ctx)

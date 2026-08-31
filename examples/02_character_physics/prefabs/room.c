@@ -3,7 +3,7 @@
 	the triangle mesh the importer builds from the same .glb, so what you see
 	is what the character walks on.
 */
-#include "prefab/prefab.h"
+#include "prefab/e64_prefab.h"
 
 
 static const PhysicsShapeDef room_shapes[] = {
