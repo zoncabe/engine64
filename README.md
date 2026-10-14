@@ -1,8 +1,14 @@
 # Engine 64
 
-Framework type game engine. Written in C++ on top of the open source SDK [Libdragon](https://github.com/DragonMinded/libdragon) and the 3D ucode & library [Tiny3D](https://github.com/HailToDodongo/tiny3d).
+<p align="center">
+  <img src="e64_logo.png" alt="Engine 64">
+</p>
 
-### Features
+
+Framework type game engine. Written in C++ on top of the open source SDK [Libdragon](https://github.com/DragonMinded/libdragon) and the 3D ucode & library [Tiny3D](https://github.com/HailToDodongo/tiny3d).
+<br/><br/>
+# Features<br/>
+<br/>
 
 **Physics engine**<br/>
 A port of [qu3e](https://github.com/RandyGaul/qu3e) by Randy Gaul, expanded to use all basic primitives plus triangle meshes. Rigid bodies with island solving and sleeping, sequential impulse contact solver with warm starting, friction and restitution.<br/>
@@ -46,8 +52,12 @@ Character sounds driven by animation and movement state: footsteps at configurab
 
 **Camera**<br/>
 Spring arm third person camera: exponential convergence on yaw and pitch with velocity clamping, per state arm length, shoulder offset and field of view, and view target blending on target changes. Camera types resolve through a handler table.
+<br/>
+<br/>
 
-### Building
+# Building
+
+<br/>
 
 1. Install the Libdragon toolchain following their [installation guide](https://github.com/DragonMinded/libdragon/wiki/Installing-libdragon).
 2. Build and install [Tiny3D](https://github.com/HailToDodongo/tiny3d/blob/main/README.md#usage).
