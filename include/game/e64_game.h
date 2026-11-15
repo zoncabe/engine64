@@ -9,7 +9,6 @@
 #include "scene2d/e64_scene2d.h"
 #include "ui/e64_ui.h"
 #include "viewport/e64_viewport.h"
-#include "controller/e64_controls.h"
 
 namespace e64 {
 
@@ -34,23 +33,20 @@ public:
 			   its way out is seen through. NULL leaves the moment it is asked. */
 			bool (*canLeave)(void);
 
-			/* Per-state input handling (menus, pause); NULL for none. The controller is
-			   already polled: the game reads it with controller::get. */
+			/* The state's input, read before its update; NULL for none. The
+			   controller is already polled: the game reads it with
+			   controller::get, writes the seats' commands and poses the camera.
+			   The engine binds no button to anything. */
 			void (*control)(void);
 
 			/* The scenes this state runs on, either or both: the 3D world and the
 			   2D one drawn over it. */
-			scene3d::Def *scene3d;
+			const Scene3D::Def *scene3d;
 			const scene2d::Def *scene2d;
 
 			/* The interface drawn over them; NULL for none. An overlay's
 			   takes the base's place while it is up. */
 			const ui::Def *ui;
-
-			/* What drives what while this state is current. Each binding names the
-			   piece it moves, so the engine wires them itself once the scenes are
-			   built. A state that drives nothing leaves it out. */
-			const controls::Def *controls;
 
 			/* The screen this state is played on. The engine opens none by itself,
 			   so the first state entered is what puts one up, and a state that wants

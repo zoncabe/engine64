@@ -1,17 +1,19 @@
 /*
-	Capsule collision response for the kinematic body, against static geometry.
+	Capsule collision for the character's collider, against static geometry:
+	detection, depenetration and the velocity response.
 
 	Depenetration and floor detection ported from Godot: the recovery step of
 	GodotSpace3D::test_body_motion (modules/godot_physics_3d/godot_space_3d.cpp)
 	and the contact classification of Character3DBody3D::_set_collision_direction
-	(scene/3d/physics/character3d_body_3d.cpp). No swept motion: the body moves
-	the full step first and is recovered out of penetration here.
+	(scene/3d/physics/character3d_body_3d.cpp). No swept motion: the collider
+	moves the full step first and is recovered out of penetration here.
 */
 #include <math.h>
 #include <fmath.h>
 #include <stdint.h>
 
 #include "character3d/e64_character3d.h"
+#include "entity/e64_entity.h"
 #include "math/e64_math.h"
 #include "physics3d/e64_physics_world.h"
 #include "physics3d/e64_rigid_body.h"
@@ -40,37 +42,50 @@ namespace character3d {
 
 namespace collider {
 
-void init(Collider *collider, float radius, float half_height)
+void init(Collider *collider, float radius, float half_height, const Vector3 *center, float yaw)
 {
 	collider->shape.radius = radius;
 	collider->shape.half_height = half_height;
-	transform::init(&collider->world);
+	collider->transform.position = *center;
+	setYaw(collider, yaw);
 }
 
-void setVertical(Collider *collider, const Vector3 *position)
+/* The matrix is the one t3d_mat4_from_srt_euler builds for a rotation about
+   z: ex = (cos, -sin, 0), ey = (sin, cos, 0). */
+float getYaw(const Collider *collider)
 {
-	collider->world.position = (Vector3){
-		position->x,
-		position->y,
-		position->z + collider->shape.radius + collider->shape.half_height,
+	const Matrix3 *r = &collider->transform.rotation;
+	return rad_to_deg(fm_atan2f(r->ey.x, r->ex.x));
+}
+
+void setYaw(Collider *collider, float yaw)
+{
+	float s, c;
+	fm_sincosf(deg_to_rad(yaw), &s, &c);
+
+	collider->transform.rotation = (Matrix3){
+		.ex = { c, -s, 0.0f },
+		.ey = { s, c, 0.0f },
+		.ez = { 0.0f, 0.0f, 1.0f },
 	};
 }
 
 }
 
 
-namespace physics {
+namespace collision {
 
-/* Registers the kinematic body in the world. Infinite mass and no gravity: the
-   solver reads it to push rigid bodies and never writes back. It must not
-   sleep, or the boxes resting on it would miss the moment it starts moving. */
+/* Registers the kinematic body in the world, as the entity's body. Infinite
+   mass and no gravity: the solver reads it to push rigid bodies and never
+   writes back. It must not sleep, or the boxes resting on it would miss the
+   moment it starts moving. */
 void createBody(Character3D *character, e64::physics::World *world)
 {
 	RigidBody::Def def;
 	rigidBody::def::init(&def);
 
 	def.body_type = RigidBody::BODY_KINEMATIC;
-	def.position = character->collider.world.position;
+	def.position = character->collider.transform.position;
 	def.axis = (Vector3){ 0.0f, 0.0f, 1.0f };
 	def.angle = 0.0f;
 	def.allow_sleep = 0;
@@ -90,20 +105,21 @@ void createBody(Character3D *character, e64::physics::World *world)
 	transform::init(&shape.tx);
 
 	rigidBody::addCapsule(rigid, &shape);
-	character->body.rigid = rigid;
+	character->entity->body = rigid;
 }
 
 
 /* Hands the frame's outcome to the world. Velocity matters as much as the
    position: it is what tells a contact how hard the character is pushing. */
-void syncBody(Character3D *character)
+void syncBody(Character3D *character, const Quaternion *rotation)
 {
-	RigidBody *rigid = character->body.rigid;
+	RigidBody *rigid = character->entity->body;
 	if (rigid == NULL) return;
 
-	rigidBody::setTransformPositionYaw(rigid, character->collider.world.position,
-	                                   deg_to_rad(character->body.rotation.z));
-	rigidBody::setLinearVelocity(rigid, character->body.velocity);
+	const Transform *transform = &character->collider.transform;
+
+	rigidBody::setTransformPositionRotation(rigid, transform->position, &transform->rotation, rotation);
+	rigidBody::setLinearVelocity(rigid, character->movement.velocity);
 	rigidBody::setToAwake(rigid);
 }
 
@@ -166,7 +182,7 @@ static int collectMeshContacts(const Collider *collider,
                                const Vector3 *velocity,
                                BodyContact *contacts, int count)
 {
-	Transform local = transform::productTransposed(tx, &collider->world);
+	Transform local = transform::productTransposed(tx, &collider->transform);
 	Vector3 local_velocity = matrix3::transformVectorTransposed(&tx->rotation, velocity);
 
 	AABB aabb;
@@ -238,13 +254,13 @@ static int collectContacts(const Collider *collider,
 					count = collectMeshContacts(collider, shape->mesh, tx, velocity, contacts, count);
 					continue;
 				case e64::physics::Shape::SHAPE_BOX:
-					collision::capsuleToStaticBox(&m, &collider->shape, &collider->world, &shape->box, tx);
+					collision::capsuleToStaticBox(&m, &collider->shape, &collider->transform, &shape->box, tx);
 					break;
 				case e64::physics::Shape::SHAPE_SPHERE:
-					collision::capsuleToStaticSphere(&m, &collider->shape, &collider->world, &shape->sphere, tx);
+					collision::capsuleToStaticSphere(&m, &collider->shape, &collider->transform, &shape->sphere, tx);
 					break;
 				case e64::physics::Shape::SHAPE_CAPSULE:
-					collision::capsuleToStaticCapsule(&m, &collider->shape, &collider->world, &shape->capsule, tx);
+					collision::capsuleToStaticCapsule(&m, &collider->shape, &collider->transform, &shape->capsule, tx);
 					break;
 			}
 			if (!m.contact_count) continue;
@@ -325,8 +341,8 @@ static void recover(Character3D *character, const e64::physics::World *world, Co
 
 	do {
 		BodyContact contacts[CHARACTER3D_MAX_CONTACTS] __attribute__((uninitialized));
-		int count = collectContacts(&character->collider, world, character->body.rigid,
-		                            &character->body.velocity, contacts);
+		int count = collectContacts(&character->collider, world, character->entity->body,
+		                            &character->movement.velocity, contacts);
 		if (!count) break;
 
 		classifyContacts(contacts, count, state);
@@ -340,8 +356,7 @@ static void recover(Character3D *character, const e64::physics::World *world, Co
 
 		if (vector3::dot(&recover_motion, &recover_motion) == 0.0f) break;
 
-		vector3::add(&character->body.position, &recover_motion);
-		collider::setVertical(&character->collider, &character->body.position);
+		vector3::add(&character->collider.transform.position, &recover_motion);
 	} while (--recover_attempts);
 }
 
@@ -350,26 +365,26 @@ static void recover(Character3D *character, const e64::physics::World *world, Co
 
 static void setGroundResponse(Character3D *character)
 {
-	KinematicBody *body = &character->body;
-	MovementData *data = &character->movement.data;
+	Movement *movement = &character->movement;
+	MovementData *data = &movement->data;
 
 	/* Moving up (jump takeoff) — touching the ground must not cancel it. */
-	if (body->velocity.z > 0.0f) return;
+	if (movement->velocity.z > 0.0f) return;
 
 	data->is_grounded = 1;
-	body->acceleration.z = 0.0f;
-	body->velocity.z = 0.0f;
+	movement->acceleration.z = 0.0f;
+	movement->velocity.z = 0.0f;
 
 	/* The floor is back: the next ledge gets its own coyote window. */
 	data->coyote_timer = 0.0f;
-	if (character->movement.current == MOVEMENT_STATE_FALLING)
-		movement::setMode(&character->movement, character->movement.locomotion);
+	if (movement->mode == MOVEMENT_STATE_FALL)
+		movement->setMode(MOVEMENT_STATE_WALK);
 }
 
 static void setCeilingResponse(Character3D *character)
 {
-	KinematicBody *body = &character->body;
-	if (body->velocity.z > 0.0f) body->velocity.z = 0.0f;
+	Vector3 *velocity = &character->movement.velocity;
+	if (velocity->z > 0.0f) velocity->z = 0.0f;
 }
 
 /* Slide: remove the velocity component pushing into the wall, keep the rest.
@@ -378,7 +393,7 @@ static void setCeilingResponse(Character3D *character)
    injects upward velocity that kills the floor detection. */
 static void setWallResponse(Character3D *character, const CollisionState *state, bool was_on_floor)
 {
-	KinematicBody *body = &character->body;
+	Vector3 *velocity = &character->movement.velocity;
 
 	if (was_on_floor || character->movement.data.is_grounded) {
 		Vector3 n = state->wall_normal;
@@ -388,15 +403,15 @@ static void setWallResponse(Character3D *character, const CollisionState *state,
 		if (magnitude < 1.0e-6f) return;
 		vector3::scale(&n, 1.0f / magnitude);
 
-		float t = body->velocity.x * n.x + body->velocity.y * n.y;
+		float t = velocity->x * n.x + velocity->y * n.y;
 		if (t < 0.0f) {
-			body->velocity.x -= t * n.x;
-			body->velocity.y -= t * n.y;
+			velocity->x -= t * n.x;
+			velocity->y -= t * n.y;
 		}
 	}
 	else {
-		float t = vector3::dot(&body->velocity, &state->wall_normal);
-		if (t < 0.0f) vector3::addScaledVector(&body->velocity, &state->wall_normal, -t);
+		float t = vector3::dot(velocity, &state->wall_normal);
+		if (t < 0.0f) vector3::addScaledVector(velocity, &state->wall_normal, -t);
 	}
 }
 
@@ -515,15 +530,19 @@ static void probeFloor(const e64::physics::World *world, const Vector3 *center, 
 	}
 }
 
-/* How far the floor is straight below the feet, so the animation can start the
-   landing exactly one clip-to-contact away from it. Negative with nothing
-   within reach. Sensors are skipped: the water is not a floor to land on. */
+/* How far the floor is straight below the capsule's bottom, so the animation
+   can start the landing exactly one clip-to-contact away from it. Negative with
+   nothing within reach. Sensors are skipped: the water is not a floor to land
+   on. */
 static float floorDistance(const Character3D *character, const e64::physics::World *world)
 {
+	const Collider *collider = &character->collider;
 	Vector3 down = { 0.0f, 0.0f, -1.0f };
 
+	/* The ray takes the center and is lowered to the capsule's bottom. */
 	RaycastData ray;
-	raycast::set(&ray, &character->body.position, &down, CHARACTER3D_FALL_PROBE_LENGTH);
+	raycast::set(&ray, &collider->transform.position, &down, CHARACTER3D_FALL_PROBE_LENGTH);
+	ray.start.z -= collider->shape.radius + collider->shape.half_height;
 
 	float distance = -1.0f;
 
@@ -548,8 +567,8 @@ static void findFloor(const Character3D *character, const e64::physics::World *w
 	float radius = character->collider.shape.radius;
 
 	/* Bottom-sphere center, swept down by the snap length. */
-	Vector3 center = character->body.position;
-	center.z += radius - CHARACTER3D_FLOOR_SNAP_LENGTH;
+	Vector3 center = character->collider.transform.position;
+	center.z -= character->collider.shape.half_height + CHARACTER3D_FLOOR_SNAP_LENGTH;
 
 	probeFloor(world, &center, radius, probe);
 }
@@ -564,65 +583,9 @@ static void snapToFloor(Character3D *character, const FloorProbe *floor,
 	if (!floor->found) return;
 
 	float drop = CHARACTER3D_FLOOR_SNAP_LENGTH - floor->penetration / floor->normal.z;
-	if (drop > 0.0f) character->body.position.z -= drop;
+	if (drop > 0.0f) character->collider.transform.position.z -= drop;
 
-	collider::setVertical(&character->collider, &character->body.position);
 	setGroundResponse(character);
-}
-
-/* Ladder probe: the climbable volume the feet are inside, resolved into the
-   frame the climb needs — where to hold on, which way to face, where the
-   bottom is.
-
-   The volume's local Y is the face normal and its local X runs along the
-   rungs, so the hold is the body brought onto the centre plane (local X at
-   zero) and pushed back out to the distance the climb clip grips at. Boxes
-   only — the frame is the point of the volume, and a sphere has no face to
-   climb. */
-static void probeLadder(Character3D *character, const e64::physics::World *world)
-{
-	MovementData *data = &character->movement.data;
-
-	data->on_ladder = false;
-
-	const Vector3 *feet = &character->body.position;
-
-	for (const RigidBody *body = world->body_list; body; body = body->next) {
-		if (!(body->flags & RigidBody::BODY_FLAG_STATIC)) continue;
-
-		for (const e64::physics::Shape *shape = body->shapes; shape; shape = shape->next) {
-			if (shape->sensor != e64::physics::Shape::SENSOR_CLIMBABLE) continue;
-			if (shape->type != e64::physics::Shape::SHAPE_BOX) continue;
-			if (!e64::physics::shape::testPoint(shape, feet)) continue;
-
-			const Transform *tx = &shape->world;
-			Vector3 local = transform::mulVectorTransposed(tx, feet);
-
-			/* Only the -Y face is climbable; the back of a ladder is its
-			   back. Turn the placement 180 to serve the other side. */
-			if (local.y > 0.0f) continue;
-
-			Vector3 hold = { 0.0f, -CHARACTER3D_LADDER_STAND_DISTANCE, local.z };
-			Vector3 anchor = transform::mulVector(tx, &hold);
-
-			/* ex/ey/ez are the local axes in world space, so ey is the face
-			   normal. The heading is built the way the movement reads one off
-			   a velocity, so the conventions cannot drift apart. */
-			Vector3 into = tx->rotation.ey;
-
-			/* The ceiling, for the entry margin to measure down from. Only
-			   yaw ever turns a ladder, so the box's local up is the world's
-			   and its half-height is the whole distance. */
-			Vector3 ceiling = { 0.0f, 0.0f, shape->box.e.z };
-
-			data->on_ladder = true;
-			data->ladder_anchor_x = anchor.x;
-			data->ladder_anchor_y = anchor.y;
-			data->ladder_yaw = rad_to_deg(atan2f(-into.x, -into.y));
-			data->ladder_top = transform::mulVector(tx, &ceiling).z;
-			return;
-		}
-	}
 }
 
 /* Water probe: fraction of the capsule under the surface, from the world's
@@ -632,23 +595,28 @@ static void probeLadder(Character3D *character, const e64::physics::World *world
 static void probeWater(Character3D *character, const e64::physics::World *world)
 {
 	MovementData *data = &character->movement.data;
+	const Collider *collider = &character->collider;
 
 	data->in_water = false;
 	data->submerged_fraction = 0.0f;
 
-	Vector3 feet = character->body.position;
+	float height = 2.0f * (collider->shape.half_height + collider->shape.radius);
+
+	/* The volume is tested at the capsule's bottom, so the water counts from
+	   the first contact. */
+	Vector3 bottom = collider->transform.position;
+	bottom.z -= 0.5f * height;
 
 	for (int32_t i = 0; i < world->buoyancy_count; i++) {
 		const buoyancy::Volume *volume = world->buoyancy[i];
 
 		for (const e64::physics::Shape *shape = volume->body->shapes; shape; shape = shape->next) {
 			if (!shape->sensor) continue;
-			if (!e64::physics::shape::testPoint(shape, &feet)) continue;
+			if (!e64::physics::shape::testPoint(shape, &bottom)) continue;
 
-			float surface = volume->surface_height(volume->surface, feet.x, feet.y);
-			float height = 2.0f * (character->collider.shape.half_height + character->collider.shape.radius);
+			float surface = volume->surface_height(volume->surface, bottom.x, bottom.y);
 
-			float fraction = (surface - feet.z) / height;
+			float fraction = (surface - bottom.z) / height;
 			if (fraction <= 0.0f) continue;
 
 			data->in_water = true;
@@ -660,28 +628,14 @@ static void probeWater(Character3D *character, const e64::physics::World *world)
 
 void collide(Character3D *character, const e64::physics::World *world)
 {
-	MovementData *data = &character->movement.data;
+	Movement *movement = &character->movement;
+	MovementData *data = &movement->data;
 
 	bool was_on_floor = data->is_grounded;
-	bool velocity_facing_up = character->body.velocity.z > 0.0f;
+	bool velocity_facing_up = movement->velocity.z > 0.0f;
 	data->is_grounded = 0;
 
-	collider::setVertical(&character->collider, &character->body.position);
-
 	probeWater(character, world);
-	probeLadder(character, world);
-
-	/* Climbing owns the body: the hands grip closer than the capsule radius,
-	   so a recovery pass would shove it off the rungs it is holding, and a
-	   floor snap would stand it on the first one it passes. The climb state
-	   is bounded by its own volume instead.
-
-	   The one thing still worth measuring is how far the ground is, which is
-	   what tells a descent it has arrived. */
-	if (character->movement.current == MOVEMENT_STATE_CLIMBING) {
-		data->floor_distance = floorDistance(character, world);
-		return;
-	}
 
 	CollisionState state = { .wall_depth = -1.0f };
 	recover(character, world, &state);
@@ -698,18 +652,14 @@ void collide(Character3D *character, const e64::physics::World *world)
 	   alone puts the character back on the ground the next frame, one frame at a
 	   time, forever.
 
-	   Only locomotion falls: a roll runs to the end of its own clip, ground
-	   under it or not. A crouch under way holds it too — the ledge ran out
-	   mid-charge and the jump is not lost for it, so the body coasts in
-	   locomotion until the crouch launches it. */
+	   Only the ground modes fall: swimming and climbing have their own exits. */
 	if (!floor.found && !data->is_grounded
-	 && movement::isLocomotion(character->movement.current)
-	 && !movement::isChargingJump(character))
-		movement::setMode(&character->movement, MOVEMENT_STATE_FALLING);
+	 && (movement->mode == MOVEMENT_STATE_IDLE || movement->mode == MOVEMENT_STATE_WALK))
+		movement->setMode(MOVEMENT_STATE_FALL);
 
 	/* Only worth measuring off the ground, and only on the way down: it feeds
 	   the landing, and a rising body has nothing to time yet. */
-	data->floor_distance = (!data->is_grounded && character->body.velocity.z < 0.0f)
+	data->floor_distance = (!data->is_grounded && movement->velocity.z < 0.0f)
 		? floorDistance(character, world)
 		: -1.0f;
 }

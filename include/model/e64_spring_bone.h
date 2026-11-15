@@ -6,8 +6,8 @@
 	it. A set listed root to tip simulates as a chain: each joint reads the
 	pose the previous one already wrote.
 */
-#ifndef ENGINE64_CHARACTER3D_SPRING_BONE_H
-#define ENGINE64_CHARACTER3D_SPRING_BONE_H
+#ifndef ENGINE64_SPRING_BONE_H
+#define ENGINE64_SPRING_BONE_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -16,6 +16,7 @@
 #include "math/e64_vector3.h"
 #include "math/e64_matrix3.h"
 #include "math/e64_quaternion.h"
+#include "math/e64_transform.h"
 #include "render/e64_render.h"
 
 namespace e64 {
@@ -92,7 +93,7 @@ typedef struct {
 	Quaternion current_rot; /* last from-to rotation, the degenerate fallback */
 
 	const SpringBonesDef *def;
-	const Render::Transform *world; /* the center */
+	const Transform *world; /* the center: the owner's transform, metres */
 	int16_t bone;
 	float radius; /* render units */
 	bool primed;
@@ -122,7 +123,7 @@ uint8_t springBones_resolveChain(const T3DSkeleton *skeleton, const SpringBonesD
                                  int16_t *joints, uint8_t max);
 
 bool springBone_init(SpringBone *spring_bone, const T3DSkeleton *skeleton, int16_t bone,
-                     uint8_t joint_index, const SpringBonesDef *def, const Render::Transform *world);
+                     uint8_t joint_index, const SpringBonesDef *def, const Transform *world);
 
 /* skeleton::Modifiers::Fn; context is the SpringBone */
 void springBone_apply(T3DSkeleton *skeleton, void *context);

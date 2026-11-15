@@ -1,8 +1,9 @@
 /*
-	The 2D character: the movement moves it, the animation picks its frame,
-	and this hands the frame to the scene entity. The position moves at the
-	game's rate and is snapped to whole pixels only when set on the entity,
-	so the sprite never lands on a half pixel.
+	The 2D character: the movement moves it and this hands the body to the
+	scene entity. Which clip the sprite plays is the game's to pick, on the
+	entity's sprite animation. The position moves at the game's rate and is
+	snapped to whole pixels only when set on the entity, so the sprite never
+	lands on a half pixel.
 */
 #include <assert.h>
 #include <malloc.h>
@@ -15,20 +16,14 @@ namespace e64 {
 
 namespace character2d {
 
-/* Hands the scene entity the current frame: its sprite, the flip, and the
-   feet position carried to the top-left corner the blit draws from. */
+/* Hands the scene entity the body: the flip, and the feet position carried
+   to the top-left corner the blit draws from. The sprite drawn is whatever
+   the entity holds, the frame the scene's animation pass left there. */
 static void setEntity(Character2D *character)
 {
 	Entity2D *entity = character->entity;
 	Sprite *sprite = &entity->graphic->sprite;
 
-	/* Without animations the entity keeps its own sprite. */
-	if (character->animation.def) {
-		sprite->asset = e64::sprite::animation::getSprite(character->animation.sprite);
-		sprite->cols = 0;
-		sprite->rows = 0;
-		sprite->frame = 0;
-	}
 	/* The frames are drawn facing left, so the mirror is the right side. */
 	sprite->flip_x = !character->facing_left;
 
@@ -63,11 +58,6 @@ Character2D *create(const Def *def, Entity2D *entity)
 		.movement = (Movement){ .settings = def->movement_settings, .data = { .is_grounded = true }, .current = MOVEMENT2D_STATE_IDLE },
 	};
 
-	/* A def without animations (a fixed body) skips them: the entity keeps
-	   the sprite it was placed with. */
-	if (def->animation_def)
-		animation::init(character, def->animation_def);
-
 	setEntity(character);
 	return character;
 }
@@ -79,9 +69,6 @@ void destroy(Character2D *character)
 
 void update(Character2D *character, float dt)
 {
-	if (character->animation.def)
-		animation::update(character, dt);
-
 	setEntity(character);
 }
 

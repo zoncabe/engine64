@@ -3,13 +3,14 @@
 
 #include <libdragon.h>
 #include <t3d/t3d.h>
-#include "camera/e64_camera3d.h"
-#include "math/e64_vector3.h"
+#include "math/e64_vector2.h"
 
 namespace e64 {
 
-struct Scene3D;
+class Camera3D;
 
+/* The screen and the 3D view over it. One instance, reached through
+   viewport::get: the display is one, so the viewport is one. */
 class Viewport {
 
 public:
@@ -50,12 +51,53 @@ public:
 	};
 
 	T3DViewport t3d_viewport;
-	Camera camera;
 	int fb_index;
 
 	/* The mode in force, so a settings change can apply itself again over
 	   the same screen. */
 	ModeDef mode;
+
+	/* Opens no screen and brings up no 3D: those are asked for. */
+	void init();
+
+	/* Changes the screen with the game running. The display is torn down and
+	   built again, so this belongs at a state change and never inside a frame.
+	   Called with the mode already in force, it does nothing. */
+	void setMode(const ModeDef *mode);
+
+	/* Applies the player's choices over the screen already set: for whoever
+	   closes the settings menu. */
+	void refreshMode();
+
+	/* The 3D pipeline, up only while a 3D scene is loaded: a 2D game never pays
+	   for it. Opening it sizes the view against the screen in force, so the
+	   mode is set first. */
+	bool has3D() const;
+	void open3D();
+	void close3D();
+
+	/* What one world pixel measures on the screen in force, for whoever places
+	   or draws in world pixels. */
+	Vector2 getScale() const;
+
+	/* The frame: the buffers drawn into, the paint that starts them, and the
+	   handover that shows the result. */
+	void attach();
+	void clear(color_t color);
+	void detach();
+
+	/* The projection is the game's call, so it picks one and keeps it fed. The
+	   camera is the scene's: the viewport only projects what it is handed. */
+	void setPerspective3D(const Camera3D *camera);
+	void setIsometric3D(const Camera3D *camera);
+
+private:
+
+	/* A width of zero is a viewport nobody gave a screen yet. */
+	bool hasScreen() const;
+
+	/* Opens the screen asked for with the player's choices laid over it. */
+	void applyMode();
 
 };
 
@@ -84,41 +126,6 @@ inline const Viewport::ModeDef SCREEN_640x480_DEF = { .width = 640, .height = 48
 namespace viewport {
 
 Viewport *get(void);
-
-/* Opens no screen and brings up no 3D: those are asked for. */
-void init(void);
-
-/* Changes the screen with the game running. The display is torn down and
-   built again, so this belongs at a state change and never inside a frame.
-   Called with the mode already in force, it does nothing. */
-void setMode(const Viewport::ModeDef *mode);
-
-/* Applies the player's choices over the screen already set: for whoever
-   closes the settings menu. */
-void refreshMode(void);
-
-/* The 3D pipeline, up only while a 3D scene is loaded: a 2D game never pays
-   for it. Opening it sizes the view against the screen in force, so the
-   mode is set first. */
-bool has3D(void);
-void open3D(void);
-void close3D(void);
-
-/* What one world pixel measures on the screen in force, for whoever places
-   or draws in world pixels. */
-Vector2 getScale(void);
-
-/* The frame: the buffers drawn into, the paint that starts them, and the
-   handover that shows the result. */
-void attach(void);
-void clear(color_t color);
-void detach(void);
-
-void updateCamera(Vector3 *center, const Scene3D *scene);
-
-/* The projection is the game's call, so it picks one and keeps it fed. */
-void setPerspectiveCamera(void);
-void setIsometricCamera(void);
 
 }
 

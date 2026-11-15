@@ -37,6 +37,17 @@ public:
 	bool is_hidden;
 };
 
+
+namespace graphic {
+
+/* The definition names the file or the clips; the live copy gets them loaded.
+   An animated sprite starts on the first frame of its first clip. destroy
+   closes them and frees the copy. */
+Graphic *create(const Graphic *def);
+void destroy(Graphic *graphic);
+
+}
+
 }
 
 #endif

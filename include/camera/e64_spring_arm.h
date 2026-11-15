@@ -1,105 +1,53 @@
 #ifndef ENGINE64_SPRING_ARM_H
 #define ENGINE64_SPRING_ARM_H
 
-#include <stdint.h>
-#include "math/e64_vector2.h"
 #include "math/e64_vector3.h"
-#include "math/e64_math.h"
+#include "camera/e64_camera3d.h"
 
 namespace e64 {
 
-typedef struct Camera Camera;
-
-/* Hard zoom-out ceiling, in metres like the rest of a scene. The near inherits
-   it, and inside it the fixed-point projection never leaves its envelope. */
-#define SPRING_ARM_MAX_LENGTH 120.0f
-
-/* Zoom-in floor. At zero the camera lands on the point it is watching, the
-   view direction comes out a null vector, and normalising that poisons every
-   number downstream. Small enough to be no limit at all in a scene built in
-   metres, and still far from where a float starts losing the direction. */
-#define SPRING_ARM_MIN_LENGTH 0.1f
+/* Absolute zoom-in floor, below any minimum the game picks. At zero the
+   camera lands on the point it is watching, the view direction comes out a
+   null vector, and normalising that poisons every number downstream. */
+#define E64_SPRING_ARM_MIN_LENGTH 0.1f
 
 
-namespace camera3d {
+/* The rail: a camera held at a distance behind a pivot, on a yaw and a
+   pitch around it. Writes the camera's position, target and up once per
+   update. No smoothing and no input live here; the game writes the pose
+   it wants and eases it beforehand if it wants a gradual change. */
+class SpringArm {
+public:
 
-typedef struct SpringArmSettings {
-
-	Vector2 response_rate;
-	Vector2 max_velocity;
-	Vector2 direction;
-
-	float zoom_response_rate;
-
-	float distance_speed;
-	float fov_speed;
-
-	float max_pitch;
-	float min_pitch;
-
-	/* What the aim adds to whatever the player has the arm set to, so the free
-	   distance and lens are never overwritten: negative pulls the arm in and
-	   narrows the view. The swing is the one that scales instead of adding. */
-	float aim_arm_length;
-	float aim_side_offset;
-	float aim_field_of_view;
-	float aim_velocity_scale;
-
-} SpringArmSettings;
-
-
-/* Where the arm is right now: seeded from the def, moved by the engine. */
-typedef struct SpringArmData {
-
-	/* What the arm is asked for and where it actually is. The stick writes the
-	   target, the aim adds its offset on top, and the arm chases the sum: the
-	   free distance survives an aim because nothing ever writes over it. */
-	float target_arm_length;
-	float arm_length;
-
-	float target_side_offset;
+	/* Shoulder shift along the camera's right, and pivot lift above the
+	   center it is handed. */
 	float side_offset;
-
-	float yaw;
-	float pitch;
-
 	float height_offset;
 
-	Vector2 velocity;
-	Vector2 target_velocity;
+	/* Degrees. Positive looks down on the pivot. */
+	float pitch;
 
-} SpringArmData;
+	/* Zoom range the game allows; the floor above still applies under it. */
+	float min_length;
+	float max_length;
 
+	SpringArm();
 
-typedef struct SpringArmDef {
+	/* Clamped to the zoom range. */
+	void setLength(float length);
+	float getLength() const;
+
+	/* Wrapped to -180..180 so it never grows without bound. Degrees. */
+	void setYaw(float yaw);
+	float getYaw() const;
+
+	void update(Camera3D *camera, const Vector3 *center) const;
+
+private:
 
 	float arm_length;
-	float side_offset;
-
 	float yaw;
-	float pitch;
-	float height_offset;
-
-	SpringArmSettings settings;
-
-} SpringArmDef;
-
-
-namespace springArm {
-
-void init(Camera *camera, const SpringArmDef *def);
-void update(Camera *camera, Vector3 *center, float dt);
-
-/* The arm's two control-driven angles, in degrees. Both answer zero on a
-   camera that is not an arm, which is what a caller that needs them reads as
-   nothing to do. */
-float getPitch(const Camera *camera);
-float getYaw(const Camera *camera);
-float getLength(const Camera *camera);
-
-}
-
-}
+};
 
 }
 

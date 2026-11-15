@@ -1,105 +1,68 @@
-#include <math.h>
 #include <fmath.h>
 
 #include "math/e64_math.h"
-#include "camera/e64_camera3d.h"
 #include "camera/e64_spring_arm.h"
 
 namespace e64 {
 
-namespace camera3d {
-namespace springArm {
-
-float getPitch(const Camera *camera)
+SpringArm::SpringArm()
+	: side_offset(0.0f),
+	  height_offset(0.0f),
+	  pitch(0.0f),
+	  min_length(E64_SPRING_ARM_MIN_LENGTH),
+	  max_length(100.0f),
+	  arm_length(5.0f),
+	  yaw(0.0f)
 {
-	if (camera->type != CAMERA_TYPE_SPRING_ARM) return 0.0f;
-	return camera->spring_arm.data.pitch;
 }
 
-float getYaw(const Camera *camera)
+void SpringArm::setLength(float length)
 {
-	if (camera->type != CAMERA_TYPE_SPRING_ARM) return 0.0f;
-	return camera->spring_arm.data.yaw;
+	float floor = min_length > E64_SPRING_ARM_MIN_LENGTH
+	            ? min_length : E64_SPRING_ARM_MIN_LENGTH;
+
+	arm_length = clampf(length, floor, max_length);
 }
 
-float getLength(const Camera *camera)
+float SpringArm::getLength() const
 {
-	if (camera->type != CAMERA_TYPE_SPRING_ARM) return 0.0f;
-	return camera->spring_arm.data.arm_length;
+	return arm_length;
 }
 
-
-static void setVelocity(Camera *camera, float dt)
+void SpringArm::setYaw(float angle)
 {
-	SpringArmData *data = &camera->spring_arm.data;
-	const SpringArmSettings *settings = &camera->spring_arm.settings;
-
-	float factor_x = fm_expf(-settings->response_rate.x * dt);
-	float factor_y = fm_expf(-settings->response_rate.y * dt);
-	data->velocity.x = data->velocity.x * factor_x + data->target_velocity.x * (1.0f - factor_x);
-	data->velocity.y = data->velocity.y * factor_y + data->target_velocity.y * (1.0f - factor_y);
+	yaw = angle_wrap(angle);
 }
 
-
-static void setPosition(Camera *camera, Vector3 *center, float dt)
+float SpringArm::getYaw() const
 {
-	SpringArmData *data = &camera->spring_arm.data;
-	const SpringArmSettings *settings = &camera->spring_arm.settings;
+	return yaw;
+}
 
-	data->pitch += data->velocity.y * dt;
-	data->yaw += data->velocity.x * dt;
-
-	data->yaw = angle_wrap(data->yaw);
-
-	if (data->pitch > settings->max_pitch) data->pitch = settings->max_pitch;
-	if (data->pitch < settings->min_pitch) data->pitch = settings->min_pitch;
-
-	float yaw = deg_to_rad(data->yaw);
-	float pitch = deg_to_rad(data->pitch);
+void SpringArm::update(Camera3D *camera, const Vector3 *center) const
+{
+	float yaw_rad = deg_to_rad(yaw);
+	float pitch_rad = deg_to_rad(pitch);
 
 	float sin_yaw, cos_yaw, sin_pitch, cos_pitch;
-	fm_sincosf(yaw, &sin_yaw, &cos_yaw);
-	fm_sincosf(pitch, &sin_pitch, &cos_pitch);
+	fm_sincosf(yaw_rad, &sin_yaw, &cos_yaw);
+	fm_sincosf(pitch_rad, &sin_pitch, &cos_pitch);
 
 	/* forward points from the camera toward the pivot; right is its horizontal perpendicular */
 	Vector3 forward = { cos_pitch * sin_yaw, cos_pitch * cos_yaw, -sin_pitch };
 	Vector3 right = { cos_yaw, -sin_yaw, 0.0f };
 
-	Vector3 pivot = { center->x, center->y, center->z + data->height_offset };
+	Vector3 pivot = { center->x, center->y, center->z + height_offset };
 
-	camera->position.x = pivot.x - forward.x * data->arm_length + right.x * data->side_offset;
-	camera->position.y = pivot.y - forward.y * data->arm_length + right.y * data->side_offset;
-	camera->position.z = pivot.z - forward.z * data->arm_length;
+	camera->position.x = pivot.x - forward.x * arm_length + right.x * side_offset;
+	camera->position.y = pivot.y - forward.y * arm_length + right.y * side_offset;
+	camera->position.z = pivot.z - forward.z * arm_length;
 
-	camera->target.x = pivot.x + right.x * data->side_offset;
-	camera->target.y = pivot.y + right.y * data->side_offset;
+	camera->target.x = pivot.x + right.x * side_offset;
+	camera->target.y = pivot.y + right.y * side_offset;
 	camera->target.z = pivot.z;
-}
 
-
-void init(Camera *camera, const SpringArmDef *def)
-{
-	camera->type = CAMERA_TYPE_SPRING_ARM;
-	camera->spring_arm.settings = def->settings;
-	camera->spring_arm.data = (SpringArmData){
-		.target_arm_length = def->arm_length,
-		.arm_length = def->arm_length,
-		.target_side_offset = def->side_offset,
-		.side_offset = def->side_offset,
-		.yaw = def->yaw,
-		.pitch = def->pitch,
-		.height_offset = def->height_offset,
-	};
-}
-
-
-void update(Camera *camera, Vector3 *center, float dt)
-{
-	setVelocity(camera, dt);
-	setPosition(camera, center, dt);
-}
-
-}
+	camera->up = vector3::create(0.0f, 0.0f, 1.0f);
 }
 
 }

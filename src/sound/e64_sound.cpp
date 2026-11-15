@@ -4,8 +4,7 @@
 #include "sound/e64_sound.h"
 #include "resource/e64_resource.h"
 #include "time/e64_time.h"
-#include "player/e64_player.h"
-#include "viewport/e64_viewport.h"
+#include "scene3d/e64_scene3d.h"
 
 namespace e64 {
 
@@ -334,27 +333,28 @@ void poll(void)
 }
 
 
-static Sound::ListenerMode listener_mode = Sound::LISTENER_PLAYER;
+/* NULL: the ear is on the camera. */
+static const Vector3 *listener_override = NULL;
 
-void setListenerMode(Sound::ListenerMode mode)
+void setListenerOverride(const Vector3 *position)
 {
-	listener_mode = mode;
+	listener_override = position;
 }
 
-/* The ear rides the driven body or the camera, as the game chose. With
-   nobody possessed (menus, cutscenes) the body falls back to the camera.
-   The right vector is always the camera's: panning follows what the screen
-   shows. */
+void clearListenerOverride(void)
+{
+	listener_override = NULL;
+}
+
+/* The ear on the override or on the scene's camera. The right vector is
+   always the camera's: panning follows what the screen shows. */
 static void updateListener(void)
 {
-	const Player *player = player::get();
-	const Viewport *viewport = viewport::get();
+	const Camera3D *camera = &scene3d::get()->camera;
 
-	bool on_player = listener_mode == Sound::LISTENER_PLAYER && player[0].entity;
-
-	Vector3 ear = on_player ? player[0].entity->transform.position
-	                        : viewport->camera.position;
-	Vector3 right = camera3d::getRight(&viewport->camera);
+	Vector3 ear = listener_override ? *listener_override
+	                                : camera->position;
+	Vector3 right = camera->getRight();
 
 	setListener(&ear, &right);
 }

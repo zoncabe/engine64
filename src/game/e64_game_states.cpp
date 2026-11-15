@@ -11,14 +11,10 @@
 #include "scene2d/e64_scene2d.h"
 #include "model/e64_mesh_deform.h"
 #include "player/e64_player.h"
-#include "player/e64_player_control.h"
-#include "controller/e64_controls.h"
 #include "viewport/e64_viewport.h"
 #include "physics3d/e64_physics.h"
-#include "sound/e64_prop_sound.h"
 #include "shaders/e64_water.h"
 #include "particles/e64_particles.h"
-#include "camera/e64_camera3d_control.h"
 #include "game/e64_game.h"
 #include "game/e64_game_states.h"
 
@@ -40,13 +36,13 @@ static void load(Game::State::ID id)
 {
 	const Game::State::Def *def = get(id);
 
-	/* The screen first: the scenes below place cameras against it. */
-	if (def->viewport) viewport::setMode(def->viewport);
+	/* The screen first: the scenes below size their views against it. */
+	if (def->viewport) viewport::get()->setMode(def->viewport);
 
-	/* The scenes take the state's controls: each seats the players and
-	   points the camera as it builds what the bindings name. */
-	if (def->scene3d) scene3d::load(def->scene3d, def->controls);
-	if (def->scene2d) scene2d::load(def->scene2d, def->controls);
+	/* The scenes build their entities and seat nobody: the state's onEnter
+	   below seats the players and places the camera, with the scenes up. */
+	if (def->scene3d) scene3d::get()->load(def->scene3d);
+	if (def->scene2d) scene2d::load(def->scene2d);
 	if (def->ui) ui::load(def->ui);
 
 	if (def->onEnter) def->onEnter();
@@ -62,7 +58,7 @@ static void unload(Game::State::ID id)
 	if (def->scene2d || def->scene3d) player::init();
 	if (def->ui) ui::unload();
 	if (def->scene2d) scene2d::unload();
-	if (def->scene3d) scene3d::unload();
+	if (def->scene3d) scene3d::get()->unload();
 }
 
 static bool isOverlay(const Game::State::Def *def)
@@ -152,9 +148,10 @@ void start(const Game::State::Def *table, uint8_t count, Game::State::ID initial
 	time::reset();
 }
 
-/* The frame of the scenes the state declares: the seats drive their bodies,
-   the world advances, the cameras follow. A state that declares none plays
-   nothing here. */
+/* The frame of the scenes the state declares: the seats drive their bodies
+   on the commands the state's control wrote, the world advances, and the
+   camera the state posed is handed to the projection. A state that declares
+   none plays nothing here. */
 static void step(const Game::State::Def *def)
 {
 	Viewport *viewport = viewport::get();
@@ -163,31 +160,21 @@ static void step(const Game::State::Def *def)
 	uint8_t fb_index = viewport->fb_index;
 
 	if (def->scene3d) {
-		for (int i = 0; i < PLAYER_COUNT; i++)
-			player::setCharacter3DControl((PlayerID)i, viewport);
 		player::update();
 
-		physics::World *world = scene3d::getPhysics();
-
-		physics::update(world, delta);
-		propSound::update(world);
+		physics::update(&scene->physics, delta);
 		water::update(delta);
 		mesh::deform::update(scene->entity, scene->entity_count, fb_index);
 
-		scene3d::updateCharacters(fb_index);
-		scene3d::updateEntities(fb_index);
+		scene->updateCharacters(fb_index);
+		scene->updateEntities(fb_index);
 
 		particles::update(fb_index);
 
-		if (viewport->camera.binding)
-			camera3d::control::update(&viewport->camera, viewport->camera.binding,
-			                          scene, delta);
-		viewport::setPerspectiveCamera();
+		viewport->setPerspective3D(&scene->camera);
 	}
 
 	if (def->scene2d) {
-		for (int i = 0; i < PLAYER_COUNT; i++)
-			player::setCharacter2DControl((PlayerID)i);
 		if (!def->scene3d) player::update();
 
 		scene2d::updateAnimations(delta);

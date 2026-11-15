@@ -1,7 +1,6 @@
 #include <assert.h>
 #include <math.h>
 #include <malloc.h>
-#include <stdio.h>
 #include <libdragon.h>
 
 #include "viewport/e64_viewport.h"
@@ -85,7 +84,7 @@ void blendLayers(const Animation::Buffer *stack, const T3DSkeleton *main)
 }
 
 
-/* --- clip cache ------------------------------------------------------------- */
+/* --- clips ------------------------------------------------------------------ */
 
 T3DSkeleton *clipBuffer(Animation *animation, uint8_t clip)
 {
@@ -93,87 +92,9 @@ T3DSkeleton *clipBuffer(Animation *animation, uint8_t clip)
 	return (buffer == Animation::SLOT_MAIN) ? &animation->main : &animation->buffer[buffer];
 }
 
-/* A closed clip is animRef NULL, the one field getClip tests: the rest of the
-   slot is rewritten whole by t3d_anim_create when the clip reopens. */
-static void closeClip(Animation *animation, uint8_t index)
-{
-	t3d_anim_destroy(&animation->clip[index]);
-	animation->clip[index].animRef = NULL;
-
-	/* RAM-resident keyframes: destroy already closed the memory stream. */
-	if (animation->clip_data[index]) {
-		free(animation->clip_data[index]);
-		animation->clip_data[index] = NULL;
-	}
-}
-
-static void openClip(Animation *animation, uint8_t index)
-{
-	T3DAnim *clip = &animation->clip[index];
-	const Animation::ClipDef *clip_def = &animation->def->clip[index];
-
-	*clip = t3d_anim_create(animation->model, clip_def->name);
-
-	/* RAM-resident keyframes: load the whole .sdata once and swap the clip's
-	   stream for a memory one. t3d keeps fread()ing as always, just without
-	   the cartridge DMA underneath; rewinds on loop become free. Remove this
-	   block (and the frees in closeClip / destroy) to fall back to cartridge
-	   streaming. */
-	{
-		int size = 0;
-		void *data = asset_load(clip->animRef->filePath, &size);
-		FILE *mem = data ? fmemopen(data, (size_t)size, "rb") : NULL;
-		if (mem) {
-			long pos = ftell(clip->file);
-			fclose(clip->file);
-			fseek(mem, pos, SEEK_SET);
-			clip->file = mem;
-			animation->clip_data[index] = data;
-		} else if (data) {
-			free(data);
-		}
-	}
-
-	t3d_anim_attach(clip, clipBuffer(animation, index));
-	t3d_anim_set_looping(clip, clip_def->is_looping);
-	t3d_anim_set_playing(clip, clip_def->is_looping);
-}
-
 T3DAnim *getClip(Animation *animation, uint8_t index)
 {
-	T3DAnim *clip = &animation->clip[index];
-	animation->clip_cooldown[index] = 0;
-	if (clip->animRef != NULL) return clip;
-
-	/* At the cap, evict the least recently touched clip. Clips touched this
-	   frame have cooldown 0 and are never evicted: live pointers stay valid. */
-	int open = 0;
-	int evict = -1;
-	for (int i = 0; i < animation->def->clip_count; i++) {
-		if (animation->clip[i].animRef == NULL) continue;
-		open++;
-		if (evict < 0 || animation->clip_cooldown[i] > animation->clip_cooldown[evict]) evict = i;
-	}
-	if (open >= Animation::CLIP_MAX_OPEN && evict >= 0 && animation->clip_cooldown[evict] > 0)
-		closeClip(animation, (uint8_t)evict);
-
-	openClip(animation, index);
-
-	return clip;
-}
-
-void closeIdleClips(Animation *animation)
-{
-	for (int i = 0; i < animation->def->clip_count; i++) {
-		if (animation->clip[i].animRef == NULL) continue;
-
-		if (animation->clip_cooldown[i] < Animation::CLIP_CLOSE_DELAY) {
-			animation->clip_cooldown[i]++;
-			continue;
-		}
-
-		closeClip(animation, (uint8_t)i);
-	}
+	return &animation->clip[index];
 }
 
 
@@ -483,9 +404,6 @@ void evaluate(Animation *animation, float delta)
 
 /* --- lifecycle -------------------------------------------------------------- */
 
-/* Only the fields that are read before being written get a value: a closed
-   clip is animRef NULL, everything else in the slot is written by
-   t3d_anim_create when it opens. */
 void init(Animation *animation, const Animation::Def *def, const T3DModel *model)
 {
 	animation->def = def;
@@ -519,14 +437,14 @@ void init(Animation *animation, const Animation::Def *def, const T3DModel *model
 
 	animation->clip = (T3DAnim *)malloc(def->clip_count * sizeof(T3DAnim));
 	assert(animation->clip);
-	animation->clip_cooldown = (uint8_t *)malloc(def->clip_count * sizeof(uint8_t));
-	assert(animation->clip_cooldown);
-	animation->clip_data = (void **)malloc(def->clip_count * sizeof(void *));
-	assert(animation->clip_data);
 	for (int i = 0; i < def->clip_count; i++) {
-		animation->clip[i].animRef = NULL;
-		animation->clip_cooldown[i] = 0;
-		animation->clip_data[i] = NULL;
+		T3DAnim *clip = &animation->clip[i];
+		const Animation::ClipDef *clip_def = &def->clip[i];
+
+		*clip = t3d_anim_create(model, clip_def->name);
+		t3d_anim_attach(clip, clipBuffer(animation, i));
+		t3d_anim_set_looping(clip, clip_def->is_looping);
+		t3d_anim_set_playing(clip, clip_def->is_looping);
 	}
 }
 
@@ -535,17 +453,13 @@ void destroy(Animation *animation)
 	const Animation::Def *def = animation->def;
 	if (!def) return;
 
-	for (int i = 0; i < def->clip_count; i++) {
-		if (animation->clip[i].animRef) t3d_anim_destroy(&animation->clip[i]);
-		if (animation->clip_data[i]) free(animation->clip_data[i]);
-	}
+	for (int i = 0; i < def->clip_count; i++)
+		t3d_anim_destroy(&animation->clip[i]);
 	for (int i = 0; i < def->buffer_count; i++)
 		t3d_skeleton_destroy(&animation->buffer[i]);
 	t3d_skeleton_destroy(&animation->main);
 
 	free(animation->clip);
-	free(animation->clip_data);
-	free(animation->clip_cooldown);
 	free(animation->buffer);
 	free(animation->node_state);
 	free(animation->node_active);

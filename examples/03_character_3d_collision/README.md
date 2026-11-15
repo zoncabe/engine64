@@ -24,7 +24,7 @@ The engine brings no movement of its own. What the body does is the `CharacterDe
 
 Its body is kinematic. The solver never moves it: it moves itself, then walks out of whatever it ended up inside, classifies each contact as floor, wall or ceiling, and answers the volumes it is standing in. That whole step is one call, `scene3d_updateCharacters`, and it is the only physics this example runs.
 
-The jump is `JUMP_SNAP`: the body leaves the floor on the press, and while A stays down the rise pays less gravity. Tapping it is a short hop, holding it all the way is the full one. The other mode, `JUMP_CHARGE`, crouches first and launches with what it gathered; the settings for it are in the same file, unused.
+The body leaves the floor on the press, and while A stays down the rise pays less gravity. Tapping it is a short hop, holding it all the way is the full one.
 
 The ladder is asked for with the stick, never a button. Walking at the rungs grabs them, up and down climbs and descends, and A lets go. Both are read against the ladder's own facing, so the camera never changes what a push means.
 

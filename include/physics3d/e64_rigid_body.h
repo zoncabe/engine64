@@ -175,7 +175,9 @@ float getAngularDamping(const RigidBody *b);
 
 void setTransformPosition (RigidBody *b, Vector3 position);
 void setTransformPositionAxisAngle(RigidBody *b, Vector3 position, Vector3 axis, float angle);
-void setTransformPositionYaw (RigidBody *b, Vector3 position, float yaw); /* radians, about Z */
+/* rotation and q are the same rotation, matrix and quaternion: the caller
+   already has both, so neither is derived here. */
+void setTransformPositionRotation (RigidBody *b, Vector3 position, const Matrix3 *rotation, const Quaternion *q);
 
 float getMass (const RigidBody *b);
 float getInvMass(const RigidBody *b);

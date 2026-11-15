@@ -63,17 +63,6 @@ public:
 
 	};
 
-	/* Where sound::update puts the ear each frame. On the player, the sound
-	   sticks to the driven body while the camera floats on its arm; on the
-	   camera, what is heard is what is seen from. Panning always follows
-	   the camera. Default: the player. */
-	enum ListenerMode {
-
-		LISTENER_PLAYER,
-		LISTENER_CAMERA,
-
-	};
-
 	const Def *def;
 	wav64_t *wave;
 
@@ -95,7 +84,15 @@ void unload(Sound *sound);
 /* Where the world is heard from. Position decides attenuation, right decides
    panning: the caller is free to take them from different places. */
 void setListener(const Vector3 *position, const Vector3 *right);
-void setListenerMode(Sound::ListenerMode mode);
+
+/* sound::update puts the ear on the camera each frame, unless an override
+   points it at another position, as Unreal's SetAudioListenerOverride does:
+   the sound sticks to a body while the camera floats on its arm. Panning
+   always follows the camera. The position is read every frame, so it has to
+   outlive the override: whoever sets it clears it before that memory goes
+   away. */
+void setListenerOverride(const Vector3 *position);
+void clearListenerOverride(void);
 
 /* Runs from the game loop, in every state: the mixer has to be polled whether
    or not a scene is loaded. */

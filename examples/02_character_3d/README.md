@@ -12,7 +12,7 @@ Its body is kinematic. Nothing in the solver moves it: it moves itself, then res
 
 One gait is declared, which is the proportional locomotion case: speed follows stick displacement. Declaring a second gait switches locomotion to target speeds, where the stick selects a gait by crossing its threshold.
 
-Jump mode is `JUMP_SNAP`: the body leaves the floor on the press, and while A stays down the rise pays less gravity, so a tap and a held press reach different heights. `JUMP_CHARGE` is the other mode, crouching first and launching on release.
+The body leaves the floor on the press, and while A stays down the rise pays less gravity, so a tap and a held press reach different heights.
 
 ### Collision
 

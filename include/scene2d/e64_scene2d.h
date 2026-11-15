@@ -10,8 +10,6 @@
 
 namespace e64 {
 
-namespace controls { struct Def; }
-
 namespace scene2d {
 
 constexpr int MAX_LAYER = 8;
@@ -93,10 +91,9 @@ namespace scene2d {
 
 Scene2D *get(void);
 
-/* The controls are the state's. A character built from a prefab its binding
-   names is seated on that binding's player as it is created. NULL drives
-   nothing. */
-void load(const Def *def, const controls::Def *controls);
+/* Builds the layers' entities in placement order. Nobody is seated: the game
+   seats its players once the scene is up, from its onEnter. */
+void load(const Def *def);
 void unload(void);
 
 /* Advances every animated sprite at the rate its owner set and hands the

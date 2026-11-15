@@ -15,14 +15,14 @@ static const e64::character3d::ColliderSettings collider = {
 	.height = 1.80f,
 };
 
-/* Gaits run slowest to fastest. Three of them: the stick alone picks the
-   middle one and sprint reaches the top, which is the one that tires the
-   body out. */
+/* Gaits run slowest to fastest. Three of them: the stick walks below half its
+   travel and runs past it, and sprint reaches the top, which is the one that
+   tires the body out. */
 static const e64::character3d::GaitSettings gait[] = {
 
-	{ .target_speed = 4.0f, .response_rate = 8.0f, .rotation_response_rate = 12.0f },
-	{ .target_speed = 6.5f, .response_rate = 9.0f, .rotation_response_rate = 10.0f },
-	{ .target_speed = 8.5f, .response_rate = 10.0f, .rotation_response_rate = 8.0f },
+	{ .target_speed = 3.0f, .response_rate = 8.0f, .rotation_response_rate = 12.0f },
+	{ .target_speed = 5.5f, .response_rate = 9.0f, .rotation_response_rate = 10.0f, .stick_threshold = 0.5f },
+	{ .target_speed = 8.0f, .response_rate = 10.0f, .rotation_response_rate = 8.0f },
 };
 
 static const e64::character3d::MovementSettings movement = {
@@ -33,23 +33,17 @@ static const e64::character3d::MovementSettings movement = {
 	.gait = gait,
 	.gait_count = sizeof(gait) / sizeof(gait[0]),
 
-	/* Snap: the body leaves the floor on the press and, while A stays down,
-	   the rise pays less gravity. A tap reaches a metre, holding all the way
-	   up reaches two and a half, and the rise ends itself either way. */
-	.jump_mode = e64::character3d::JUMP_SNAP,
+	/* The body leaves the floor on the press and, while A stays down, the
+	   rise pays less gravity. A tap reaches a metre, holding all the way up
+	   reaches two and a half, and the rise ends itself either way. */
 	.jump_response_rate = 10.0f,
-	.jump_base_speed = 9.0f,
+	.jump_base_speed = 8.0f,
 
-	/* Only read under charge, the other mode: how long the crouch lasts and
-	   what it turns into. */
-	.jump_force_multiplier = 30.0f,
-	.jump_timer_max = 0.25f,
-
-	.jump_hold_gravity_scale = 0.7f,
+	.jump_hold_gravity_scale = 0.75f,
 
 	/* Coyote time: walking off a ledge the jump still answers for this long,
 	   so arriving at the edge and pressing does not cost the jump. */
-	.jump_coyote_time = 0.15f,
+	.jump_coyote_time = 0.10f,
 
 	/* Half the steering of the ground: the jump keeps most of the run that
 	   launched it, but the stick still counts for something. */

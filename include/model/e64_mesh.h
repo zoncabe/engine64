@@ -52,15 +52,13 @@ public:
 	};
 
 
-	/* Every model draws through its objects. Each object owns a block with
-	   its geometry alone (userBlock); its material lives in the global
-	   material table, shared with every other object of the same material,
-	   whatever model it came from. object_material is the table id of each
-	   object, object_part the part it belongs to. */
-	T3DObject **object;
-	uint8_t *object_material;
+	/* Every model draws through its objects, read from the model's own chunk
+	   table (mesh::object). Each object owns a block with its geometry alone
+	   (userBlock) and keeps its material's table id in userValue0; the
+	   material lives in the global material table, shared with every other
+	   object of the same material, whatever model it came from. object_part
+	   is the part of each object, in the model's object order. */
 	uint8_t *object_part; /* 0 = unnamed remainder, 1.. = named part */
-	uint16_t object_count;
 
 	/* The bone matrices the geometry was recorded against: the skeleton
 	   segment placeholder for a skinned model, NULL for a static one. Kept
@@ -116,6 +114,17 @@ public:
 
 
 namespace mesh {
+
+/* The model's object at index i, NULL past the last one. The exporter writes
+   the object chunks first in the chunk table, one after the other, so the
+   objects are entries 0..n-1 of it and the walk stops at the first entry of
+   another type. */
+inline T3DObject *object(const Mesh *mesh, uint16_t i)
+{
+	const T3DModel *model = mesh->model;
+	if (i >= model->chunkCount || model->chunkOffsets[i].type != T3D_CHUNK_TYPE_OBJECT) return NULL;
+	return (T3DObject *)((char *)model + (model->chunkOffsets[i].offset & 0x00FFFFFF));
+}
 
 /* Loads the model, opens its animation when the def has one and records it
    with every part on screen. */

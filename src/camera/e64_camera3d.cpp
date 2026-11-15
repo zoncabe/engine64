@@ -2,116 +2,66 @@
 
 #include "math/e64_math.h"
 #include "camera/e64_camera3d.h"
-#include "camera/e64_spring_arm.h"
 
 namespace e64 {
 
-namespace camera3d {
-
-static void (*handler[CAMERA_TYPE_COUNT])(Camera *, Vector3 *, float) = {
-	[CAMERA_TYPE_SPRING_ARM] = springArm::update,
-};
-
-void init(Camera *camera)
+/* Position and target one unit apart so the view matrix is not degenerate
+   before anything places the camera. The lens starts at a mid value inside
+   its bounds; the scene writes the real one. */
+Camera3D::Camera3D()
+	: position{ 0.0f, 1.0f, 0.0f },
+	  target{ 0.0f, 0.0f, 0.0f },
+	  up{ 0.0f, 0.0f, 1.0f },
+	  near_clipping(1.0f),
+	  far_clipping(200.0f),
+	  field_of_view(60.0f)
 {
-	/* Lens and placement come from the scene's camera3d::Def; position and target
-	   are one unit apart so the view matrix is not degenerate before the first
-	   update places them. */
-	*camera = (Camera){
-		.position = { 0.0f, 1.0f, 0.0f },
-		.target = { 0.0f, 0.0f, 0.0f },
-		.type = CAMERA_TYPE_NONE,
-	};
 }
 
-void reset(Camera *camera)
+void Camera3D::setFieldOfView(float fov)
 {
-	init(camera);
+	field_of_view = clampf(fov, E64_CAMERA_FOV_MIN, E64_CAMERA_FOV_MAX);
 }
 
-/* horizontal yaw of the view direction, in the yaw convention of the engine;
-   measured from the view (position -> target) so lateral offsets like the
-   shoulder cancel out instead of skewing the angle */
-float getAngleAround(const Camera *camera, const Vector3 *point)
+float Camera3D::getFieldOfView() const
 {
-	(void)point;
+	return field_of_view;
+}
 
-	float dx = camera->target.x - camera->position.x;
-	float dy = camera->target.y - camera->position.y;
+float Camera3D::getYaw() const
+{
+	float dx = target.x - position.x;
+	float dy = target.y - position.y;
 
 	if (dx == 0.0f && dy == 0.0f) return 0.0f;
 
 	return rad_to_deg(fm_atan2f(dx, dy));
 }
 
-/* The camera's right hand side on the ground plane. */
-Vector3 getRight(const Camera *camera)
+/* Positive looking up, negative looking down. */
+float Camera3D::getPitch() const
 {
-	float dx = camera->target.x - camera->position.x;
-	float dy = camera->target.y - camera->position.y;
+	float dx = target.x - position.x;
+	float dy = target.y - position.y;
+	float dz = target.z - position.z;
+
+	float horizontal = sqrtf(dx * dx + dy * dy);
+
+	if (horizontal == 0.0f && dz == 0.0f) return 0.0f;
+
+	return rad_to_deg(fm_atan2f(dz, horizontal));
+}
+
+Vector3 Camera3D::getRight() const
+{
+	float dx = target.x - position.x;
+	float dy = target.y - position.y;
 
 	float length = sqrtf(dx * dx + dy * dy);
 	if (length < 1e-4f) return vector3::create(0.0f, -1.0f, 0.0f);
 
 	/* Z is up, so right is forward crossed with it. */
 	return vector3::create(dy / length, -dx / length, 0.0f);
-}
-
-
-/* Starts a transition to whatever center the camera is fed next, gliding out of
-   the given point. Passing a duration of zero cuts straight to the new target. */
-void setViewTarget(Camera *camera, const Vector3 *from, float duration)
-{
-	camera->blend_from = *from;
-	camera->blend_elapsed = 0.0f;
-	camera->blend_duration = duration;
-}
-
-/* The near runs at a fifth of the arm, floored at a metre (the engine is
-   in centimetres): the cut zone ends at 20% of the way to the pivot, so it
-   never reaches the pieces in view. The far rides the arm whole, so the
-   back plane keeps its authored distance past the pivot at any zoom. */
-void fitClipping(Camera *camera, const struct Scene3D *scene)
-{
-	if (!camera->auto_clipping) return;
-	if (camera->type != CAMERA_TYPE_SPRING_ARM) return;
-
-	float arm = camera->spring_arm.data.arm_length;
-	float near = arm * 0.2f;
-
-	camera->near_clipping = near > camera->base_near_clipping
-	                      ? near : camera->base_near_clipping;
-	camera->far_clipping = arm + camera->base_far_clipping;
-}
-
-void update(Camera *camera, Vector3 *center, const struct Scene3D *scene, float dt)
-{
-	if (camera->type == CAMERA_TYPE_NONE) return;
-
-	Vector3 blended;
-
-	if (camera->blend_elapsed < camera->blend_duration) {
-		camera->blend_elapsed += dt;
-
-		float t = camera->blend_elapsed / camera->blend_duration;
-		if (t > 1.0f) t = 1.0f;
-
-		float alpha = ease_cubic_in_out(t);
-
-		blended.x = lerpf(camera->blend_from.x, center->x, alpha);
-		blended.y = lerpf(camera->blend_from.y, center->y, alpha);
-		blended.z = lerpf(camera->blend_from.z, center->z, alpha);
-
-		center = &blended;
-	}
-
-	handler[camera->type](camera, center, dt);
-
-	/* The flags read here are the previous frame's cull: the planes trail
-	   the visibility by one frame. */
-	fitClipping(camera, scene);
-}
-
 }
 
 }

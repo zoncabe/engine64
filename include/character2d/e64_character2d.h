@@ -6,7 +6,6 @@
 
 #include "entity/e64_entity2d.h"
 #include "character2d/e64_character2d_movement.h"
-#include "character2d/e64_character2d_animation.h"
 #include "character2d/e64_character2d_physics.h"
 
 namespace e64 {
@@ -20,9 +19,9 @@ public:
 
 	const character2d::Def *def;
 
-	/* The scene entity this character draws through. The character picks
-	   the clip of its sprite and writes the frame, flip and position from
-	   create to destroy. */
+	/* The scene entity this character draws through. The character writes
+	   its flip and position from create to destroy; which clip the sprite
+	   plays is the game's to pick, on the entity's sprite animation. */
 	Entity2D *entity;
 
 	/* The stage the body collides with, handed over by the scene once it
@@ -33,7 +32,6 @@ public:
 	bool facing_left;
 
 	character2d::Movement movement;
-	character2d::Animation animation;
 
 	void updateMovement(character2d::MovementCommand *cmd, float dt);
 };
@@ -44,7 +42,6 @@ namespace character2d {
 typedef struct Def {
 
 	const MovementSettings *movement_settings;
-	const AnimationDef *animation_def;
 	const ColliderSettings *collider_settings;
 
 } Def;
@@ -53,8 +50,7 @@ typedef struct Def {
 Character2D *create(const Def *def, Entity2D *entity);
 void destroy(Character2D *character);
 
-/* Advances the animation off the movement and writes the frame to the
-   entity, anchored at the feet and snapped to whole pixels. */
+/* Writes the body's flip and position to the entity, anchored at the feet. */
 void update(Character2D *character, float dt);
 
 }

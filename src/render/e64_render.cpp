@@ -70,25 +70,27 @@ static void start(int *fb_index)
 	const Scene2D *scene = scene2d::get();
 	if (scene->def && scene->def->background.a) clear = scene->def->background;
 
-	viewport::attach();
+	Viewport *viewport = viewport::get();
+
+	viewport->attach();
 
 	/* The 3D pipeline is only up while a 3D scene is, and it starts its own
 	   frame: the render state it leaves is the one the clear and everything
 	   after it run under, which is why it goes first. */
-	if (viewport::has3D()) {
+	if (viewport->has3D()) {
 		t3d_frame_start();
-		t3d_viewport_attach(&viewport::get()->t3d_viewport);
+		t3d_viewport_attach(&viewport->t3d_viewport);
 	}
 
-	viewport::clear(clear);
+	viewport->clear(clear);
 
 	/* Only the 3D pipeline writes depth. */
-	if (viewport::has3D()) t3d_screen_clear_depth();
+	if (viewport->has3D()) t3d_screen_clear_depth();
 }
 
 static void end(void)
 {
-	viewport::detach();
+	viewport::get()->detach();
 }
 
 /* No key a sprite could carry: the RDP is not on a sprite mode. */
@@ -237,7 +239,7 @@ void draw(void)
 	Viewport *viewport = viewport::get();
 
 	context::init(ctx);
-	scene3d::setRenderContext(scene3d::get(), ctx, viewport);
+	scene3d::get()->setRenderContext(ctx, viewport);
 	scene2d::setRenderContext(scene2d::get(), ctx);
 	/* Last in the list, so it draws over the scene. */
 	ui::setRenderContext(ui::get(), ctx);

@@ -8,7 +8,7 @@
 #include <t3d/t3dmodel.h>
 
 #include "model/e64_mesh_deform.h"
-#include "entity/e64_entity3d.h"
+#include "entity/e64_entity.h"
 
 namespace e64 {
 namespace mesh {
@@ -104,7 +104,7 @@ static uint16_t find(const Bucket *bucket, uint32_t mask, const int16_t pos[3])
 }
 
 
-/* The RSP's segment table is one, shared by every deform, and the render loop
+/* The RSP's segment table is one, shared by every deform, and the update
    binds every frame's buffer before running any display list: with a common
    id the last binding would feed its vertices to all of them. Each binding
    holds its own id for as long as it lives. */
@@ -213,8 +213,9 @@ static bool bind(Deform *deform, T3DModel *model,
 }
 
 
-/* Points the segment at this frame's copy. Must run before the mesh's display
-   list, and outside it: the block is recorded once and the address changes. */
+/* Points the segment at the copy just written. The segment is this binding's
+   own, so it holds that copy until the next write: the draws of every frame
+   in between, a pause included, read the same vertices. */
 static void select(const Deform *deform, uint8_t fb_index)
 {
 	if (deform->vertex_buffer[0] == NULL) return;
@@ -262,6 +263,8 @@ static void write(const Deform *deform, uint8_t fb_index)
 	   range covers whole cache lines and nothing is left dirty behind the DMA.
 	   Safe to do while the RSP draws, because it is reading another copy. */
 	data_cache_hit_writeback(verts, deform->vertex_bytes);
+
+	select(deform, fb_index);
 }
 
 
@@ -299,9 +302,9 @@ bool set(Mesh *mesh, const Vector3 *source, const Vector3 *source_normal,
 	   and the geometry blocks were recorded before that with the old absolute
 	   ones. Record them again so the draw goes through the segment. The
 	   materials are untouched: they hold no vertex address. */
-	for (uint16_t i = 0; i < mesh->object_count; i++) {
-		if (mesh->object[i]->userBlock) rspq_block_free(mesh->object[i]->userBlock);
-		mesh->object[i]->userBlock = NULL;
+	for (uint16_t i = 0; T3DObject *o = object(mesh, i); i++) {
+		if (o->userBlock) rspq_block_free(o->userBlock);
+		o->userBlock = NULL;
 	}
 	recordGeometry(mesh);
 
@@ -309,18 +312,12 @@ bool set(Mesh *mesh, const Vector3 *source, const Vector3 *source_normal,
 	return true;
 }
 
-void update(Entity3D *const *entity, uint8_t count, uint8_t fb_index)
+void update(Entity *const *entity, uint8_t count, uint8_t fb_index)
 {
 	for (uint8_t i = 0; i < count; i++)
-		if (entity[i]->mesh && entity[i]->mesh->deform)
-			write(entity[i]->mesh->deform, fb_index);
-}
-
-/* Separate from the update because it has to run at draw time, in front of the
-   display list, not when the vertices are written. */
-void bindFrame(Mesh *mesh, uint8_t fb_index)
-{
-	if (mesh->deform) select(mesh->deform, fb_index);
+		for (uint8_t j = 0; j < entity[i]->mesh_count; j++)
+			if (entity[i]->mesh[j]->deform)
+				write(entity[i]->mesh[j]->deform, fb_index);
 }
 
 void destroy(Mesh *mesh)

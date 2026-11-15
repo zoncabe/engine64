@@ -5,8 +5,6 @@
 #include <t3d/t3danim.h>
 
 #include "engine/e64_common.h"
-#include "time/e64_time.h"
-#include "sound/e64_sound.h"
 #include "camera/e64_camera3d.h"
 #include "menu/e64_settings.h"
 #include "viewport/e64_viewport.h"
@@ -17,49 +15,49 @@ namespace viewport {
 
 static Viewport v;
 
-
 Viewport *get(void) { return &v; }
+
+}
+
 
 /* The camera stands in the world, so it is in metres like everything else in a
    scene, and it has to hand the view over in the units the models are drawn in.
    That is the whole of the conversion on this side. */
-void setPerspectiveCamera()
+void Viewport::setPerspective3D(const Camera3D *camera)
 {
-	const Camera *camera = &v.camera;
-
 	t3d_viewport_set_projection(
-		&v.t3d_viewport,
-		T3D_DEG_TO_RAD(camera->field_of_view),
+		&t3d_viewport,
+		T3D_DEG_TO_RAD(camera->getFieldOfView()),
 		camera->near_clipping * RENDER_SCALE,
 		camera->far_clipping * RENDER_SCALE
 	);
 
 	T3DVec3 eye = {{camera->position.x * RENDER_SCALE, camera->position.y * RENDER_SCALE, camera->position.z * RENDER_SCALE}};
 	T3DVec3 target = {{camera->target.x * RENDER_SCALE, camera->target.y * RENDER_SCALE, camera->target.z * RENDER_SCALE}};
-	T3DVec3 up = {{0, 0, 1}};
-	t3d_viewport_look_at(&v.t3d_viewport, &eye, &target, &up);
+	T3DVec3 up = {{camera->up.x, camera->up.y, camera->up.z}};
+	t3d_viewport_look_at(&t3d_viewport, &eye, &target, &up);
 }
 
-void setIsometricCamera()
+void Viewport::setIsometric3D(const Camera3D *camera)
 {
 	t3d_viewport_set_ortho(
-		&v.t3d_viewport,
+		&t3d_viewport,
 		-640, 640,
 		-480, 480,
-		v.camera.near_clipping,
-		v.camera.far_clipping
+		camera->near_clipping,
+		camera->far_clipping
 	);
 
-	T3DVec3 eye = {{v.camera.position.x, v.camera.position.y, v.camera.position.z}};
-	T3DVec3 target = {{v.camera.target.x, v.camera.target.y, v.camera.target.z}};
-	T3DVec3 up = {{0, 0, 1}};
-	t3d_viewport_look_at(&v.t3d_viewport, &eye, &target, &up);
+	T3DVec3 eye = {{camera->position.x, camera->position.y, camera->position.z}};
+	T3DVec3 target = {{camera->target.x, camera->target.y, camera->target.z}};
+	T3DVec3 up = {{camera->up.x, camera->up.y, camera->up.z}};
+	t3d_viewport_look_at(&t3d_viewport, &eye, &target, &up);
 }
 
 /* A width of zero is a viewport nobody gave a screen yet. Needed because
    the swap below closes the open screen first, and closing one that was
    never opened is not allowed. */
-static bool hasScreen(void) { return v.mode.width > 0; }
+bool Viewport::hasScreen() const { return mode.width > 0; }
 
 /* Opens the screen the game asked for with the player's choices laid over
    it. Both halves are read here and nowhere else, so a change to either one
@@ -68,9 +66,9 @@ static bool hasScreen(void) { return v.mode.width > 0; }
    Closed and opened again rather than switched in place: libdragon's hot
    switch reuses the buffers it already reserved, so it can only shrink the
    picture, never grow it, and it lives behind the preview flag besides. */
-static void applyMode(void)
+void Viewport::applyMode()
 {
-	const Viewport::ModeDef *mode = &v.mode;
+	const ModeDef *mode = &this->mode;
 	const Settings *settings = settings::get();
 
 	/* The picture's shape and the margin for a television's overscan are
@@ -108,55 +106,53 @@ static void applyMode(void)
 /* Nothing of the screen and nothing of tiny3d happens here: the engine
    picks no resolution of its own, and a game with no 3D scene never pays
    for the 3D pipeline. */
-void init(void)
+void Viewport::init()
 {
-	v.mode = (Viewport::ModeDef){};
-
-	camera3d::init(&v.camera);
-	v.fb_index = 0;
+	mode = (ModeDef){};
+	fb_index = 0;
 }
 
-Vector2 getScale(void)
+Vector2 Viewport::getScale() const
 {
 	return (Vector2){
-		v.mode.scale_x > 0.0f ? v.mode.scale_x : 1.0f,
-		v.mode.scale_y > 0.0f ? v.mode.scale_y : 1.0f,
+		mode.scale_x > 0.0f ? mode.scale_x : 1.0f,
+		mode.scale_y > 0.0f ? mode.scale_y : 1.0f,
 	};
 }
 
 /* Whether the 3D pipeline is up. A view with no width was never opened. */
-bool has3D(void) { return v.t3d_viewport.size[0] > 0; }
+bool Viewport::has3D() const { return t3d_viewport.size[0] > 0; }
 
 /* Brought up when a 3D scene is loaded and taken down when it is dropped,
    so the 2D game runs without it. The view is sized against the screen in
    force, so this comes after the mode is set. */
-void open3D(void)
+void Viewport::open3D()
 {
 	if (has3D()) return;
 
 	t3d_init((T3DInitParams){});
-	v.t3d_viewport = t3d_viewport_create_buffered(Viewport::FB_COUNT);
-	t3d_viewport_set_area(&v.t3d_viewport, 0, 0, display_get_width(), display_get_height());
+	t3d_viewport = t3d_viewport_create_buffered(FB_COUNT);
+	t3d_viewport_set_area(&t3d_viewport, 0, 0, display_get_width(), display_get_height());
 }
 
-void close3D(void)
+void Viewport::close3D()
 {
 	if (!has3D()) return;
 
 	t3d_destroy();
-	v.t3d_viewport = (T3DViewport){};
+	t3d_viewport = (T3DViewport){};
 }
 
-void setMode(const Viewport::ModeDef *mode)
+void Viewport::setMode(const ModeDef *mode)
 {
 	assert(mode && mode->width > 0 && mode->height > 0);
 
 	if (hasScreen()
-	 && mode->width == v.mode.width
-	 && mode->height == v.mode.height
-	 && mode->interlaced == v.mode.interlaced
-	 && mode->depth == v.mode.depth
-	 && mode->buffers == v.mode.buffers) return;
+	 && mode->width == this->mode.width
+	 && mode->height == this->mode.height
+	 && mode->interlaced == this->mode.interlaced
+	 && mode->depth == this->mode.depth
+	 && mode->buffers == this->mode.buffers) return;
 
 	/* The buffers being handed back are the ones still being drawn into:
 	   nothing may be in flight when they are freed. */
@@ -165,12 +161,12 @@ void setMode(const Viewport::ModeDef *mode)
 		display_close();
 	}
 
-	v.mode = *mode;
-	v.fb_index = 0;
+	this->mode = *mode;
+	fb_index = 0;
 	applyMode();
 }
 
-void refreshMode(void)
+void Viewport::refreshMode()
 {
 	if (!hasScreen()) return;
 
@@ -180,26 +176,19 @@ void refreshMode(void)
 }
 
 /* The frame's buffers: what is drawn into until it is shown. */
-void attach(void)
+void Viewport::attach()
 {
 	rdpq_attach(display_get(), display_get_zbuf());
 }
 
-void clear(color_t color)
+void Viewport::clear(color_t color)
 {
 	rdpq_clear(color);
 }
 
-void detach(void)
+void Viewport::detach()
 {
 	rdpq_detach_show();
-}
-
-void updateCamera(Vector3 *center, const Scene3D *scene)
-{
-	camera3d::update(&v.camera, center, scene, time::get()->delta);
-}
-
 }
 
 }

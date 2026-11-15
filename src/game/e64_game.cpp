@@ -4,7 +4,6 @@
 #include "render/e64_render.h"
 #include "player/e64_player.h"
 #include "controller/e64_controller.h"
-#include "player/e64_player_control.h"
 #include "game/e64_game.h"
 #include "game/e64_game_states.h"
 #include "sound/e64_sound.h"
@@ -37,7 +36,7 @@ void init()
 
 	time::init();
 
-	viewport::init();
+	viewport::get()->init();
 
 	particles::init();
 

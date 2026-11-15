@@ -5,34 +5,26 @@
 
 #include "model/e64_mesh_deform.h"
 #include "viewport/e64_viewport.h"
-#include "camera/e64_camera3d_control.h"
-#include "controller/e64_controls.h"
-#include "player/e64_player.h"
-#include "time/e64_time.h"
 #include "scene3d/e64_light.h"
 #include "scene3d/e64_fog.h"
-#include "entity/e64_entity3d.h"
 #include "scene3d/e64_scene3d.h"
-#include "physics3d/e64_physics_world.h"
-#include "physics3d/shapes/e64_physics_shape.h"
-#include "physics3d/e64_rigid_body.h"
+#include "character3d/e64_character3d_collision.h"
 #include "physics3d/e64_physics.h"
 #include "engine/e64_common.h"
 
 namespace e64 {
 
 static Scene3D scene;
-static physics::World g_physics;
 
 namespace scene3d {
 
 Scene3D *get(void) { return &scene; }
-physics::World *getPhysics(void) { return &g_physics; }
 
-void load(const Def *def, const controls::Def *controls)
+}
+
+
+void Scene3D::load(const Def *def)
 {
-	const character3d::ControlBinding *binding = controls ? controls->character3d : NULL;
-
 	/* A scene with no light def is left pitch black rather than lit by
 	   something the game never asked for. */
 	static const light::Def unlit = {};
@@ -40,7 +32,7 @@ void load(const Def *def, const controls::Def *controls)
 
 	/* The 3D pipeline comes up with the scene that needs it and goes down
 	   with it, so a game that never loads one never pays for it. */
-	viewport::open3D();
+	viewport::get()->open3D();
 
 	const light::Def *light_def = def->light ? def->light : &unlit;
 	const fog::Def *fog_def = def->fog ? def->fog : &no_fog;
@@ -48,160 +40,119 @@ void load(const Def *def, const controls::Def *controls)
 	light::init(light_def);
 	fog::init(fog_def);
 
-	Camera *camera = &viewport::get()->camera;
-	camera3d::reset(camera);
-	if (def->camera) {
-		camera->target_field_of_view = def->camera->field_of_view;
-		camera->field_of_view = def->camera->field_of_view;
-		camera->near_clipping = def->camera->near_clipping;
-		camera->far_clipping = def->camera->far_clipping;
-		camera->base_near_clipping = def->camera->near_clipping;
-		camera->base_far_clipping = def->camera->far_clipping;
-		camera->auto_clipping = def->camera->auto_clipping;
-	}
-	switch (def->camera ? def->camera->type : camera3d::CAMERA_TYPE_NONE) {
-		case camera3d::CAMERA_TYPE_SPRING_ARM:
-			camera3d::springArm::init(camera, &def->camera->spring_arm);
-			break;
-		case camera3d::CAMERA_TYPE_NONE:
-		case camera3d::CAMERA_TYPE_COUNT:
-			break;
-	}
-	camera->binding = controls ? controls->camera : NULL;
-
-	assert(scene.entity_count == 0);
-	scene = (Scene3D){};
+	/* The camera goes back to its defaults with the rest: the game places it
+	   from its onEnter, once the scene is up. */
+	assert(entity_count == 0);
+	*this = (Scene3D){};
 
 	Vector3 gravity = { 0.0f, 0.0f, -9.8f };
-	physics::world::init(&g_physics, physics::TIMESTEP, gravity, physics::SOLVER_ITERATIONS);
-	physics::world::setWind(&g_physics, def->wind);
+	physics::world::init(&physics, physics::TIMESTEP, gravity, physics::SOLVER_ITERATIONS);
+	physics::world::setWind(&physics, def->wind);
 
-	for (int i = 0; i < def->entity_count; i++) {
-		const Entity *placed = &def->entity[i];
-		const Prefab3D *prefab = placed->prefab;
+	for (int i = 0; i < def->instance_count; i++) {
+		const Instance *instance = &def->instance[i];
+		const Prefab *prefab = instance->prefab;
 
-		Vector3 scale = placed->scale;
-		if (scale.x == 0.0f && scale.y == 0.0f && scale.z == 0.0f)
-			scale = (Vector3){ 1.0f, 1.0f, 1.0f };
+		/* The entity opens the prefab's content; the instance says where it
+		   stands, and what depends on the place follows the transform. */
+		Entity *e = entity::create(prefab);
+		e->transform.position = instance->position;
+		e->transform.rotation = instance->rotation;
+		if (instance->scale.x != 0.0f || instance->scale.y != 0.0f || instance->scale.z != 0.0f)
+			e->transform.scale = instance->scale;
 
-		/* entity.c builds from a flat parameter block: filled here straight
-		   from the prefab and its placement, and gone after the load. */
-		entity3d::Def entity_def = {
-			.position = placed->position,
-			.rotation = placed->rotation,
-			.scale = scale,
-			.mesh = prefab->mesh.model ? &prefab->mesh : NULL,
-			.collider = prefab->collider,
-			.sound = prefab->sound,
-			.sound_count = prefab->sound_count,
-			.cull = true,
-		};
+		e->startLoopSounds();
+		e->attachPhysics(&physics);
 
-		switch (prefab->type) {
-			case prefab3d::PREFAB3D_CHARACTER:
-				entity_def.character = prefab->character;
-				break;
-			case prefab3d::PREFAB3D_PROP:
-				entity_def.body = prefab->prop;
-				break;
-			case prefab3d::PREFAB3D_CLOTH:
-				entity_def.cloth = prefab->cloth;
-				break;
-			case prefab3d::PREFAB3D_WATER:
-				entity_def.water = prefab->water;
-				break;
+		/* Cloth and water deform the mesh of the same index. Both run in
+		   metres, the vertex buffer in render units. */
+		for (uint8_t c = 0; c < prefab->cloth_count && c < e->mesh_count; c++) {
+			Cloth *cloth = physics::world::createCloth(&physics, &prefab->cloth[c]);
+			if (!cloth) continue;
+
+			cloth->culled = &e->mesh[c]->culled;
+			mesh::deform::set(e->mesh[c], cloth->render_position, cloth->normal,
+			                  NULL, cloth->particle_count, RENDER_SCALE);
 		}
 
-		Entity3D *entity = entity3d::create(&entity_def);
+		for (uint8_t w = 0; w < prefab->water_count && w < e->mesh_count; w++) {
+			Water *water = water::create(&prefab->water[w]);
+			if (!water) continue;
 
-		if (entity_def.collider)
-			entity3d::attachPhysics(entity, &entity_def, &g_physics);
+			/* The offsets are what scroll the texture layers; render reads
+			   them after the recorded material. */
+			water->culled = &e->mesh[w]->culled;
+			mesh::deform::set(e->mesh[w], water->position, water->normal,
+			                  water->rgba, water->count, RENDER_SCALE);
+			e->mesh[w]->texture_scroll = water->offset;
 
-		if (entity_def.cloth) {
-			Cloth *cloth = physics::world::createCloth(&g_physics, entity_def.cloth);
-			/* The cloth runs in metres, the vertex buffer in render units. */
-			if (cloth) {
-				cloth->culled = &entity->mesh->culled;
-				mesh::deform::set(entity->mesh, cloth->render_position, cloth->normal,
-				                  NULL, cloth->particle_count, RENDER_SCALE);
-			}
+			/* The entity's body is the water's sensor volume: bind them and
+			   the bodies inside it start floating. */
+			if (e->body)
+				water::bindPhysics(water, e->body, &physics);
 		}
 
-		if (entity_def.water) {
-			Water *water = water::create(entity_def.water);
-			/* Same contract as the cloth: points in metres, buffer in render
-			   units. The offsets are what scroll the texture layers; render
-			   reads them after the recorded material. */
-			if (water) {
-				water->culled = &entity->mesh->culled;
-				mesh::deform::set(entity->mesh, water->position, water->normal,
-				                  water->rgba, water->count, RENDER_SCALE);
-				entity->mesh->texture_scroll = water->offset;
+		for (uint8_t c = 0; c < prefab->character3d_count; c++) {
+			assert(character3d_count < MAX_CHARACTERS);
+			Character3D *ch = character3d::create(&prefab->character3d[c], e);
+			character[character3d_count++] = ch;
 
-				/* The entity's collider is the water's sensor volume: bind
-				   them and the bodies inside it start floating. */
-				if (entity->body)
-					water::bindPhysics(water, entity->body, &g_physics);
-			}
+			character3d::collision::createBody(ch, &physics);
 		}
 
-		if (entity_def.character) {
-			assert(scene.character3d_count < MAX_CHARACTERS);
-			Character3D *character = character3d::create(entity_def.character, entity);
-			scene.character[scene.character3d_count++] = character;
-
-			character3d::physics::createBody(character, &g_physics);
-
-			const character3d::WeaponsDef *weapons = entity_def.character->weapons_def;
-			for (int slot = 0; weapons && slot < character3d::WEAPON_SLOT_COUNT; slot++)
-				if (weapons->weapon[slot])
-					character3d::weapon::equip(character, slot, weapons->weapon[slot]);
-
-			/* The binding names this placement: its player takes the body. */
-			if (binding && binding->character == placed)
-				player::setCharacter3D(character, binding);
-		}
-
-		if (!entity_def.character) {
+		/* A character is placed every frame by updateCharacters; everything
+		   else gets its matrices once, here. */
+		if (prefab->character3d_count == 0) {
 			for (int fb = 0; fb < Viewport::FB_COUNT; fb++)
-				mesh::setMatrix(entity->mesh, &entity->transform, fb);
+				e->setMatrix(fb);
 		}
 
-		scene.entity[scene.entity_count++] = entity;
+		addEntity(e);
 	}
 }
 
-void clear(void)
+void Scene3D::clear(void)
 {
-	scene = (Scene3D){};
+	*this = (Scene3D){};
 }
 
-void unload(void)
+void Scene3D::unload(void)
 {
-	for (int i = 0; i < scene.character3d_count; i++)
-		character3d::destroy(scene.character[i]);
-	for (int i = 0; i < scene.entity_count; i++)
-		entity3d::destroy(scene.entity[i]);
+	for (int i = 0; i < character3d_count; i++)
+		character3d::destroy(character[i]);
+	for (int i = 0; i < entity_count; i++)
+		entity::destroy(entity[i]);
 	water::clear();
 	clear();
-	physics::world::shutdown(&g_physics);
+	physics::world::shutdown(&physics);
 
-	viewport::close3D();
+	viewport::get()->close3D();
 }
 
 /* The characters' half of the frame after physics::update: each one collides
    against the world, hands the outcome to its body, and from there to what
-   draws it. Always these four, always in this order, so no game writes them
+   draws it. Always these steps, always in this order, so no game writes them
    out. The list is the scene's, which is why it lives here. */
-void updateCharacters(uint8_t fb_index)
+void Scene3D::updateCharacters(uint8_t fb_index)
 {
-	for (int i = 0; i < scene.character3d_count; i++) {
-		Character3D *character = scene.character[i];
+	for (int i = 0; i < character3d_count; i++) {
+		Character3D *ch = character[i];
+		const character3d::Collider *collider = &ch->collider;
 
-		character3d::physics::collide(character, &g_physics);
-		character3d::physics::syncBody(character);
-		entity3d::setTransform(character->entity, &character->body);
-		entity3d::setMatrix(character->entity, fb_index);
+		character3d::collision::collide(ch, &physics);
+
+		/* The collider's matrix as a quaternion, once per frame: the body and
+		   every mesh take the same one. */
+		Quaternion rotation = quaternion::fromMatrix3(&collider->transform.rotation);
+		character3d::collision::syncBody(ch, &rotation);
+
+		/* The model is drawn foot_offset above the capsule's bottom. */
+		Vector3 position = collider->transform.position;
+		position.z += collider->foot_offset - collider->shape.radius - collider->shape.half_height;
+
+		Entity *e = ch->entity;
+		for (uint8_t m = 0; m < e->mesh_count; m++)
+			mesh::setMatrixFromBody(e->mesh[m], &position, &rotation, &e->transform.scale, fb_index);
 	}
 }
 
@@ -209,80 +160,62 @@ void updateCharacters(uint8_t fb_index)
    somewhere new by the time the frame gets here, and the matrix it is drawn
    with has to say so. Anything still was placed when the scene loaded and this
    passes over it. The list is the scene's, which is why it lives here. */
-void updateEntities(uint8_t fb_index)
+void Scene3D::updateEntities(uint8_t fb_index)
 {
-	for (int i = 0; i < scene.entity_count; i++)
-		entity3d::setMatrixFromBody(scene.entity[i], fb_index);
+	for (int i = 0; i < entity_count; i++)
+		entity[i]->setMatrixFromBody(fb_index);
 }
 
-/* The camera's half of the frame: it reads the buttons the scene declared for
-   it, settles where it now belongs around what it is watching, and hands the
-   result to the projection. Always these three, always in this order, so no
-   game writes them out. */
-void updateCamera(const Vector3 *target)
+void Scene3D::addEntity(Entity *e)
 {
-	Camera *camera = &viewport::get()->camera;
-
-	if (camera->binding)
-		camera3d::control::update(camera, camera->binding, &scene, time::get()->delta);
-
-	viewport::updateCamera((Vector3 *)target, &scene);
-	viewport::setPerspectiveCamera();
+	assert(entity_count < MAX_ENTITIES);
+	entity[entity_count++] = e;
 }
 
-void addEntity(Entity3D *entity)
+Character3D *Scene3D::getCharacter3D(uint8_t index)
 {
-	assert(scene.entity_count < MAX_ENTITIES);
-	scene.entity[scene.entity_count++] = entity;
+	if (index >= character3d_count) return NULL;
+	return character[index];
 }
 
-Character3D *getCharacter3D(uint8_t index)
-{
-	if (index >= scene.character3d_count) return NULL;
-	return scene.character[index];
-}
-
-void setRenderContext(const Scene3D *s, Render::Context *ctx, const Viewport *viewport)
+void Scene3D::setRenderContext(Render::Context *ctx, const Viewport *viewport) const
 {
 	uint8_t fb_index = viewport->fb_index;
 
-	for (int i = 0; i < s->entity_count; i++) {
-		Entity3D *e = s->entity[i];
-		Mesh *mesh = e->mesh;
-		if (!mesh) continue;
-		T3DSkeleton *skel = mesh->skeleton;
+	for (int i = 0; i < entity_count; i++) {
+		const Entity *e = entity[i];
 
-		/* The mesh culls itself and writes its own flags; here they are
-		   only consumed. */
-		if (e->cull) {
-			mesh::cull(mesh, &viewport->t3d_viewport);
-			if (mesh->culled) continue;
-		}
+		for (uint8_t m = 0; m < e->mesh_count; m++) {
+			Mesh *mesh = e->mesh[m];
+			T3DSkeleton *skel = mesh->skeleton;
 
-		/* Point the segment the recorded display list reads from at this
-		   frame's copy, the one the update already wrote. */
-		mesh::deform::bindFrame(mesh, fb_index);
+			/* The mesh culls itself and writes its own flags; here they are
+			   only consumed. */
+			if (e->cull) {
+				mesh::cull(mesh, &viewport->t3d_viewport);
+				if (mesh->culled) continue;
+			}
 
-		/* One element per object still on: its part turned on, and not cut
-		   by the frustum when the entity culls. A part displaced from the
-		   rest of the model carries a matrix of its own; every other object
-		   draws with the entity's. */
-		for (uint16_t o = 0; o < mesh->object_count; o++) {
-			uint8_t part = mesh->object_part[o];
-			if (!(mesh->visible & (1u << part))) continue;
-			if (e->cull && !mesh->object[o]->isVisible) continue;
+			/* One element per object still on: its part turned on, and not
+			   cut by the frustum when the entity culls. A part displaced from
+			   the rest of the model carries a matrix of its own; every other
+			   object draws with the entity's. */
+			for (uint16_t i = 0; T3DObject *object = mesh::object(mesh, i); i++) {
+				uint8_t part = mesh->object_part[i];
+				if (!(mesh->visible & (1u << part))) continue;
+				if (e->cull && !object->isVisible) continue;
 
-			assert(ctx->element3d_count < Render::MAX_3D_ELEMENTS);
-			ctx->element3d[ctx->element3d_count++] = (Render::Element3D){
-				.material = mesh->object_material[o],
-				.object = mesh->object[o],
-				.mesh = mesh,
-				.matrix = (T3DMat4FP *)mesh::part::getMatrix(mesh, part, fb_index),
-				.skeleton = skel,
-			};
+				assert(ctx->element3d_count < Render::MAX_3D_ELEMENTS);
+				ctx->element3d[ctx->element3d_count++] = (Render::Element3D){
+					.material = object->userValue0,
+					.object = object,
+					.mesh = mesh,
+					.matrix = (T3DMat4FP *)mesh::part::getMatrix(mesh, part, fb_index),
+					.skeleton = skel,
+				};
+			}
 		}
 	}
 }
 
-}
 }

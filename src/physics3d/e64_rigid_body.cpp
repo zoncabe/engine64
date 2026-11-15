@@ -425,25 +425,12 @@ void setTransformPositionAxisAngle(RigidBody *b, Vector3 position, Vector3 axis,
 }
 
 
-/* Yaw only, for a body that never tilts: the quaternion and the matrix come
-   straight from the half angle's sine and cosine, the same values the
-   axis-angle path would reach through the general quaternion-to-matrix
-   expansion with every other term zero. */
-void setTransformPositionYaw(RigidBody *b, Vector3 position, float yaw)
+/* Both forms of the rotation handed in: nothing is converted here. */
+void setTransformPositionRotation(RigidBody *b, Vector3 position, const Matrix3 *rotation, const Quaternion *q)
 {
-	float s, c;
-	fm_sincosf(0.5f * yaw, &s, &c);
-
-	float ss2 = 2.0f * s * s; /* 1 - cos(yaw) */
-	float sc2 = 2.0f * s * c; /* sin(yaw) */
-
 	b->world_center = position;
-	b->q = (Quaternion){ 0.0f, 0.0f, s, c };
-	b->tx.rotation = (Matrix3){
-		.ex = { 1.0f - ss2, sc2, 0.0f },
-		.ey = { -sc2, 1.0f - ss2, 0.0f },
-		.ez = { 0.0f, 0.0f, 1.0f },
-	};
+	b->q = *q;
+	b->tx.rotation = *rotation;
 	synchronizeProxies(b);
 }
 

@@ -291,7 +291,7 @@ void cull(Mesh *mesh, const T3DViewport *viewport)
 	   by node and marks only what it reaches, so everything starts off. */
 	const T3DBvh *bvh = mesh->skeleton ? NULL : t3d_model_bvh_get(mesh->model);
 	if (bvh && !mesh->part_offset) {
-		for (uint16_t i = 0; i < mesh->object_count; i++) mesh->object[i]->isVisible = false;
+		for (uint16_t i = 0; T3DObject *o = object(mesh, i); i++) o->isVisible = false;
 		t3d_model_bvh_query_frustum(bvh, &frustum);
 		return;
 	}
@@ -314,19 +314,18 @@ void cull(Mesh *mesh, const T3DViewport *viewport)
 		test[p] = &part_frustum[p];
 	}
 
-	for (uint16_t i = 0; i < mesh->object_count; i++) {
-		T3DObject *object = mesh->object[i];
+	for (uint16_t i = 0; T3DObject *o = object(mesh, i); i++) {
 		uint8_t part = mesh->object_part[i];
 
 		/* A skinned body's object boxes are written per bone and say nothing
 		   about the pose: it rides the whole-model box tested above. Its named
 		   parts keep their own box, where the file modelled them. */
 		if (mesh->skeleton && part == 0) {
-			object->isVisible = in_box;
+			o->isVisible = in_box;
 			continue;
 		}
 
-		object->isVisible = t3d_frustum_vs_aabb_s16(test[part], object->aabbMin, object->aabbMax);
+		o->isVisible = t3d_frustum_vs_aabb_s16(test[part], o->aabbMin, o->aabbMax);
 	}
 }
 
@@ -390,11 +389,11 @@ void setMatrix(Mesh *mesh, const Render::Transform *transform, uint8_t fb_index)
    records it and t3d_model_free releases it with the model. */
 void recordGeometry(Mesh *mesh)
 {
-	for (uint16_t i = 0; i < mesh->object_count; i++) {
-		if (mesh->object[i]->userBlock) continue;
+	for (uint16_t i = 0; T3DObject *o = object(mesh, i); i++) {
+		if (o->userBlock) continue;
 		rspq_block_begin();
-		t3d_model_draw_object(mesh->object[i], mesh->bone_matrices);
-		mesh->object[i]->userBlock = rspq_block_end();
+		t3d_model_draw_object(o, mesh->bone_matrices);
+		o->userBlock = rspq_block_end();
 	}
 }
 
@@ -402,16 +401,16 @@ void record(Mesh *mesh, const char *const *names, uint8_t count, const T3DMat4FP
 {
 	assert(1 + count <= Mesh::MAX_PARTS);
 
-	uint16_t total = 0;
-	T3DModelIter it = t3d_model_iter_create(mesh->model, T3D_CHUNK_TYPE_OBJECT);
-	while (t3d_model_iter_next(&it)) total++;
+	/* mesh::object reads the objects from the start of the chunk table, where
+	   the exporter writes them. A file laid out otherwise is caught here. */
+	assert(mesh->model->chunkCount > 0 && mesh->model->chunkOffsets[0].type == T3D_CHUNK_TYPE_OBJECT);
 
-	mesh->object_count = total;
-	mesh->object = (T3DObject **)malloc(sizeof(T3DObject *) * total);
-	mesh->object_material = (uint8_t *)malloc(total);
+	uint16_t total = 0;
+	while (object(mesh, total)) total++;
+
 	mesh->object_part = (uint8_t *)malloc(total);
 	mesh->bone_matrices = matrices;
-	assert(mesh->object && mesh->object_material && mesh->object_part);
+	assert(mesh->object_part);
 
 	/* The names are kept so a part can be found by the name it was declared
 	   with; only the pointers are copied, the strings stay where they are. */
@@ -421,19 +420,17 @@ void record(Mesh *mesh, const char *const *names, uint8_t count, const T3DMat4FP
 	mesh->part_matrix = NULL;
 	for (int i = 0; i < count; i++) mesh->part_name[i] = names[i];
 
-	/* Each object: its material through the table, its part by name, part 0
-	   for everything the list did not claim. */
-	uint16_t n = 0;
-	it = t3d_model_iter_create(mesh->model, T3D_CHUNK_TYPE_OBJECT);
-	while (t3d_model_iter_next(&it)) {
-		mesh->object[n] = it.object;
-		mesh->object_material[n] = material::acquire(it.object->material);
+	/* Each object: its material through the table, kept in the object, and
+	   its part by name, part 0 for everything the list did not claim. Every
+	   mesh of the file holds its own user of each material; the id comes out
+	   the same for all of them. */
+	for (uint16_t n = 0; T3DObject *o = object(mesh, n); n++) {
+		o->userValue0 = material::acquire(o->material);
 		mesh->object_part[n] = 0;
 
 		for (int p = 0; p < count; p++)
-			if (it.object->name && strcmp(it.object->name, names[p]) == 0)
+			if (o->name && strcmp(o->name, names[p]) == 0)
 				mesh->object_part[n] = (uint8_t)(1 + p);
-		n++;
 	}
 
 	recordGeometry(mesh);
@@ -446,20 +443,15 @@ void record(Mesh *mesh, const char *const *names, uint8_t count, const T3DMat4FP
    be drawing; only the materials are given back. */
 void release(Mesh *mesh)
 {
-	for (uint16_t i = 0; i < mesh->object_count; i++)
-		material::release(mesh->object_material[i]);
+	for (uint16_t i = 0; T3DObject *o = object(mesh, i); i++)
+		material::release(o->userValue0);
 
-	free(mesh->object);
-	free(mesh->object_material);
 	free(mesh->object_part);
 	free(mesh->part_name);
 	free(mesh->part_offset);
 	if (mesh->part_matrix) free_uncached(mesh->part_matrix);
 
-	mesh->object = NULL;
-	mesh->object_material = NULL;
 	mesh->object_part = NULL;
-	mesh->object_count = 0;
 	mesh->part_name = NULL;
 	mesh->part_count = 0;
 	mesh->part_offset = NULL;

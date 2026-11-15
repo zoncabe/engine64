@@ -8,8 +8,6 @@
 #include <malloc.h>
 
 #include "scene2d/e64_scene2d.h"
-#include "controller/e64_controls.h"
-#include "player/e64_player.h"
 #include "viewport/e64_viewport.h"
 
 namespace e64 {
@@ -32,11 +30,9 @@ static void loadFont(uint8_t id)
 	scene.font[scene.font_count++] = id;
 }
 
-void load(const Def *def, const controls::Def *controls)
+void load(const Def *def)
 {
 	assert(def && def->layer_count <= MAX_LAYER);
-
-	const character2d::ControlBinding *binding = controls ? controls->character2d : NULL;
 
 	/* A scene may be loaded over another (an overlay taking the screen):
 	   what the one leaving created goes first. */
@@ -79,10 +75,6 @@ void load(const Def *def, const controls::Def *controls)
 				assert(scene.character2d_count < MAX_CHARACTER);
 				Character2D *character = character2d::create(prefab->character, entity);
 				scene.character[scene.character2d_count++] = character;
-
-				/* The binding names this placement: its player takes the body. */
-				if (binding && binding->character == placed)
-					player::setCharacter2D(character, binding);
 			}
 
 			/* The stage draws through its own elements; the entity only
@@ -204,7 +196,7 @@ void setRenderContext(const Scene2D *s, Render::Context *ctx)
 			   it lands; a scene with no camera draws at the placed size. On
 			   top of it goes what a world pixel measures on this screen. */
 			float zoom = s->camera.type == camera2d::CAMERA2D_TYPE_NONE ? 1.0f : s->camera.zoom;
-			Vector2 scale = viewport::getScale();
+			Vector2 scale = viewport::get()->getScale();
 
 			/* Whole screen pixels, like the stage's tiles, so a sprite
 			   standing on one never lands between texels. Rounded here and

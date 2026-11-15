@@ -32,7 +32,6 @@
 #include "player/e64_player.h" /* the seat a controller drives */
 #include "camera/e64_camera3d_control.h" /* buttons wired to camera motion */
 #include "player/e64_player_control.h" /* reading a seat's buttons */
-#include "time/e64_time.h" /* frame delta */
 #include "debug/e64_debug.h" /* on-screen debug lines */
 
 
@@ -160,15 +159,6 @@ enum { GAMEPLAY3D, STATE_COUNT };
 static void gameplay3d_update(void)
 {
 	e64::Viewport *viewport = e64::viewport::get();
-	float delta = e64::time::get()->delta;
-
-	e64::player::setCharacter3DControl(e64::PLAYER_1, viewport);
-	e64::player::update();
-
-	e64::scene3d::updateCharacters(viewport->fb_index);
-
-	e64::camera3d::control::update(&viewport->camera, viewport->camera.binding, e64::scene3d::get(), delta);
-	e64::viewport::setPerspectiveCamera();
 
 	/* Debug lines have to be rewritten every frame; nothing persists.
 	*/

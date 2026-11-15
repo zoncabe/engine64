@@ -1,12 +1,15 @@
 #ifndef ENGINE64_PLAYER_H
 #define ENGINE64_PLAYER_H
 
-#include "entity/e64_entity3d.h"
+#include "controller/e64_controller.h"
 #include "character3d/e64_character3d_movement.h"
-#include "character3d/e64_character3d_control.h"
-#include "character2d/e64_character2d_control.h"
+#include "character2d/e64_character2d_movement.h"
 
 namespace e64 {
+
+class Character3D;
+class Character2D;
+
 
 namespace player {
 
@@ -34,17 +37,13 @@ typedef struct Player {
 		struct {
 			Character3D *character;
 			character3d::MovementCommand cmd;
-			const character3d::ControlBinding *control;
 		} character3d;
 
 		struct {
 			Character2D *character;
 			character2d::MovementCommand cmd;
-			const character2d::ControlBinding *control;
 		} character2d;
 	};
-
-	Entity3D *entity;
 
 } Player;
 
@@ -53,13 +52,12 @@ namespace player {
 
 Player *get(void);
 void init(void);
-/* Seats a player: the body it drives and the buttons that drive it, together.
-   Seating one kind of body leaves the seat driving that kind and no other. */
-void setCharacter3D(Character3D *character, const character3d::ControlBinding *control);
-void setCharacter2D(Character2D *character, const character2d::ControlBinding *control);
+/* Seats a player on the body it drives. Seating one kind of body leaves the
+   seat driving that kind and no other. */
+void setCharacter3D(PlayerID id, Character3D *character);
+void setCharacter2D(PlayerID id, Character2D *character);
 void switchCharacter3D(PlayerID id, int8_t direction);
 void update(void);
-void setMatrix(uint8_t fb_index);
 
 }
 

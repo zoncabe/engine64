@@ -33,7 +33,6 @@
 #include "player/e64_player_control.h" /* reading a seat's buttons */
 #include "controller/e64_controls.h" /* the controls a state declares */
 #include "camera/e64_spring_arm.h" /* reading the arm back for debug */
-#include "time/e64_time.h" /* frame delta */
 #include "debug/e64_debug.h" /* on-screen debug lines */
 
 
@@ -104,16 +103,13 @@ static const e64::character3d::MovementSettings movement = {
 	.gait = gait,
 	.gait_count = E64_ARRAY_COUNT(gait),
 
-	/* Two ways a button becomes height. JUMP_SNAP leaves the floor on the
-	   frame the button goes down and keeps rising while it is held; JUMP_CHARGE
-	   crouches first and launches on release, with the crouch deciding the
-	   height. */
-	.jump_mode = e64::character3d::JUMP_SNAP,
+	/* The body leaves the floor on the press and keeps rising while the
+	   button is held. */
 	.jump_response_rate = 10.0f,
 	.jump_base_speed = 9.0f,
 
-	/* Snap only: the fraction of gravity paid while the button stays down, and
-	   only on the way up. Lower jumps higher, 1.0 makes holding do nothing.
+	/* The fraction of gravity paid while the button stays down, and only on
+	   the way up. Lower jumps higher, 1.0 makes holding do nothing.
 	   This is what makes a tap and a held press reach different heights.
 
 	   .jump_coyote_time belongs here too, and is left at zero: the jump stops
@@ -241,24 +237,6 @@ enum { GAMEPLAY3D, STATE_COUNT };
 static void gameplay3d_update(void)
 {
 	e64::Viewport *viewport = e64::viewport::get();
-
-	/* The movement step, in two halves. The first reads the seat's buttons and
-	   stick and turns them into a movement command, rotated by the camera
-	   angle so pushing up always walks away from the camera. The second runs
-	   that command through the movement settings and produces velocity. */
-	e64::player::setCharacter3DControl(e64::PLAYER_1, viewport);
-	e64::player::update();
-
-	/* Characters resolve their own collision and write their own matrix for
-	   this frame's buffer. Call it once per frame, after the movement step. */
-	e64::scene3d::updateCharacters(viewport->fb_index);
-
-	/* The camera, driven straight from its binding rather than through
-	   scene3d::updateCamera. The binding names a player, and the camera follows
-	   that player's body on its own, so there is no target to supply here.
-	   Example 01 does the other thing: no body, so the game supplies a point. */
-	e64::camera3d::control::update(&viewport->camera, viewport->camera.binding, e64::scene3d::get(), e64::time::get()->delta);
-	e64::viewport::setPerspectiveCamera();
 
 	/* Debug lines have to be rewritten every frame; nothing persists. */
 	e64::debug::ui::set(0, "STICK walk");

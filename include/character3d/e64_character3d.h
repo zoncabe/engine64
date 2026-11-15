@@ -11,18 +11,13 @@
 #include "physics3d/e64_physics.h"
 #include "model/e64_mesh.h"
 #include "model/e64_skeleton.h"
-#include "character3d/e64_character3d_physics.h"
+#include "model/e64_spring_bone.h"
+#include "character3d/e64_character3d_collision.h"
 #include "character3d/e64_character3d_movement.h"
-#include "character3d/e64_character3d_stats.h"
-#include "character3d/e64_character3d_animation.h"
-#include "character3d/e64_character3d_weapon.h"
-#include "character3d/e64_character3d_aim.h"
-#include "character3d/e64_character3d_spring_bone.h"
-#include "character3d/e64_character3d_sound.h"
 
 namespace e64 {
 
-typedef struct Entity3D Entity3D;
+class Entity;
 
 /* An aggregate on purpose: no constructor, public data. character3d::create
    builds it with a designated initializer over one allocation that also
@@ -30,19 +25,12 @@ typedef struct Entity3D Entity3D;
 class Character3D {
 public:
 
-	Entity3D *entity;
-	character3d::KinematicBody body;
+	Entity *entity;
 	character3d::Collider collider;
 	character3d::Movement movement;
-	character3d::Animation animation;
-	character3d::Weapons weapons;
-	character3d::Aiming aiming;
-	character3d::Sound sound;
 	skeleton::Modifiers skeleton_modifiers;
-	character3d::Stats stats;
 
 	void updateMovement(character3d::MovementCommand *cmd, float dt);
-	void setAnimation();
 };
 
 
@@ -51,18 +39,13 @@ namespace character3d {
 typedef struct Def {
 
 	const MovementSettings *movement_settings;
-	const AnimationDef *animation_def;
 	const ColliderSettings *collider_settings;
-	const WeaponsDef *weapons_def;
 	const SpringBonesDef *spring_bones; /* optional: array of sets, one tuning each, count 0 terminates */
-	const AimingSettings *aiming_settings; /* optional: spine chain for the camera-pitch bend */
-	const SoundDef *sound_def;
-	const StatsSettings *stats_settings;
 
 } Def;
 
 
-Character3D *create(const Def *def, Entity3D *entity);
+Character3D *create(const Def *def, Entity *entity);
 void destroy(Character3D *character);
 
 }

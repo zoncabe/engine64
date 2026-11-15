@@ -19,14 +19,6 @@ public:
 	static constexpr uint8_t MAX_LAYERS = 24;
 	static constexpr uint8_t SLOT_MAIN = 0xFF;
 
-	/* Open clips hold a FILE, and libc caps those at 64 (lock pool): fmemopen
-	   streams included, they take a lock like any file. Clips open on first
-	   use and close after a while untouched, so only the graph's working set
-	   holds files. The delay keeps blend-boundary flicker from churning
-	   open/close, and the hard cap bounds the open set no matter the input. */
-	static constexpr uint8_t CLIP_CLOSE_DELAY = 60; /* frames untouched before closing */
-	static constexpr uint8_t CLIP_MAX_OPEN = 24; /* per graph */
-
 	typedef enum {
 
 		NODE_CLIP,
@@ -107,8 +99,6 @@ public:
 	T3DSkeleton main;
 	T3DSkeleton *buffer;
 	T3DAnim *clip;
-	void **clip_data; /* RAM copy of each open clip's .sdata, NULL when closed */
-	uint8_t *clip_cooldown; /* frames since the graph last touched each clip */
 	uint8_t *node_state;
 	bool *node_active;
 	float *param;
@@ -134,12 +124,7 @@ void destroy(Animation *animation);
 /* Where a clip writes its pose: the main or one of the def's buffers. */
 T3DSkeleton *clipBuffer(Animation *animation, uint8_t clip);
 
-/* The clip, open. Opens it on first use, evicting the least recently touched
-   one at the cap. */
 T3DAnim *getClip(Animation *animation, uint8_t index);
-
-/* Once per frame: closes what the graph stopped touching. */
-void closeIdleClips(Animation *animation);
 
 /* Splits a [0,1] weight over count clips: the base index and the share of
    the next one. */

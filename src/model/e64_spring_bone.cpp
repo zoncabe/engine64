@@ -7,7 +7,7 @@
 #include <fgeom.h>
 #include <fmath.h>
 
-#include "character3d/e64_character3d_spring_bone.h"
+#include "model/e64_spring_bone.h"
 #include "model/e64_skeleton.h"
 #include "engine/e64_common.h"
 #include "math/e64_math.h"
@@ -48,7 +48,7 @@ uint8_t springBones_resolveChain(const T3DSkeleton *skeleton, const SpringBonesD
    rest offset; the end bone has no child and extends by the def's length
    along its own axis. */
 bool springBone_init(SpringBone *spring_bone, const T3DSkeleton *skeleton, int16_t bone,
-                     uint8_t joint_index, const SpringBonesDef *def, const Render::Transform *world)
+                     uint8_t joint_index, const SpringBonesDef *def, const Transform *world)
 {
 	int16_t index = bone;
 	if (index < 0) return false;
@@ -221,27 +221,11 @@ static Vector3 springBoneCollision_collidePlane(const Vector3 *origin, const Mat
    module holds was scaled once at init: the owner's transform is the only
    thing it reads live, and it is in metres like everything the game declares,
    while the chain lives in the skeleton's space, which is the model's, at
-   RENDER_SCALE units per metre. */
-static Vector3 springBone_centerPosition(const Render::Transform *world)
+   RENDER_SCALE units per metre. Only its change from frame to frame is used,
+   so which point of the owner it is does not matter. */
+static Vector3 springBone_centerPosition(const Transform *world)
 {
 	return vector3::scaled(&world->position, RENDER_SCALE);
-}
-
-/* The center's rotation: same euler convention as the renderer, whatever
-   axes the owner rotates on. */
-static Matrix3 springBone_centerMatrix(const Render::Transform *world)
-{
-	T3DMat4 mat;
-	t3d_mat4_from_srt_euler(&mat,
-		(float[3]){1.0f, 1.0f, 1.0f},
-		(float[3]){deg_to_rad(world->rotation.x), deg_to_rad(world->rotation.y), deg_to_rad(world->rotation.z)},
-		(float[3]){0.0f, 0.0f, 0.0f});
-
-	return (Matrix3){
-		.ex = { mat.m[0][0], mat.m[0][1], mat.m[0][2] },
-		.ey = { mat.m[1][0], mat.m[1][1], mat.m[1][2] },
-		.ez = { mat.m[2][0], mat.m[2][1], mat.m[2][2] },
-	};
 }
 
 /* SpringBoneSimulator3D::_process_joints, one joint. */
@@ -274,9 +258,11 @@ void springBone_apply(T3DSkeleton *skeleton, void *context)
 	Matrix3 current_mat = quaternion::toMatrix3(&current_rot);
 
 	/* Vector3 external = inverted_center_rotation.xform(gravity_direction *
-	   gravity * delta): gravity lives in the world, the center rotates. */
-	Matrix3 center_rot = springBone_centerMatrix(joint->world);
-	Matrix3 center_rot_t = matrix3::transposed(&center_rot);
+	   gravity * delta): gravity lives in the world, the center rotates. The
+	   center's rotation is the owner's matrix as it stands, in the renderer's
+	   convention. */
+	const Matrix3 *center_rot = &joint->world->rotation;
+	Matrix3 center_rot_t = matrix3::transposed(center_rot);
 	Vector3 external = matrix3::transformVector(&center_rot_t, &setting->gravity_direction);
 	vector3::scale(&external, setting->gravity * RENDER_SCALE * delta);
 
@@ -288,7 +274,7 @@ void springBone_apply(T3DSkeleton *skeleton, void *context)
 		joint->current_tail = rest_tail;
 		joint->prev_tail = rest_tail;
 		joint->pre_skel_comp_pos = springBone_centerPosition(joint->world);
-		joint->pre_skel_comp_rot = center_rot;
+		joint->pre_skel_comp_rot = *center_rot;
 		joint->primed = true;
 	}
 	else {
@@ -323,7 +309,7 @@ void springBone_apply(T3DSkeleton *skeleton, void *context)
 		}
 
 		joint->pre_skel_comp_pos = center_position;
-		joint->pre_skel_comp_rot = center_rot;
+		joint->pre_skel_comp_rot = *center_rot;
 	}
 
 	/* Integration of velocity by verlet. */

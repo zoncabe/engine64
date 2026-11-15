@@ -1,3 +1,11 @@
+/*
+	The movement component, after Unreal's CharacterMovementComponent: the
+	velocity model is CalcVelocity and ApplyVelocityBraking, read from the
+	engine source (CharacterMovementComponent.cpp). Per frame: the input is
+	turned into an acceleration, friction and braking shape the velocity, the
+	mode adds its vertical, the collider is moved by the result and turned to
+	face it. The collision pass runs after this and corrects what it has to.
+*/
 #include <assert.h>
 #include <math.h>
 #include <fmath.h>
@@ -8,605 +16,335 @@
 namespace e64 {
 
 namespace character3d {
-namespace movement {
 
-static const bool updates_locomotion[MOVEMENT_STATE_COUNT] = {
-	[MOVEMENT_STATE_IDLE] = true,
-	[MOVEMENT_STATE_WALKING] = true,
-	[MOVEMENT_STATE_ROLLING] = false,
-	[MOVEMENT_STATE_FALLING] = false,
-	[MOVEMENT_STATE_SWIMMING] = false,
-	[MOVEMENT_STATE_CLIMBING] = false,
-};
-
-void setMode(Movement *movement, uint8_t new_mode)
+/* Unreal's ApplyVelocityBraking, on the horizontal plane. With no input, the
+   friction takes a share of the velocity per second and the braking a fixed
+   amount: both bring it to a stop, and the stop is exact — a reversal or the
+   brake-to-stop threshold zero it, so it never trails off for ever. */
+void Movement::applyBraking(float friction, float braking_deceleration, float dt)
 {
-	if (movement->current == new_mode) return;
-	movement->current = new_mode;
-	if (updates_locomotion[new_mode]) movement->locomotion = new_mode;
-}
+	if (friction <= 0.0f && braking_deceleration <= 0.0f) return;
 
-bool isLocomotion(uint8_t mode)
-{
-	return updates_locomotion[mode];
-}
+	Vector2 old_velocity = { velocity.x, velocity.y };
+	float speed = vector2::magnitude(&old_velocity);
+	if (speed == 0.0f) return;
 
-static void evaluateTransitions(Character3D *character)
-{
-	Movement *movement = &character->movement;
-	if (movement->next == MOVEMENT_STATE_NONE) return;
-	setMode(movement, movement->next);
-	movement->next = MOVEMENT_STATE_NONE;
-}
+	/* The braking deceleration points against the velocity. */
+	float reverse = braking_deceleration / speed;
+	velocity.x += (-friction * velocity.x - reverse * velocity.x) * dt;
+	velocity.y += (-friction * velocity.y - reverse * velocity.y) * dt;
 
-
-static const GaitSettings *getGait(const Character3D *character)
-{
-	const MovementSettings *settings = character->movement.settings;
-	uint8_t gait = (uint8_t)character->movement.data.gait;
-	if (gait >= settings->gait_count) gait = settings->gait_count - 1;
-	return &settings->gait[gait];
-}
-
-/* Tired caps the body at a share of what it asks for. The stats belong to the
-   character, so the movement reads them where they live. */
-static float getSpeedScale(const Character3D *character)
-{
-	return character->stats.tired ? character->stats.settings->tired_speed_scale : 1.0f;
-}
-
-static float getTargetSpeed(const Character3D *character, uint8_t state)
-{
-	/* Anything but walking is asking to stand still. */
-	if (state != MOVEMENT_STATE_WALKING) return 0.0f;
-
-	float speed = getGait(character)->target_speed;
-
-	/* A single gait has none above it to step to: the fraction it carries is
-	   the share of that one speed the stick is asking for. */
-	if (character->movement.settings->gait_count == 1) speed *= character->movement.data.gait;
-	return speed;
-}
-
-static float getAccelerationRate(const Character3D *character, uint8_t state)
-{
-	if (state == MOVEMENT_STATE_WALKING) return getGait(character)->response_rate;
-	return character->movement.settings->idle_response_rate;
-}
-
-static float getRotationAccelerationRate(const Character3D *character, uint8_t state)
-{
-	if (state == MOVEMENT_STATE_WALKING) return getGait(character)->rotation_response_rate;
-	return character->movement.settings->idle_rotation_response_rate;
-}
-
-static void setHorizontalVelocity(Character3D *character, float yaw, float target_speed, float response_rate, float dt)
-{
-	KinematicBody *body = &character->body;
-
-	float s, c;
-	fm_sincosf(deg_to_rad(yaw), &s, &c);
-	float target_vx = target_speed * s;
-	float target_vy = target_speed * -c;
-
-	float factor = fm_expf(-response_rate * dt);
-	body->velocity.x = body->velocity.x * factor + target_vx * (1.0f - factor);
-	body->velocity.y = body->velocity.y * factor + target_vy * (1.0f - factor);
-}
-
-/*
-static void setHorizontalVelocity(Character3D *character, float yaw, float target_speed, float response_rate, float dt)
-{
-	KinematicBody *body = &character->body;
-
-	float target_vx = target_speed *  fm_sinf(deg_to_rad(yaw));
-	float target_vy = target_speed * -fm_cosf(deg_to_rad(yaw));
-
-	body->acceleration.x = response_rate * (target_vx - body->velocity.x);
-	body->acceleration.y = response_rate * (target_vy - body->velocity.y);
-
-	body->velocity.x += body->acceleration.x * dt;
-	body->velocity.y += body->acceleration.y * dt;
-}
-*/
-
-static void setRotation(Character3D *character, float dt)
-{
-	KinematicBody *body = &character->body;
-	MovementData *data = &character->movement.data;
-
-	/* Climbing already set the facing from the ladder, and its velocity is
-	   the pull onto the anchor: read as a heading it would spin the body. */
-	if (character->movement.current == MOVEMENT_STATE_CLIMBING) return;
-
-	bool moving = body->velocity.x != 0 || body->velocity.y != 0;
-
-	if (moving) {
-		Vector2 horizontal_velocity = {body->velocity.x, body->velocity.y};
-		data->horizontal_speed = vector2::magnitude(&horizontal_velocity);
+	/* Overshot past zero, or close enough to it: stop. */
+	if (velocity.x * old_velocity.x + velocity.y * old_velocity.y <= 0.0f
+	 || velocity.x * velocity.x + velocity.y * velocity.y
+	    <= E64_CHARACTER3D_BRAKE_TO_STOP_SPEED * E64_CHARACTER3D_BRAKE_TO_STOP_SPEED) {
+		velocity.x = 0.0f;
+		velocity.y = 0.0f;
 	}
+}
 
-	float facing_yaw;
-	if (data->strafe) {
-		/* With the weapon up the body keeps tracking the camera even planted;
-		   the plain strafe leaves a standstill facing free. */
-		if (!moving && !data->aiming && !data->charging_shoot) return;
-		facing_yaw = data->strafe_yaw;
-	} else {
-		if (!moving) return;
-		facing_yaw = rad_to_deg(fm_atan2f(-body->velocity.x, -body->velocity.y));
+/* Unreal's CalcVelocity, on the horizontal plane. The input's length is the
+   analog modifier: it scales the max speed and the acceleration both.
 
-		if (data->rotation_mode == CHARACTER3D_ROTATION_MODE_SNAP) {
-			body->rotation.z = angle_wrap(facing_yaw);
-			return;
+   With input, the friction kills the part of the velocity not along it — how
+   fast a turn sheds the old heading — then the acceleration adds along it and
+   the result is clamped to the max speed. A body already over the max (a
+   launch, a push) keeps its speed and only steers: the clamp is to what it
+   has, not to the max. Fluid friction decays the velocity whether there is
+   input or not, so a stroke never coasts. Without input it brakes. */
+void Movement::calcVelocity(const Vector2 *input, float max_speed, float friction,
+                            float braking_deceleration, float acceleration_scale, bool fluid, float dt)
+{
+	float input_size = vector2::magnitude(input);
+	if (input_size > 1.0f) input_size = 1.0f;
+
+	float max_acceleration = settings.max_acceleration * acceleration_scale;
+	bool zero_acceleration = input_size == 0.0f || max_acceleration <= 0.0f;
+
+	if (zero_acceleration) {
+		acceleration.x = 0.0f;
+		acceleration.y = 0.0f;
+		applyBraking(friction, braking_deceleration, dt);
+		if (fluid) {
+			float decay = 1.0f - friction * dt;
+			if (decay < 0.0f) decay = 0.0f;
+			velocity.x *= decay;
+			velocity.y *= decay;
 		}
-	}
-
-	const float current_yaw = body->rotation.z;
-	const float target_yaw = angle_wrap_relative(facing_yaw, current_yaw);
-
-	if (fabsf(target_yaw - current_yaw) <= CHARACTER3D_ROTATION_SNAP_THRESHOLD) {
-		body->rotation.z = target_yaw;
 		return;
 	}
 
-	uint8_t state = character->movement.current;
-	if (state == MOVEMENT_STATE_ROLLING || state == MOVEMENT_STATE_FALLING)
-		state = character->movement.locomotion;
-	float response_rate = getRotationAccelerationRate(character, state);
-	float factor = fm_expf(-response_rate * dt);
-	body->rotation.z = angle_wrap(current_yaw * factor + target_yaw * (1.0f - factor));
+	Vector2 direction = vector2::normalized(input);
+	acceleration.x = direction.x * max_acceleration * input_size;
+	acceleration.y = direction.y * max_acceleration * input_size;
+
+	/* Friction turns the velocity: the component off the input direction is
+	   shed at friction per second, the one along it is kept whole. */
+	float speed = sqrtf(velocity.x * velocity.x + velocity.y * velocity.y);
+	float turn = friction * dt;
+	if (turn > 1.0f) turn = 1.0f;
+	velocity.x -= (velocity.x - direction.x * speed) * turn;
+	velocity.y -= (velocity.y - direction.y * speed) * turn;
+
+	if (fluid) {
+		float decay = 1.0f - friction * dt;
+		if (decay < 0.0f) decay = 0.0f;
+		velocity.x *= decay;
+		velocity.y *= decay;
+	}
+
+	float max_input_speed = max_speed * input_size;
+	float max_input_speed_sq = max_input_speed * max_input_speed;
+
+	/* Over the max already: keep what it has, steer only. */
+	float speed_sq = velocity.x * velocity.x + velocity.y * velocity.y;
+	if (speed_sq > max_input_speed_sq * 1.0201f) { /* Unreal's 1% tolerance, squared */
+		max_input_speed_sq = speed_sq;
+		max_input_speed = sqrtf(speed_sq);
+	}
+
+	velocity.x += acceleration.x * dt;
+	velocity.y += acceleration.y * dt;
+
+	speed_sq = velocity.x * velocity.x + velocity.y * velocity.y;
+	if (speed_sq > max_input_speed_sq) {
+		float scale = max_input_speed / sqrtf(speed_sq);
+		velocity.x *= scale;
+		velocity.y *= scale;
+	}
 }
 
-static void updateBody(Character3D *character, float dt)
+/* Gravity and the terminal speed that goes with it. The collision pass clears
+   the acceleration again on landing. */
+void Movement::applyGravity(float gravity_scale, float dt)
 {
-	KinematicBody *body = &character->body;
-	MovementData *data = &character->movement.data;
+	acceleration.z = settings.gravity * gravity_scale;
+	velocity.z += acceleration.z * dt;
+	if (velocity.z < settings.fall_max_speed)
+		velocity.z = settings.fall_max_speed;
+}
 
-	data->previous_yaw = body->rotation.z;
-
-	/* A ladder standing in water is still a ladder: the climb owns the
-	   vertical, so the buoyancy must not bob the body off its rungs. */
-	if (data->in_water && character->movement.current != MOVEMENT_STATE_CLIMBING) {
-		const MovementSettings *settings = character->movement.settings;
-
-		/* Stroking raises the equilibrium so the swim pose meets the surface. */
-		float stroke = (settings->swim_slow_speed > 0.0f)
-			? data->horizontal_speed / settings->swim_slow_speed : 0.0f;
+/* Fake buoyancy. Gravity scaled by how far the capsule sits from the
+   equilibrium depth: deeper than it, the push turns upward. Stroking slides
+   the equilibrium toward the swim one so the swim pose meets the surface. The
+   fluid friction drags the vertical too, growing with the submerged body, so a
+   dive keeps its momentum through the surface and brakes on the way down. */
+void Movement::applyBuoyancy(float dt)
+{
+	float stroke = 0.0f;
+	if (settings.max_swim_speed > 0.0f) {
+		Vector2 horizontal = { velocity.x, velocity.y };
+		stroke = vector2::magnitude(&horizontal) / settings.max_swim_speed;
 		if (stroke > 1.0f) stroke = 1.0f;
-
-		float equilibrium = settings->water_equilibrium_idle
-			+ (settings->water_equilibrium_swim - settings->water_equilibrium_idle) * stroke;
-
-		/* Gravity scaled by how far the capsule sits from the equilibrium
-		   depth: deeper than it, the push turns upward. The drag grows with
-		   the submerged body, so a dive keeps its momentum through the
-		   surface and brakes progressively on the way down. */
-		float buoyant = CHARACTER3D_GRAVITY * (1.0f - data->submerged_fraction / equilibrium);
-		body->velocity.z += buoyant * dt;
-		body->velocity.z /= (1.0f + CHARACTER3D_WATER_DRAG * data->submerged_fraction * dt);
-
-		/* Progressive sink limit: none at the splash so a dive keeps its
-		   momentum, full past the saturation fraction — the pool is barely
-		   deeper than the capsule, so the brake cannot wait for the drag. */
-		float t = data->submerged_fraction / CHARACTER3D_WATER_SINK_LIMIT_FULL;
-		if (t > 1.0f) t = 1.0f;
-		float limit = CHARACTER3D_FALL_MAX_SPEED + (CHARACTER3D_WATER_SINK_MAX_SPEED - CHARACTER3D_FALL_MAX_SPEED) * t;
-		if (body->velocity.z < limit) body->velocity.z = limit;
-	}
-	else if (body->acceleration.z)
-		body->velocity.z += body->acceleration.z * dt;
-
-	if (fabsf(body->velocity.x) < LOCOMOTION_MIN_SPEED && fabsf(body->velocity.y) < LOCOMOTION_MIN_SPEED && body->velocity.z == 0) {
-		body->velocity.x = 0;
-		body->velocity.y = 0;
-		data->horizontal_speed = 0;
 	}
 
-	if (body->velocity.x != 0 || body->velocity.y != 0 || body->velocity.z != 0)
-		vector3::addScaledVector(&body->position, &body->velocity, dt);
+	float equilibrium = settings.water_equilibrium_idle
+		+ (settings.water_equilibrium_swim - settings.water_equilibrium_idle) * stroke;
 
-	setRotation(character, dt);
+	float buoyant = settings.gravity * (1.0f - data.submerged_fraction / equilibrium);
+	acceleration.z = buoyant;
+	velocity.z += buoyant * dt;
+	velocity.z /= (1.0f + settings.fluid_friction * data.submerged_fraction * dt);
+
+	/* Progressive sink limit: none at the splash so a dive keeps its momentum,
+	   the sink max once submerged past the limit fraction — the pool is barely
+	   deeper than the capsule, so the brake cannot wait for the drag. */
+	float t = data.submerged_fraction / settings.water_sink_limit_full;
+	if (t > 1.0f) t = 1.0f;
+	float limit = settings.fall_max_speed + (settings.water_sink_max_speed - settings.fall_max_speed) * t;
+	if (velocity.z < limit) velocity.z = limit;
 }
 
-/* The crouch that starts a jump runs here, on the ground, over walk or idle:
-   the stick still drives the body and holding the button only brakes it. The
-   impulse and the switch to the air come together when the crouch ends, so a
-   jump is never a state of its own — the air is always a fall. */
-static void setChargingJump(Character3D *character, MovementCommand *cmd, float dt)
+/* The jump leaves the floor with the velocity it had plus the jump speed up.
+   The air is always a fall: a jump is never a mode of its own. */
+void Movement::jump(MovementCommand *cmd)
 {
-	KinematicBody *body = &character->body;
-	MovementData *data = &character->movement.data;
-	const MovementSettings *settings = character->movement.settings;
-
-	if (cmd->jump_triggered) {
-		data->jump_initial_velocity = body->velocity;
-		data->jump_timer = 0.0f;
-		data->jump_force = 0.0f;
-		cmd->jump_triggered = false;
-
-		/* Snap: no crouch at all. The floor is left on this very frame with
-		   the minimum launch, and the rest of the height is added in the air
-		   for as long as the button holds. */
-		if (settings->jump_mode == JUMP_SNAP) {
-			body->velocity = data->jump_initial_velocity;
-			vector3::scale(&body->velocity, CHARACTER3D_JUMP_LAUNCH_VELOCITY_SCALE);
-			body->velocity.z = settings->jump_base_speed;
-
-			character->movement.next = MOVEMENT_STATE_FALLING;
-			return;
-		}
-	}
-	else if (data->jump_timer == 0.0f) return; /* nothing being charged */
-
-	data->jump_timer += dt;
-	if (cmd->jump_held) {
-		data->jump_force += dt;
-		vector3::scale(&body->velocity, CHARACTER3D_JUMP_HOLD_VELOCITY_SCALE);
-	}
-
-	if (data->jump_timer < settings->jump_timer_max) return;
-
-	/* Leaving the floor: the launch keeps a share of the run it came from. */
-	body->velocity = data->jump_initial_velocity;
-	vector3::scale(&body->velocity, CHARACTER3D_JUMP_LAUNCH_VELOCITY_SCALE);
-	body->velocity.z = data->jump_force * settings->jump_force_multiplier;
-	if (body->velocity.z < settings->jump_base_speed)
-		body->velocity.z = settings->jump_base_speed;
-
-	data->jump_force = 0.0f;
-	data->jump_timer = 0.0f;
-	character->movement.next = MOVEMENT_STATE_FALLING;
-}
-
-/* Coyote time for the snap: the body falls the way it always did, but for a
-   moment after the edge the button still launches. The charge needs none of
-   this — its crouch holds it in locomotion until it lets go. */
-bool isCoyoteOpen(const Character3D *character)
-{
-	return !character->movement.data.is_grounded
-	    && character->movement.data.coyote_timer < character->movement.settings->jump_coyote_time;
-}
-
-static void setSnappingJump(Character3D *character, MovementCommand *cmd, float dt)
-{
-	KinematicBody *body = &character->body;
-	MovementData *data = &character->movement.data;
-	const MovementSettings *settings = character->movement.settings;
-
-	data->coyote_timer += dt;
-
-	if (settings->jump_mode != JUMP_SNAP
-	 || !cmd->jump_triggered
-	 || data->coyote_timer >= settings->jump_coyote_time) return;
-
-	/* The run it walked off the ledge with is what it launches on: there was
-	   no press on the floor to have saved one. */
-	data->jump_initial_velocity = body->velocity;
-	vector3::scale(&body->velocity, CHARACTER3D_JUMP_LAUNCH_VELOCITY_SCALE);
-	body->velocity.z = settings->jump_base_speed;
-
-	/* One launch per edge: the window closes on the jump it granted. */
-	data->coyote_timer = settings->jump_coyote_time;
+	velocity.z = settings.jump_speed;
+	data.is_grounded = false;
+	data.coyote_timer = settings.jump_coyote_time;
+	setMode(MOVEMENT_STATE_FALL);
 	cmd->jump_triggered = false;
 }
 
-/* A crouch already under way. The edge can run out mid-crouch and the jump is
-   not lost for it: the body stays in locomotion and coasts, keeping the speed
-   it had and taking no gravity, until the crouch finishes and launches it as
-   if it had never left the ledge. */
-bool isChargingJump(const Character3D *character)
+/* Unreal's walking: full friction and braking, no vertical. Idle and walk are
+   the same ground: the mode is read off the result after the integration. */
+void Movement::updateWalking(MovementCommand *cmd, float dt)
 {
-	return character->movement.settings->jump_mode == JUMP_CHARGE
-	    && character->movement.data.jump_timer > 0.0f;
+	calcVelocity(&cmd->input, settings.max_walk_speed,
+	             settings.ground_friction, settings.braking_deceleration_walking,
+	             1.0f, false, dt);
+
+	acceleration.z = 0.0f;
+
+	if (cmd->jump_triggered) jump(cmd);
 }
 
-static void setLocomotion(Character3D *character, MovementCommand *cmd, float dt)
+/* Unreal's falling: air_control scales the acceleration, the lateral friction
+   and the falling braking shape the rest. Coyote time: for a moment after the
+   edge the button still launches. Holding it makes the rise cost less gravity,
+   only on the way up — past the top the fall is the fall. */
+void Movement::updateFalling(MovementCommand *cmd, float dt)
 {
-	uint8_t state = character->movement.current;
-	float target = getTargetSpeed(character, state) * getSpeedScale(character);
+	data.is_grounded = false;
 
-	setHorizontalVelocity(character, cmd->target_yaw, target, getAccelerationRate(character, state), dt);
-	setChargingJump(character, cmd, dt);
-}
-
-/* Gravity and the terminal speed that goes with it, for anything with no floor
-   under it. The collision pass clears the acceleration again on landing. */
-static void setGravity(KinematicBody *body, float gravity_scale)
-{
-	body->acceleration.z = CHARACTER3D_GRAVITY * gravity_scale;
-	if (body->velocity.z < CHARACTER3D_FALL_MAX_SPEED)
-		body->velocity.z = CHARACTER3D_FALL_MAX_SPEED;
-}
-
-static void setRolling(Character3D *character, MovementCommand *cmd, float dt)
-{
-	MovementData *data = &character->movement.data;
-	const MovementSettings *settings = character->movement.settings;
-
-	/* The trigger is the entry mark and is consumed here: the stick yaw is
-	   taken once and held until grip, and the timer starts from zero however
-	   the previous roll ended — a ledge can end one before its own last phase. */
-	if (cmd->roll_triggered) {
-		data->roll_yaw = cmd->target_yaw;
-		data->roll_timer = 0.0f;
-		cmd->roll_triggered = false;
+	if (data.coyote_timer < settings.jump_coyote_time) {
+		data.coyote_timer += dt;
+		if (cmd->jump_triggered) jump(cmd);
 	}
 
-	/* Rolling off a ledge drops: the state is what holds to the end of the
-	   clip, not the ground. */
-	if (!data->is_grounded) setGravity(&character->body, 1.0f);
+	calcVelocity(&cmd->input, settings.max_walk_speed,
+	             settings.falling_lateral_friction, settings.braking_deceleration_falling,
+	             settings.air_control, false, dt);
 
-	/* Out to idle, not to the locomotion state held from before the roll: the
-	   control runs first next frame and the stick raises it to walk if it is
-	   asking for one, the same way the floor probe turns it into a fall. */
-	if (data->roll_timer >= settings->roll_timer_max) {
-		character->movement.next = MOVEMENT_STATE_IDLE;
-		data->roll_timer = 0.0f;
-		return;
-	}
-
-	/* Three phases off the one timer: the launch drives the stick yaw at the
-	   roll's own speed, the spin holds whatever speed it reached along the
-	   body's own facing, and the grip hands the steering back to the stick. */
-	float yaw = data->roll_yaw;
-	float target_speed = settings->roll_target_speed;
-	float response_rate = settings->roll_launch_response_rate;
-
-	if (data->roll_timer >= settings->roll_grip_time) {
-		yaw = cmd->target_yaw;
-		target_speed = data->horizontal_speed;
-		response_rate = settings->roll_grip_response_rate;
-	}
-	else if (data->roll_timer >= settings->roll_ground_time) {
-		yaw = -character->body.rotation.z;
-		target_speed = data->horizontal_speed;
-		response_rate = settings->roll_spin_response_rate;
-	}
-
-	setHorizontalVelocity(character, yaw, target_speed, response_rate, dt);
-	data->roll_timer += dt;
-}
-
-static void setFalling(Character3D *character, MovementCommand *cmd, float dt)
-{
-	KinematicBody *body = &character->body;
-	MovementData *data = &character->movement.data;
-	const MovementSettings *settings = character->movement.settings;
-
-	data->is_grounded = 0;
-
-	setSnappingJump(character, cmd, dt);
-
-	/* Air control decides both halves at once: how far the heading can be
-	   pulled toward the stick, and how much the speed can move toward what
-	   the same stick would give on the ground. At zero neither moves and the
-	   jump keeps the run that launched it. */
-	float target_speed = data->horizontal_speed;
-	if (settings->air_control > 0.0f) {
-		float ground = character->movement.locomotion == MOVEMENT_STATE_WALKING
-		             ? getTargetSpeed(character, MOVEMENT_STATE_WALKING) * getSpeedScale(character)
-		             : 0.0f;
-		target_speed += (ground - target_speed) * settings->air_control;
-	}
-
-	setHorizontalVelocity(character, cmd->target_yaw, target_speed,
-	                      settings->jump_response_rate * settings->air_control, dt);
-
-	/* Snap: holding the button makes the rise cost less gravity, so how long
-	   it is held is how high it goes. Only on the way up — past the top the
-	   fall is the fall, and nobody floats down. */
 	float gravity_scale = 1.0f;
-	if (settings->jump_mode == JUMP_SNAP && cmd->jump_held && body->velocity.z > 0.0f)
-		gravity_scale = settings->jump_hold_gravity_scale;
+	if (cmd->jump_held && velocity.z > 0.0f)
+		gravity_scale = settings.jump_hold_gravity_scale;
 
-	setGravity(body, gravity_scale);
+	applyGravity(gravity_scale, dt);
 }
 
-/* The vertical is not touched here: the fake buoyancy in updateBody floats,
-   bobs and damps the capsule on its own. The stick only swims horizontally. */
-static void setSwimming(Character3D *character, MovementCommand *cmd, float dt)
+/* Unreal's swimming, horizontal only: the vertical is the buoyancy's. */
+void Movement::updateSwimming(MovementCommand *cmd, float dt)
 {
-	const MovementSettings *settings = character->movement.settings;
-	KinematicBody *body = &character->body;
+	data.is_grounded = false;
 
-	/* Tired locks the fast stroke away, same as the top gait on land. */
-	uint8_t swim_gait = cmd->swim_gait;
-	if (character->stats.tired && swim_gait == CHARACTER3D_SWIM_GAIT_FAST)
-		swim_gait = CHARACTER3D_SWIM_GAIT_SLOW;
+	calcVelocity(&cmd->input, settings.max_swim_speed,
+	             settings.fluid_friction, settings.braking_deceleration_swimming,
+	             1.0f, true, dt);
 
-	float target = 0.0f;
-	if (swim_gait == CHARACTER3D_SWIM_GAIT_SLOW) target = settings->swim_slow_speed;
-	if (swim_gait == CHARACTER3D_SWIM_GAIT_FAST) target = settings->swim_fast_speed;
-
-	setHorizontalVelocity(character, cmd->target_yaw, target * getSpeedScale(character), settings->swim_response_rate, dt);
-	body->acceleration.z = 0.0f;
+	applyBuoyancy(dt);
 }
 
-/* On a ladder the state owns the body outright: no gravity, and the stick
-   drives the vertical instead of a run. The horizontal is spent entirely on
-   pulling the body onto the anchor the probe wrote, so an approach from the
-   side slides into the ladder's centre line rather than climbing thin air. */
-static void setClimbing(Character3D *character, MovementCommand *cmd, float dt)
+/* Climb: no gravity and the horizontal brakes to a stop. What drives the
+   vertical and what enters and leaves the mode is not defined yet — the
+   command carries no climb axis and the world has no climbable. Until then a
+   body put in this mode hangs still where it is. */
+void Movement::updateClimbing(MovementCommand *cmd, float dt)
 {
-	KinematicBody *body = &character->body;
-	MovementData *data = &character->movement.data;
-	const MovementSettings *settings = character->movement.settings;
+	(void)cmd;
 
-	body->acceleration.z = 0.0f;
+	data.is_grounded = false;
+	acceleration = (Vector3){ 0.0f, 0.0f, 0.0f };
 
-	float target = cmd->climb * settings->climb_speed * getSpeedScale(character);
-	float factor = fm_expf(-settings->climb_response_rate * dt);
-	body->velocity.z = body->velocity.z * factor + target * (1.0f - factor);
-
-	/* The anchor is a position, not a target speed: the pull is written as
-	   the velocity that closes the gap left this frame, so it dies out on
-	   arrival instead of circling it. */
-	float pull = (1.0f - fm_expf(-CHARACTER3D_LADDER_ANCHOR_RATE * dt)) / dt;
-	body->velocity.x = (data->ladder_anchor_x - body->position.x) * pull;
-	body->velocity.y = (data->ladder_anchor_y - body->position.y) * pull;
-
-	data->horizontal_speed = 0.0f;
-	data->is_grounded = 0;
-
-	/* The rungs are what the body faces, whatever it faced walking in. */
-	body->rotation.z = data->ladder_yaw;
-	data->rotation_mode = CHARACTER3D_ROTATION_MODE_SNAP;
+	applyBraking(0.0f, settings.braking_deceleration_climbing, dt);
+	velocity.z = 0.0f;
 }
 
-/* Ladder entry and exit, from the climbable probe of the physics pass.
-   Entering asks the stick to be pushing at the rungs, so walking past a
-   ladder never snatches the body onto it.
-
-   Every exit but the release is a loss of contact: the volume is what says
-   where climbing is possible, and running off its top while still climbing
-   is the body cresting the ladder. That exit gets a push toward the rungs so
-   it lands on the ledge instead of peeling back off the face. */
-static void evaluateLadder(Character3D *character, MovementCommand *cmd)
+/* Swim entry and exit, from the water probe of the collision pass. Entry is
+   the swim equilibrium: sunk past the depth the buoyancy holds the body at,
+   the water is already carrying it. Exit trails entry by the exit scale, the
+   hysteresis against the waves, and needs footing; out of the water with
+   nothing under the feet it is a fall. */
+void Movement::evaluateWater()
 {
-	Movement *movement = &character->movement;
-	MovementData *data = &movement->data;
-	KinematicBody *body = &character->body;
-
-	if (movement->current != MOVEMENT_STATE_CLIMBING) {
-		if (!data->on_ladder || cmd->climb <= 0.0f) return;
-		if (movement->next != MOVEMENT_STATE_NONE) return;
-
-		/* Swimming counts: a ladder in a pool is how the body gets out. */
-		if (!isLocomotion(movement->current)
-		 && movement->current != MOVEMENT_STATE_FALLING
-		 && movement->current != MOVEMENT_STATE_SWIMMING) return;
-
-		/* Not from the crest: standing on top of the ladder leaves the feet
-		   right at the volume's ceiling, and without this margin the climb
-		   that just ended there grabs straight back on. */
-		if (body->position.z > data->ladder_top - CHARACTER3D_LADDER_ENTER_MARGIN) return;
-
-		/* Grabbing on kills whatever vertical the body arrived with: a fall
-		   caught by a ladder would otherwise ride its own speed down past
-		   the rungs while the climb slowly talks it out of it. */
-		body->velocity.z = 0.0f;
-		movement->next = MOVEMENT_STATE_CLIMBING;
+	if (mode != MOVEMENT_STATE_SWIM) {
+		if (mode == MOVEMENT_STATE_CLIMB) return;
+		if (data.in_water && data.submerged_fraction >= settings.water_equilibrium_swim)
+			setMode(MOVEMENT_STATE_SWIM);
 		return;
 	}
 
-	if (cmd->climb_release) {
-		/* The release is the jump button: whatever ask it left in the command
-		   dies here, or the fall would carry it to the floor and launch it
-		   on the landing. */
-		cmd->jump_triggered = false;
-		cmd->jump_held = false;
-		movement->next = MOVEMENT_STATE_FALLING;
+	if (!data.in_water) {
+		setMode(MOVEMENT_STATE_FALL);
 		return;
 	}
 
-	if (!data->on_ladder) {
-		/* Off the top with the stick still climbing: step onto the landing.
-		   The push is horizontal and the fall carries it from there, so the
-		   body arrives with the landing clip it already has.
-
-		   The heading is commandeered along with the velocity. The fall
-		   steers toward whatever the stick last asked for, and on a ladder
-		   the stick means up, not a direction — left to itself the body
-		   would crest the top and immediately walk off wherever the camera
-		   happened to be pointing, which mostly means back into the rungs
-		   it just left. It holds this heading until the stick is moved. */
-		if (cmd->climb > 0.0f) {
-			float s, c;
-			fm_sincosf(deg_to_rad(-data->ladder_yaw), &s, &c);
-			body->velocity.x = CHARACTER3D_LADDER_EXIT_SPEED * s;
-			body->velocity.y = CHARACTER3D_LADDER_EXIT_SPEED * -c;
-			body->velocity.z = 0.0f;
-			data->horizontal_speed = CHARACTER3D_LADDER_EXIT_SPEED;
-			cmd->target_yaw = -data->ladder_yaw;
-		}
-		movement->next = MOVEMENT_STATE_FALLING;
-		return;
-	}
-
-	/* Back at the foot with the stick pushing down: the ground itself is
-	   what says so, not the volume — its floor sits below the stair's, so
-	   that someone standing at the bottom is inside it to begin with. */
-	if (cmd->climb < 0.0f && data->floor_distance >= 0.0f
-	 && data->floor_distance <= CHARACTER3D_LADDER_GROUND_REACH)
-		movement->next = movement->locomotion;
+	if (data.is_grounded
+	 && data.submerged_fraction < settings.water_equilibrium_swim * settings.water_swim_exit_scale)
+		setMode(MOVEMENT_STATE_WALK);
 }
 
-/* Swim entry and exit, from the water probe of the physics pass. Two separate
-   questions, never one: the volume says whether there is water, and the floor
-   says whether it can be walked. A body inside the water with nothing under
-   its feet swims; one standing on the bottom wades, however deep the water
-   reaches on it.
-
-   How far the body sinks is not asked here on purpose. It moves with the
-   buoyancy, which moves with the speed, and a state read off it changes when
-   the stick does: standing still in a shallow pool would drop the swim, and
-   pushing the stick would take it back, over and over. */
-static void evaluateWater(Character3D *character)
+/* Unreal's bOrientRotationToMovement: the collider turns toward its velocity
+   at a constant rate, degrees per second, and snaps the last sliver. Yaw
+   convention of the engine: velocity (sin yaw, -cos yaw) faces yaw. The yaw is
+   read from the collider's rotation matrix and the matrix is rebuilt from the
+   new one, so no wrap is needed. */
+void Movement::rotate(Collider *collider, float dt)
 {
-	Movement *movement = &character->movement;
-	const MovementData *data = &movement->data;
-	uint8_t current = movement->current;
+	if (mode == MOVEMENT_STATE_CLIMB) return;
+	if (velocity.x == 0.0f && velocity.y == 0.0f) return;
 
-	if (current != MOVEMENT_STATE_SWIMMING) {
-		bool can_enter = isLocomotion(current)
-		              || current == MOVEMENT_STATE_FALLING
-		              || current == MOVEMENT_STATE_ROLLING;
+	float facing_yaw = rad_to_deg(fm_atan2f(-velocity.x, -velocity.y));
+	float current_yaw = collider::getYaw(collider);
+	float target_yaw = angle_wrap_relative(facing_yaw, current_yaw);
+	float delta = target_yaw - current_yaw;
+	float step = settings.rotation_rate * dt;
 
-		if (can_enter && data->in_water && !data->is_grounded)
-			movement->next = MOVEMENT_STATE_SWIMMING;
+	if (fabsf(delta) <= step || fabsf(delta) <= E64_CHARACTER3D_ROTATION_SNAP_THRESHOLD) {
+		collider::setYaw(collider, target_yaw);
 		return;
 	}
 
-	/* Out of the water, or standing on the bottom of it. Airborne, the floor
-	   probe of the physics pass turns it into falling on its own. */
-	if (!data->in_water || data->is_grounded)
-		movement->next = movement->locomotion;
+	collider::setYaw(collider, current_yaw + (delta > 0.0f ? step : -step));
 }
 
-static void (*handler[MOVEMENT_STATE_COUNT])(Character3D *, MovementCommand *, float) = {
-	[MOVEMENT_STATE_IDLE] = setLocomotion,
-	[MOVEMENT_STATE_WALKING] = setLocomotion,
-	[MOVEMENT_STATE_ROLLING] = setRolling,
-	[MOVEMENT_STATE_FALLING] = setFalling,
-	[MOVEMENT_STATE_SWIMMING] = setSwimming,
-	[MOVEMENT_STATE_CLIMBING] = setClimbing,
-};
 
-_Static_assert(sizeof(handler) / sizeof(handler[0]) == MOVEMENT_STATE_COUNT, "movement::handler must have one entry per character state");
+void Movement::update(Collider *collider, MovementCommand *cmd, float dt)
+{
+	assert(collider);
+	assert(cmd);
+
+	switch (mode) {
+		case MOVEMENT_STATE_IDLE:
+		case MOVEMENT_STATE_WALK:  updateWalking(cmd, dt); break;
+		case MOVEMENT_STATE_FALL:  updateFalling(cmd, dt); break;
+		case MOVEMENT_STATE_SWIM:  updateSwimming(cmd, dt); break;
+		case MOVEMENT_STATE_CLIMB: updateClimbing(cmd, dt); break;
+		default: assert(0 && "movement mode out of range");
+	}
+
+	if (velocity.x != 0.0f || velocity.y != 0.0f || velocity.z != 0.0f)
+		vector3::addScaledVector(&collider->transform.position, &velocity, dt);
+
+	rotate(collider, dt);
+	evaluateWater();
+
+	/* The ground modes are one ground: moving is walk, still is idle. */
+	if (mode == MOVEMENT_STATE_IDLE || mode == MOVEMENT_STATE_WALK) {
+		bool moving = velocity.x != 0.0f || velocity.y != 0.0f
+		           || cmd->input.x != 0.0f || cmd->input.y != 0.0f;
+		mode = moving ? MOVEMENT_STATE_WALK : MOVEMENT_STATE_IDLE;
+	}
+}
+
+void Movement::setMode(uint8_t new_mode)
+{
+	assert(new_mode < MOVEMENT_STATE_COUNT);
+	mode = new_mode;
+}
+
+bool Movement::isCoyoteOpen() const
+{
+	return !data.is_grounded && data.coyote_timer < settings.jump_coyote_time;
+}
+
+/* Unreal's Launch: the velocity is replaced and the body is in the air. */
+void Movement::launch(const Vector3 *new_velocity)
+{
+	velocity = *new_velocity;
+	data.is_grounded = false;
+	data.coyote_timer = settings.jump_coyote_time;
+	setMode(MOVEMENT_STATE_FALL);
+}
+
+/* Added to the velocity; the mode changes only if it lifts a grounded body. */
+void Movement::addImpulse(const Vector3 *impulse)
+{
+	vector3::add(&velocity, impulse);
+	data.coyote_timer = settings.jump_coyote_time;
+
+	if ((mode == MOVEMENT_STATE_IDLE || mode == MOVEMENT_STATE_WALK) && velocity.z > 0.0f) {
+		data.is_grounded = false;
+		setMode(MOVEMENT_STATE_FALL);
+	}
+}
 
 }
-}
+
 
 void Character3D::updateMovement(character3d::MovementCommand *cmd, float dt)
 {
-	assert(cmd);
-
-	assert(movement.current < character3d::MOVEMENT_STATE_COUNT);
-	assert(character3d::movement::handler[movement.current] != NULL);
-
-	movement.data.rotation_mode = CHARACTER3D_ROTATION_MODE_LERP;
-	movement.data.strafe = cmd->strafe;
-	movement.data.strafe_locked = cmd->strafe_locked;
-	movement.data.strafe_yaw = cmd->strafe_yaw;
-	movement.data.aiming = cmd->aiming;
-	movement.data.charging_shoot = cmd->charging_shoot;
-	movement.data.shooting = cmd->shooting;
-
-	/* Tired locks the top gait away: the character stays on the previous one
-	   until the stamina is back. */
-	float gait = cmd->gait;
-	uint8_t last = movement.settings->gait_count - 1;
-	if (stats.tired && last > 0 && gait > (float)(last - 1))
-		gait = (float)(last - 1);
-	movement.data.gait = gait;
-	movement.next = character3d::MOVEMENT_STATE_NONE;
-
-	character3d::movement::handler[movement.current](this, cmd, dt);
-	character3d::movement::updateBody(this, dt);
-	character3d::movement::evaluateWater(this);
-	character3d::movement::evaluateLadder(this, cmd);
-	character3d::movement::evaluateTransitions(this);
+	movement.update(&collider, cmd, dt);
 }
 
 }
