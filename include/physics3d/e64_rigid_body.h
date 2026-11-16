@@ -84,6 +84,12 @@ public:
 		int lock_axis_x;
 		int lock_axis_y;
 		int lock_axis_z;
+
+		/* The collision the body carries, each shape with its own offset in
+		   its .tx. rigidBody::init does not read them: whoever creates the
+		   body adds them, with the scale it stands at. */
+		const physics::Shape::Def *shape;
+		uint8_t shape_count;
 	};
 
 

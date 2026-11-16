@@ -2,66 +2,71 @@
 #define ENGINE64_LIGHT_H
 
 #include <libdragon.h>
-#include <t3d/t3dmath.h>
+
+#include "math/e64_vector3.h"
 
 namespace e64 {
 
-namespace light {
+/* One light of the scene, a primitive like a mesh or a sound: a prefab
+   declares it, light::create opens it, and whoever holds it moves it by
+   writing its fields. It carries its own place in the scene, in metres. */
+class Light {
+public:
 
-/* t3d hands out seven slots and a light takes one whatever its kind, so the
-   split between directional and point is the scene's to make. */
-constexpr int COUNT = 7;
+	/* t3d hands out seven slots and a light takes one whatever its kind, so
+	   the split between directional and point is the game's to make. */
+	static constexpr int MAX_LIGHTS = 7;
+
+	enum Type {
+
+		/* A free slot. Zero on purpose: lights nobody opened are all free. */
+		LIGHT_NONE,
+
+		LIGHT_DIRECTIONAL,
+		LIGHT_POINT,
+
+	};
 
 
-typedef enum {
+	struct Def {
 
-	/* An empty slot. Zero on purpose: the set walks the table in order and
-	   stops at the first one, so a scene pays only for what it declared. */
-	LIGHT_NONE,
+		Type type;
+		color_t color;
 
-	LIGHT_DIRECTIONAL,
-	LIGHT_POINT,
+		/* Directional: where the light comes from. Normalised when the
+		   light is created. */
+		Vector3 direction;
 
-} Type;
+		/* Point: where it stands in the scene and how far it carries. */
+		Vector3 position;
+		float size;
 
+	};
 
-typedef struct {
 
 	Type type;
 	color_t color;
 
-	union {
-		/* Where the light comes from; normalised by the init. */
-		struct { T3DVec3 direction; } directional;
+	Vector3 direction; /* directional; kept normalised by whoever writes it */
+	Vector3 position; /* point, metres */
+	float size; /* point, metres */
 
-		/* Where it stands and how far it carries. */
-		struct { T3DVec3 position; float size; } point;
-	};
-
-} Source;
-
-
-typedef struct {
-
-	color_t ambient_color;
-	Source source[COUNT];
-
-} Def;
-
-}
-
-typedef light::Def Light;
+};
 
 
 namespace light {
 
-Light *get(void);
+/* Frees every light and sets the ambient colour. */
+void init(color_t ambient_color);
 
-/* Copies the scene's declaration into the live lights. */
-void init(const Def *def);
+void setAmbient(color_t ambient_color);
 
-/* Hands the lights to t3d, stopping at the first empty slot. */
-void set(const Light *source);
+/* Opens a light from its declaration. Asserts when the seven are taken. */
+Light *create(const Light::Def *def);
+void destroy(Light *light);
+
+/* Hands the ambient colour and the open lights to t3d. */
+void set(void);
 
 }
 

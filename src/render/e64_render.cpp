@@ -31,19 +31,6 @@ namespace render {
 static Render::Context frame_context;
 
 
-namespace transform {
-
-void init(Render::Transform *t)
-{
-	*t = (Render::Transform){
-		.position = {0.0f, 0.0f, 0.0f},
-		.rotation = {0.0f, 0.0f, 0.0f},
-		.scale = {1.0f, 1.0f, 1.0f},
-	};
-}
-
-}
-
 namespace context {
 
 void init(Render::Context *ctx)
@@ -247,7 +234,7 @@ void draw(void)
 	start(&viewport->fb_index);
 
 	if (ctx->element3d_count > 0) {
-		light::set(light::get());
+		light::set();
 		fog::set(fog::get());
 
 		/* The elements grouped by material: a counting sort over the table

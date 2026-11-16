@@ -7,6 +7,7 @@
 #include <t3d/t3dskeleton.h>
 
 #include "render/e64_render.h"
+#include "render/e64_transform3d.h"
 #include "math/e64_vector2.h"
 #include "math/e64_vector3.h"
 #include "math/e64_quaternion.h"
@@ -33,6 +34,10 @@ public:
 
 		const char *model;
 
+		/* Where the model stands in the scene. Left at zero it is at the
+		   origin, unrotated, at its own size. */
+		Transform3D transform;
+
 		/* The model's clips and the graph that blends them. NULL: the model
 		   is static. */
 		const Animation::Def *animation;
@@ -42,7 +47,7 @@ public:
 		   the model is drawn whole. */
 		const char *const *part;
 
-		/* Where each of those objects is drawn, in the entity's own space and
+		/* Where each of those objects is drawn, in the model's own space and
 		   in the same order as the names. A part left at zero stays where it
 		   was modelled. */
 		const Vector3 *part_position;
@@ -73,11 +78,11 @@ public:
 	uint8_t part_count;
 
 	/* A named part can be drawn away from the rest of the model. Its offset is
-	   held in the entity's own space and turned into a matrix of its own every
+	   held in the model's own space and turned into a matrix of its own every
 	   frame, one per framebuffer. Both stay NULL until a part is actually
-	   offset, and a part left at zero keeps using the entity's matrix.
+	   offset, and a part left at zero keeps using the model's matrix.
 	   Indexed by named part, so part 1 is the first entry. */
-	Render::Transform *part_offset;
+	Transform3D *part_offset;
 	T3DMat4FP *part_matrix;
 
 	T3DMat4FP *matrix_buffer; /* NULL = matrix baked in dl (static mesh) */
@@ -103,12 +108,11 @@ public:
 	int16_t local_min[3];
 	int16_t local_max[3];
 
-	/* Where the entity stands, in render units, as last handed to the
-	   matrix. The frustum is moved into the model's space with these, so
-	   every box stays the one the file wrote. */
-	Vector3 scale;
-	Quaternion rotation;
-	Vector3 position;
+	/* Where the model stands, the mesh's own: declared by its def, and
+	   rewritten by whoever moves it. The matrix is written from it and the
+	   frustum is moved into the model's space with it, so every box stays
+	   the one the file wrote. */
+	Transform3D transform;
 	bool culled;
 };
 
@@ -126,8 +130,9 @@ inline T3DObject *object(const Mesh *mesh, uint16_t i)
 	return (T3DObject *)((char *)model + (model->chunkOffsets[i].offset & 0x00FFFFFF));
 }
 
-/* Loads the model, opens its animation when the def has one and records it
-   with every part on screen. */
+/* Loads the model, opens its animation when the def has one, records it
+   with every part on screen and places it where the def says, with its
+   matrix written for every framebuffer. */
 Mesh *create(const Mesh::Def *def);
 void destroy(Mesh *mesh);
 
@@ -140,12 +145,10 @@ void initBounds(Mesh *mesh);
    boxes are written per bone and say nothing about the posed mesh. */
 void cull(Mesh *mesh, const T3DViewport *viewport);
 
-void setMatrix(Mesh *mesh, const Render::Transform *transform, uint8_t fb_index);
-
-/* Same, but from a simulated body: position in metres and a quaternion, which
-   is what a tumbling body actually has. */
-void setMatrixFromBody(Mesh *mesh, const Vector3 *position, const Quaternion *rotation,
-                       const Vector3 *scale, uint8_t fb_index);
+/* Moves the model: keeps the transform as the mesh's own and writes the
+   frame's matrix from it. What follows a body is placed through
+   transform3d::fromBody. */
+void setMatrix(Mesh *mesh, const Transform3D *transform, uint8_t fb_index);
 
 /* Records the model: one geometry block per object, and its material shared
    through the global table. Objects named in the list become parts 1..count,
@@ -177,14 +180,14 @@ void setVisible(Mesh *mesh, uint8_t part, bool visible);
 
 bool isVisible(const Mesh *mesh, uint8_t part);
 
-/* Moves one named part away from the rest of the model, in the entity's own
-   space: position in render units, rotation in degrees, and a zero scale left
-   as original size. The part is given matrices of its own the first time it is
-   offset, and follows the entity from then on. */
-void setOffset(Mesh *mesh, uint8_t part, const Render::Transform *offset);
+/* Moves one named part away from the rest of the model, in the model's own
+   space: position in metres, and a rotation or a scale left at zero taken
+   as none. The part is given matrices of its own the first time it is
+   offset, and follows the model from then on. */
+void setOffset(Mesh *mesh, uint8_t part, const Transform3D *offset);
 
 /* The offset a part is currently drawn with, NULL when it has none. */
-const Render::Transform *getOffset(const Mesh *mesh, uint8_t part);
+const Transform3D *getOffset(const Mesh *mesh, uint8_t part);
 
 /* The matrix a part has to be drawn with: its own when it is offset, and the
    mesh's otherwise. Part 0 always draws with the mesh's. */

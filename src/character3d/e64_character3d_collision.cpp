@@ -13,7 +13,7 @@
 #include <stdint.h>
 
 #include "character3d/e64_character3d.h"
-#include "entity/e64_entity.h"
+#include "entity/e64_entity3d.h"
 #include "math/e64_math.h"
 #include "physics3d/e64_physics_world.h"
 #include "physics3d/e64_rigid_body.h"

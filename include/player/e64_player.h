@@ -56,7 +56,6 @@ void init(void);
    seat driving that kind and no other. */
 void setCharacter3D(PlayerID id, Character3D *character);
 void setCharacter2D(PlayerID id, Character2D *character);
-void switchCharacter3D(PlayerID id, int8_t direction);
 void update(void);
 
 }

@@ -203,9 +203,7 @@ static void skinnedBound(Mesh *mesh, const T3DChunkSkeleton *skeleton)
 
 void initBounds(Mesh *mesh)
 {
-	mesh->scale = (Vector3){ 1.0f, 1.0f, 1.0f };
-	mesh->rotation = quaternion::identity();
-	mesh->position = (Vector3){ 0.0f, 0.0f, 0.0f };
+	mesh->transform = transform3d::identity();
 	mesh->culled = false;
 
 	const T3DChunkSkeleton *skeleton = t3d_model_get_skeleton(mesh->model);
@@ -220,46 +218,22 @@ void initBounds(Mesh *mesh)
 	}
 }
 
-/* The RSP matrix of a placement, straight in fixed point. */
-static void writeMatrix(T3DMat4FP *out, const Vector3 *scale, const Quaternion *rotation, const Vector3 *position)
-{
-	t3d_mat4fp_from_srt(
-		out,
-		(float[3]){ scale->x, scale->y, scale->z },
-		(float[4]){ rotation->x, rotation->y, rotation->z, rotation->w },
-		(float[3]){ position->x, position->y, position->z }
-	);
-}
-
-/* An offset part's placement: the entity's with the offset applied inside it.
-   Scales multiply per axis and rotations compose, which equals the entity's
-   matrix times the offset's while the entity's scale is uniform or the offset
-   carries no rotation; a prop scaled per axis with a rotated part would need
-   the full product. */
-static void composePart(const Mesh *mesh, const Render::Transform *offset,
-                        Vector3 *scale, Quaternion *rotation, Vector3 *position)
-{
-	Vector3 local = {
-		mesh->scale.x * offset->position.x * RENDER_SCALE,
-		mesh->scale.y * offset->position.y * RENDER_SCALE,
-		mesh->scale.z * offset->position.z * RENDER_SCALE,
-	};
-	Vector3 moved = quaternion::rotateVector(&mesh->rotation, &local);
-	Quaternion turn = quaternion::fromEuler(deg_to_rad(offset->rotation.x), deg_to_rad(offset->rotation.y), deg_to_rad(offset->rotation.z));
-
-	*scale    = (Vector3){ mesh->scale.x * offset->scale.x, mesh->scale.y * offset->scale.y, mesh->scale.z * offset->scale.z };
-	*rotation = quaternion::product(&mesh->rotation, &turn);
-	*position = (Vector3){ mesh->position.x + moved.x, mesh->position.y + moved.y, mesh->position.z + moved.z };
-}
-
 /* The frustum in the space of a placement. A world plane n·x + w, for a point
    placed by scale S, rotation R and translation t, reads (S·Rᵀn)·x + (w + n·t)
    on the model's own coordinates. The box test only looks at the sign, so the
-   planes need no renormalising. */
-static void localFrustum(T3DFrustum *out, const T3DFrustum *world,
-                         const Vector3 *scale, const Quaternion *rotation, const Vector3 *position)
+   planes need no renormalising. The frustum and the boxes are in render
+   units, so the placement's position is taken there. */
+static void localFrustum(T3DFrustum *out, const T3DFrustum *world, const Transform3D *placement)
 {
+	const Quaternion *rotation = &placement->rotation;
+	const Vector3 *scale = &placement->scale;
+
 	Quaternion inverse = { -rotation->x, -rotation->y, -rotation->z, rotation->w };
+	Vector3 position = {
+		placement->position.x * RENDER_SCALE,
+		placement->position.y * RENDER_SCALE,
+		placement->position.z * RENDER_SCALE,
+	};
 
 	for (int i = 0; i < 6; i++) {
 		const float *plane = world->planes[i].v;
@@ -269,14 +243,14 @@ static void localFrustum(T3DFrustum *out, const T3DFrustum *world,
 		out->planes[i].v[0] = r.x * scale->x;
 		out->planes[i].v[1] = r.y * scale->y;
 		out->planes[i].v[2] = r.z * scale->z;
-		out->planes[i].v[3] = plane[3] + n.x * position->x + n.y * position->y + n.z * position->z;
+		out->planes[i].v[3] = plane[3] + n.x * position.x + n.y * position.y + n.z * position.z;
 	}
 }
 
 void cull(Mesh *mesh, const T3DViewport *viewport)
 {
 	T3DFrustum frustum;
-	localFrustum(&frustum, &viewport->viewFrustum, &mesh->scale, &mesh->rotation, &mesh->position);
+	localFrustum(&frustum, &viewport->viewFrustum, &mesh->transform);
 
 	bool in_box = t3d_frustum_vs_aabb_s16(&frustum, mesh->local_min, mesh->local_max);
 
@@ -307,10 +281,8 @@ void cull(Mesh *mesh, const T3DViewport *viewport)
 		test[p] = &frustum;
 		if (!mesh->part_offset) continue;
 
-		Vector3 scale, position;
-		Quaternion rotation;
-		composePart(mesh, &mesh->part_offset[p - 1], &scale, &rotation, &position);
-		localFrustum(&part_frustum[p], &viewport->viewFrustum, &scale, &rotation, &position);
+		Transform3D placed = transform3d::product(&mesh->transform, &mesh->part_offset[p - 1]);
+		localFrustum(&part_frustum[p], &viewport->viewFrustum, &placed);
 		test[p] = &part_frustum[p];
 	}
 
@@ -334,46 +306,27 @@ void cull(Mesh *mesh, const T3DViewport *viewport)
 /* Placement                                                                 */
 /* ------------------------------------------------------------------------ */
 
-/* An offset part is drawn with the entity's placement carrying its own on
-   top, so it follows whatever the entity does and keeps its displacement
+/* An offset part is drawn with the model's placement carrying its own on
+   top, so it follows whatever the model does and keeps its displacement
    inside it. */
 static void setPartMatrices(Mesh *mesh, uint8_t fb_index)
 {
 	if (!mesh->part_matrix) return;
 
 	for (int i = 0; i < mesh->part_count; i++) {
-		Vector3 scale, position;
-		Quaternion rotation;
-		composePart(mesh, &mesh->part_offset[i], &scale, &rotation, &position);
-		writeMatrix(&mesh->part_matrix[i * Viewport::FB_COUNT + fb_index], &scale, &rotation, &position);
+		Transform3D placed = transform3d::product(&mesh->transform, &mesh->part_offset[i]);
+		transform3d::toMatrix(&placed, &mesh->part_matrix[i * Viewport::FB_COUNT + fb_index]);
 	}
 }
 
 
-/* A simulated body tumbles, and euler angles cannot describe that without
-   picking an order and losing the tumble at the poles. The body already keeps
-   a quaternion, so it goes straight to the matrix. */
-void setMatrixFromBody(Mesh *mesh, const Vector3 *position, const Quaternion *rotation,
-                       const Vector3 *scale, uint8_t fb_index)
+/* The placement is kept as the mesh's own transform: the RSP matrix is
+   written from it, and the culling moves the frustum with it. */
+void setMatrix(Mesh *mesh, const Transform3D *transform, uint8_t fb_index)
 {
-	mesh->scale = *scale;
-	mesh->rotation = *rotation;
-	mesh->position = (Vector3){ position->x * RENDER_SCALE, position->y * RENDER_SCALE, position->z * RENDER_SCALE };
+	mesh->transform = *transform;
 
-	writeMatrix(&mesh->matrix_buffer[fb_index], &mesh->scale, &mesh->rotation, &mesh->position);
-	setPartMatrices(mesh, fb_index);
-}
-
-
-/* The placement is kept as scale, rotation and translation: the RSP matrix
-   is written from it, and the culling moves the frustum with it. */
-void setMatrix(Mesh *mesh, const Render::Transform *transform, uint8_t fb_index)
-{
-	mesh->scale = transform->scale;
-	mesh->rotation = quaternion::fromEuler(deg_to_rad(transform->rotation.x), deg_to_rad(transform->rotation.y), deg_to_rad(transform->rotation.z));
-	mesh->position = (Vector3){ transform->position.x * RENDER_SCALE, transform->position.y * RENDER_SCALE, transform->position.z * RENDER_SCALE };
-
-	writeMatrix(&mesh->matrix_buffer[fb_index], &mesh->scale, &mesh->rotation, &mesh->position);
+	transform3d::toMatrix(&mesh->transform, &mesh->matrix_buffer[fb_index]);
 	setPartMatrices(mesh, fb_index);
 }
 
@@ -472,7 +425,6 @@ Mesh *create(const Mesh::Def *def)
 	mesh->model = (T3DModel *)resource::load(def->model, Resource::MODEL, NULL);
 	mesh->matrix_buffer = (T3DMat4FP *)malloc_uncached(sizeof(T3DMat4FP) * Viewport::FB_COUNT);
 	assert(mesh->matrix_buffer);
-	t3d_mat4fp_identity(mesh->matrix_buffer);
 	initBounds(mesh);
 
 	/* An animated model records against the skeleton segment, filled each
@@ -498,9 +450,17 @@ Mesh *create(const Mesh::Def *def)
 		if (position->x == 0.0f && position->y == 0.0f && position->z == 0.0f)
 			continue;
 
-		Render::Transform offset = { .position = *position, .scale = { 1.0f, 1.0f, 1.0f } };
+		Transform3D offset = transform3d::identity();
+		offset.position = *position;
 		part::setOffset(mesh, 1 + i, &offset);
 	}
+
+	/* The model stands where its def says from the start, in every
+	   framebuffer: whatever never moves is never written again. The parts
+	   are already offset, so their matrices come out with it. */
+	Transform3D placed = transform3d::fromDeclaration(&def->transform);
+	for (int fb = 0; fb < Viewport::FB_COUNT; fb++)
+		setMatrix(mesh, &placed, fb);
 
 	return mesh;
 }
@@ -547,20 +507,20 @@ bool isVisible(const Mesh *mesh, uint8_t part)
 	return (mesh->visible & (1u << part)) != 0;
 }
 
-void setOffset(Mesh *mesh, uint8_t part, const Render::Transform *offset)
+void setOffset(Mesh *mesh, uint8_t part, const Transform3D *offset)
 {
 	assert(part > 0 && part <= mesh->part_count);
 
 	/* Nothing is reserved until a part is actually moved: a model whose parts
 	   only ever show and hide pays for none of this. */
 	if (!mesh->part_offset) {
-		mesh->part_offset = (Render::Transform *)malloc(sizeof(Render::Transform) * mesh->part_count);
+		mesh->part_offset = (Transform3D *)malloc(sizeof(Transform3D) * mesh->part_count);
 		assert(mesh->part_offset);
 
 		/* The parts not being moved have to come out where they already were,
 		   so they start at no offset and original size, not at zero. */
 		for (int i = 0; i < mesh->part_count; i++)
-			mesh->part_offset[i] = (Render::Transform){ .scale = { 1.0f, 1.0f, 1.0f } };
+			mesh->part_offset[i] = transform3d::identity();
 
 		mesh->part_matrix = (T3DMat4FP *)malloc_uncached(sizeof(T3DMat4FP) * mesh->part_count * Viewport::FB_COUNT);
 		assert(mesh->part_matrix);
@@ -568,10 +528,10 @@ void setOffset(Mesh *mesh, uint8_t part, const Render::Transform *offset)
 			t3d_mat4fp_identity(&mesh->part_matrix[i]);
 	}
 
-	mesh->part_offset[part - 1] = *offset;
+	mesh->part_offset[part - 1] = transform3d::fromDeclaration(offset);
 }
 
-const Render::Transform *getOffset(const Mesh *mesh, uint8_t part)
+const Transform3D *getOffset(const Mesh *mesh, uint8_t part)
 {
 	if (!mesh->part_offset || part == 0 || part > mesh->part_count) return NULL;
 	return &mesh->part_offset[part - 1];

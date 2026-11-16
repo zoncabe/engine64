@@ -29,15 +29,6 @@ public:
 	   count. */
 	static constexpr uint16_t MAX_3D_ELEMENTS = 256;
 	static constexpr uint8_t MAX_SECTIONS = 8;
-
-	struct Transform {
-
-		Vector3 position;
-		Vector3 rotation;
-		Vector3 scale;
-
-	};
-
 	struct Element2D {
 
 		const Graphic *graphic;
@@ -95,12 +86,6 @@ public:
 
 
 namespace render {
-
-namespace transform {
-
-void init(Render::Transform *t);
-
-}
 
 namespace context {
 

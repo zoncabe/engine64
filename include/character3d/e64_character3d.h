@@ -17,7 +17,7 @@
 
 namespace e64 {
 
-class Entity;
+class Entity3D;
 
 /* An aggregate on purpose: no constructor, public data. character3d::create
    builds it with a designated initializer over one allocation that also
@@ -25,7 +25,7 @@ class Entity;
 class Character3D {
 public:
 
-	Entity *entity;
+	Entity3D *entity;
 	character3d::Collider collider;
 	character3d::Movement movement;
 	skeleton::Modifiers skeleton_modifiers;
@@ -45,7 +45,7 @@ typedef struct Def {
 } Def;
 
 
-Character3D *create(const Def *def, Entity *entity);
+Character3D *create(const Def *def, Entity3D *entity);
 void destroy(Character3D *character);
 
 }

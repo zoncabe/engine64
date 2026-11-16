@@ -3,14 +3,14 @@
 #include <string.h>
 #include <libdragon.h>
 
-#include "entity/e64_entity.h"
+#include "entity/e64_entity3d.h"
 #include "character3d/e64_character3d.h"
 
 namespace e64 {
 
 namespace character3d {
 
-Character3D *create(const Def *def, Entity *entity)
+Character3D *create(const Def *def, Entity3D *entity)
 {
 	/* The spring bone states ride in the same allocation; their only
 	   references are the modifier contexts, freed with the character. */
@@ -36,16 +36,17 @@ Character3D *create(const Def *def, Entity *entity)
 		},
 	};
 
-	/* The instance stands at its position: the capsule center goes half the
-	   capsule's height above it. */
-	Vector3 center = entity->transform.position;
-	center.z += collider_settings->height * 0.5f;
+	/* Nothing is placed here: the capsule is built standing on the origin,
+	   its center half its height above it, facing yaw zero. Whoever creates
+	   the character moves it afterwards, by writing the collider's
+	   transform. */
+	Vector3 center = { 0.0f, 0.0f, collider_settings->height * 0.5f };
 
 	collider::init(&character->collider,
 		collider_settings->radius,
 		(collider_settings->height - 2.0f * collider_settings->radius) * 0.5f,
 		&center,
-		entity->transform.rotation.z);
+		0.0f);
 
 	if (spring_bones > 0) {
 		assert(entity->mesh_count > 0);

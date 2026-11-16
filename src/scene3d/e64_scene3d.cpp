@@ -3,14 +3,11 @@
 
 #include <t3d/t3dmath.h>
 
-#include "model/e64_mesh_deform.h"
 #include "viewport/e64_viewport.h"
 #include "scene3d/e64_light.h"
 #include "scene3d/e64_fog.h"
 #include "scene3d/e64_scene3d.h"
-#include "character3d/e64_character3d_collision.h"
 #include "physics3d/e64_physics.h"
-#include "engine/e64_common.h"
 
 namespace e64 {
 
@@ -25,20 +22,16 @@ Scene3D *get(void) { return &scene; }
 
 void Scene3D::load(const Def *def)
 {
-	/* A scene with no light def is left pitch black rather than lit by
-	   something the game never asked for. */
-	static const light::Def unlit = {};
 	static const fog::Def no_fog = {};
 
 	/* The 3D pipeline comes up with the scene that needs it and goes down
 	   with it, so a game that never loads one never pays for it. */
 	viewport::get()->open3D();
 
-	const light::Def *light_def = def->light ? def->light : &unlit;
-	const fog::Def *fog_def = def->fog ? def->fog : &no_fog;
-
-	light::init(light_def);
-	fog::init(fog_def);
+	/* No light is open yet: the entities bring theirs. Until then the scene
+	   is lit by its ambient colour alone, and black if the def gave none. */
+	light::init(def->ambient_color);
+	fog::init(def->fog ? def->fog : &no_fog);
 
 	/* The camera goes back to its defaults with the rest: the game places it
 	   from its onEnter, once the scene is up. */
@@ -48,67 +41,6 @@ void Scene3D::load(const Def *def)
 	Vector3 gravity = { 0.0f, 0.0f, -9.8f };
 	physics::world::init(&physics, physics::TIMESTEP, gravity, physics::SOLVER_ITERATIONS);
 	physics::world::setWind(&physics, def->wind);
-
-	for (int i = 0; i < def->instance_count; i++) {
-		const Instance *instance = &def->instance[i];
-		const Prefab *prefab = instance->prefab;
-
-		/* The entity opens the prefab's content; the instance says where it
-		   stands, and what depends on the place follows the transform. */
-		Entity *e = entity::create(prefab);
-		e->transform.position = instance->position;
-		e->transform.rotation = instance->rotation;
-		if (instance->scale.x != 0.0f || instance->scale.y != 0.0f || instance->scale.z != 0.0f)
-			e->transform.scale = instance->scale;
-
-		e->startLoopSounds();
-		e->attachPhysics(&physics);
-
-		/* Cloth and water deform the mesh of the same index. Both run in
-		   metres, the vertex buffer in render units. */
-		for (uint8_t c = 0; c < prefab->cloth_count && c < e->mesh_count; c++) {
-			Cloth *cloth = physics::world::createCloth(&physics, &prefab->cloth[c]);
-			if (!cloth) continue;
-
-			cloth->culled = &e->mesh[c]->culled;
-			mesh::deform::set(e->mesh[c], cloth->render_position, cloth->normal,
-			                  NULL, cloth->particle_count, RENDER_SCALE);
-		}
-
-		for (uint8_t w = 0; w < prefab->water_count && w < e->mesh_count; w++) {
-			Water *water = water::create(&prefab->water[w]);
-			if (!water) continue;
-
-			/* The offsets are what scroll the texture layers; render reads
-			   them after the recorded material. */
-			water->culled = &e->mesh[w]->culled;
-			mesh::deform::set(e->mesh[w], water->position, water->normal,
-			                  water->rgba, water->count, RENDER_SCALE);
-			e->mesh[w]->texture_scroll = water->offset;
-
-			/* The entity's body is the water's sensor volume: bind them and
-			   the bodies inside it start floating. */
-			if (e->body)
-				water::bindPhysics(water, e->body, &physics);
-		}
-
-		for (uint8_t c = 0; c < prefab->character3d_count; c++) {
-			assert(character3d_count < MAX_CHARACTERS);
-			Character3D *ch = character3d::create(&prefab->character3d[c], e);
-			character[character3d_count++] = ch;
-
-			character3d::collision::createBody(ch, &physics);
-		}
-
-		/* A character is placed every frame by updateCharacters; everything
-		   else gets its matrices once, here. */
-		if (prefab->character3d_count == 0) {
-			for (int fb = 0; fb < Viewport::FB_COUNT; fb++)
-				e->setMatrix(fb);
-		}
-
-		addEntity(e);
-	}
 }
 
 void Scene3D::clear(void)
@@ -118,64 +50,63 @@ void Scene3D::clear(void)
 
 void Scene3D::unload(void)
 {
-	for (int i = 0; i < character3d_count; i++)
-		character3d::destroy(character[i]);
+	/* The game takes down what it built first, with the entities and the
+	   physics world still up. */
 	for (int i = 0; i < entity_count; i++)
-		entity::destroy(entity[i]);
-	water::clear();
+		if (entity[i]->destroy) entity[i]->destroy(entity[i]);
+
+	for (int i = 0; i < entity_count; i++)
+		entity3d::destroy(entity[i]);
+	free(entity);
 	clear();
 	physics::world::shutdown(&physics);
 
 	viewport::get()->close3D();
 }
 
-/* The characters' half of the frame after physics::update: each one collides
-   against the world, hands the outcome to its body, and from there to what
-   draws it. Always these steps, always in this order, so no game writes them
-   out. The list is the scene's, which is why it lives here. */
-void Scene3D::updateCharacters(uint8_t fb_index)
+/* Nothing is placed here: each model and each light is already where its
+   def says when entity3d::create returns, and the body goes where its own
+   def says. */
+Entity3D *Scene3D::createEntity(const Prefab3D *prefab)
 {
-	for (int i = 0; i < character3d_count; i++) {
-		Character3D *ch = character[i];
-		const character3d::Collider *collider = &ch->collider;
+	Entity3D *e = entity3d::create(prefab);
 
-		character3d::collision::collide(ch, &physics);
+	/* The body first: a sound plays from where the body is. */
+	e->attachPhysics(&physics, prefab->body);
+	e->startLoopSounds();
 
-		/* The collider's matrix as a quaternion, once per frame: the body and
-		   every mesh take the same one. */
-		Quaternion rotation = quaternion::fromMatrix3(&collider->transform.rotation);
-		character3d::collision::syncBody(ch, &rotation);
+	addEntity(e);
 
-		/* The model is drawn foot_offset above the capsule's bottom. */
-		Vector3 position = collider->transform.position;
-		position.z += collider->foot_offset - collider->shape.radius - collider->shape.half_height;
+	/* The game's part of the entity, over one that is whole and already in
+	   the scene's list. */
+	if (e->create) e->create(e);
 
-		Entity *e = ch->entity;
-		for (uint8_t m = 0; m < e->mesh_count; m++)
-			mesh::setMatrixFromBody(e->mesh[m], &position, &rotation, &e->transform.scale, fb_index);
-	}
+	return e;
 }
 
-/* The same for everything else in the world. What the solver moved is
-   somewhere new by the time the frame gets here, and the matrix it is drawn
-   with has to say so. Anything still was placed when the scene loaded and this
-   passes over it. The list is the scene's, which is why it lives here. */
+/* The game's half of the frame, entity by entity, in the scene's order. */
+void Scene3D::updateCallbacks(void)
+{
+	for (int i = 0; i < entity_count; i++)
+		if (entity[i]->update) entity[i]->update(entity[i]);
+}
+
+/* What the solver moved is somewhere new by the time the frame gets here,
+   and the matrix it is drawn with has to say so. Anything still was placed
+   when it was created and this passes over it. The list is the scene's,
+   which is why it lives here. */
 void Scene3D::updateEntities(uint8_t fb_index)
 {
 	for (int i = 0; i < entity_count; i++)
 		entity[i]->setMatrixFromBody(fb_index);
 }
 
-void Scene3D::addEntity(Entity *e)
+/* The array grows by one pointer per entity. */
+void Scene3D::addEntity(Entity3D *e)
 {
-	assert(entity_count < MAX_ENTITIES);
+	entity = (Entity3D **)realloc(entity, (entity_count + 1) * sizeof(Entity3D *));
+	assert(entity);
 	entity[entity_count++] = e;
-}
-
-Character3D *Scene3D::getCharacter3D(uint8_t index)
-{
-	if (index >= character3d_count) return NULL;
-	return character[index];
 }
 
 void Scene3D::setRenderContext(Render::Context *ctx, const Viewport *viewport) const
@@ -183,7 +114,7 @@ void Scene3D::setRenderContext(Render::Context *ctx, const Viewport *viewport) c
 	uint8_t fb_index = viewport->fb_index;
 
 	for (int i = 0; i < entity_count; i++) {
-		const Entity *e = entity[i];
+		const Entity3D *e = entity[i];
 
 		for (uint8_t m = 0; m < e->mesh_count; m++) {
 			Mesh *mesh = e->mesh[m];
@@ -199,7 +130,7 @@ void Scene3D::setRenderContext(Render::Context *ctx, const Viewport *viewport) c
 			/* One element per object still on: its part turned on, and not
 			   cut by the frustum when the entity culls. A part displaced from
 			   the rest of the model carries a matrix of its own; every other
-			   object draws with the entity's. */
+			   object draws with the model's. */
 			for (uint16_t i = 0; T3DObject *object = mesh::object(mesh, i); i++) {
 				uint8_t part = mesh->object_part[i];
 				if (!(mesh->visible & (1u << part))) continue;

@@ -166,7 +166,7 @@ static void step(const Game::State::Def *def)
 		water::update(delta);
 		mesh::deform::update(scene->entity, scene->entity_count, fb_index);
 
-		scene->updateCharacters(fb_index);
+		scene->updateCallbacks();
 		scene->updateEntities(fb_index);
 
 		particles::update(fb_index);

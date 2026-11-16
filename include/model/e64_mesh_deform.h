@@ -24,7 +24,7 @@
 
 namespace e64 {
 
-class Entity;
+class Entity3D;
 
 namespace mesh {
 
@@ -84,7 +84,7 @@ bool set(Mesh *mesh, const Vector3 *source, const Vector3 *source_normal,
    frame's vertex buffer of every deformed mesh among these entities, and
    points each mesh's t3d segment at it. Runs once per frame, after whatever
    drives the sources has moved. */
-void update(Entity *const *entity, uint8_t count, uint8_t fb_index);
+void update(Entity3D *const *entity, uint16_t count, uint8_t fb_index);
 
 /* Releases the binding and its buffers. No-op when the mesh is not deformed. */
 void destroy(Mesh *mesh);

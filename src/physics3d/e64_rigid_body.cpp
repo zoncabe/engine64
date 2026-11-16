@@ -58,6 +58,8 @@ void init(RigidBody::Def *d)
 	d->lock_axis_z = 0;
 	d->linear_damping = 0.0f;
 	d->angular_damping = 0.1f;
+	d->shape = NULL;
+	d->shape_count = 0;
 }
 
 }

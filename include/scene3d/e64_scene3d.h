@@ -1,7 +1,9 @@
 #ifndef ENGINE64_SCENE3D_H
 #define ENGINE64_SCENE3D_H
 
-#include "entity/e64_entity.h"
+#include <libdragon.h>
+
+#include "entity/e64_entity3d.h"
 #include "scene3d/e64_light.h"
 #include "scene3d/e64_fog.h"
 #include "camera/e64_camera3d.h"
@@ -12,29 +14,15 @@ namespace e64 {
 class Scene3D {
 public:
 
-	static constexpr int MAX_CHARACTERS = 16;
-	static constexpr int MAX_ENTITIES = 255;
-
-	/* One occurrence of a prefab in the scene: which prefab and where. A
-	   scene's content is an array of these; the load walks it in order and
-	   builds the live entity of the same index. A zero scale means identity. */
-	struct Instance {
-
-		const Prefab *prefab;
-		Vector3 position;
-		Vector3 rotation;
-		Vector3 scale;
-
-	};
-
+	/* What a scene is before anything stands in it: the colour that lights
+	   what no light reaches, the fog and the wind. The entities are not
+	   declared here: the game creates them with createEntity once the scene
+	   is up. Left at zero the scene is pitch black, without fog or wind. */
 	struct Def {
 
-		const light::Def *light;
+		color_t ambient_color;
 		const fog::Def *fog;
 		Vector3 wind;
-
-		const Instance *instance;
-		uint8_t instance_count;
 
 	};
 
@@ -44,33 +32,42 @@ public:
 	   wants, and the step hands it to the viewport. */
 	Camera3D camera;
 
-	/* The world the scene loads its bodies and cloths into. */
+	/* The world the scene creates its bodies in. */
 	physics::World physics;
 
-	Entity *entity[MAX_ENTITIES];
-	uint8_t entity_count;
+	/* The scene's entities, in creation order: an array of pointers that
+	   grows by one with each entity created and is freed at unload. NULL
+	   while the scene has none. */
+	Entity3D **entity;
+	uint16_t entity_count;
 
-	Character3D *character[MAX_CHARACTERS];
-	uint8_t character3d_count;
 
-
-	/* The entities come out in declaration order: the scene's entity list
-	   reads by the same index as the def's instance list. Nobody is seated:
-	   the game seats its players once the scene is up, from its onEnter. */
+	/* Brings the scene up empty: lights, fog and the physics world. Nobody
+	   is seated and nothing stands in it: the game creates its entities and
+	   seats its players from its onEnter. */
 	void load(const Def *def);
 	void clear(void);
+
+	/* Calls each entity's destroy first, with the scene still whole, and
+	   then takes the entities and the world down. */
 	void unload(void);
 
-	/* Collides every character and carries the result to what draws it. Call
-	   after physics::update, with the frame's buffer index. */
-	void updateCharacters(uint8_t fb_index);
+	/* Opens the prefab as an entity of this scene: its models, lights and
+	   sounds where each one declares, its body in the scene's world, its
+	   looping sounds playing, and its create called last. The entity is the
+	   scene's from here on, destroyed at unload. */
+	Entity3D *createEntity(const Prefab3D *prefab);
 
-	/* The same for everything else the world holds. Call after physics::update,
-	   with the frame's buffer index. */
+	/* Calls the update of every entity that has one. Call after
+	   physics::update: the game reads the world already advanced, and what
+	   it writes enters the next frame's step. */
+	void updateCallbacks(void);
+
+	/* Carries what the solver moved to what draws it. Call after
+	   physics::update, with the frame's buffer index. */
 	void updateEntities(uint8_t fb_index);
 
-	void addEntity(Entity *entity);
-	Character3D *getCharacter3D(uint8_t index);
+	void addEntity(Entity3D *entity);
 
 	/* Pushes one Render::Element3D per visible model object into the frame's
 	   context. The culling runs here, against the frame's frustum, before each
